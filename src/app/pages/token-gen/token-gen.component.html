@@ -1,0 +1,109 @@
+<div class="page-container fade-in-up">
+  <div class="page-header">
+    <h1>Keycloak IAM Manager</h1>
+    <p>Generate & manage OpenID Connect deployment access configurations natively from a unified matrix.</p>
+  </div>
+
+  <div class="split-layout">
+    <!-- Left Column: Config & Env Choice -->
+    <div class="left-col">
+      <mat-card class="token-card">
+        
+        <div class="env-groups">
+          <!-- Production Matrix -->
+          <div class="env-group">
+            <h3><mat-icon inline>rocket_launch</mat-icon> Production</h3>
+            <mat-radio-group [ngModel]="selectedEnv()" (ngModelChange)="onEnvChange($event)" class="radio-grid">
+              <mat-radio-button *ngFor="let env of prodEnvs" [value]="env" color="accent" class="env-radio">
+                {{ env | uppercase }}
+              </mat-radio-button>
+            </mat-radio-group>
+          </div>
+
+          <!-- Non-Production Matrix -->
+          <div class="env-group">
+            <h3><mat-icon inline>science</mat-icon> UAT & Pre-Prod</h3>
+            <mat-radio-group [ngModel]="selectedEnv()" (ngModelChange)="onEnvChange($event)" class="radio-grid highlight">
+              <mat-radio-button *ngFor="let env of nonProdEnvs" [value]="env" color="primary" class="env-radio">
+                {{ env | uppercase }}
+              </mat-radio-button>
+            </mat-radio-group>
+          </div>
+        </div>
+
+        <form [formGroup]="form" class="config-form" *ngIf="selectedEnv()">
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>Keycloak Server / Base URL</mat-label>
+              <input matInput formControlName="baseUrl" placeholder="e.g. https://sso.yourcompany.com/auth" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>Realm Name</mat-label>
+              <input matInput formControlName="realm" placeholder="master" />
+            </mat-form-field>
+          </div>
+
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>OIDC Client ID</mat-label>
+              <input matInput formControlName="clientId" placeholder="frontend-client" />
+            </mat-form-field>
+          </div>
+
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>Username Identity</mat-label>
+              <input matInput formControlName="username" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>IAM Password</mat-label>
+              <input matInput formControlName="password" [type]="showPassword() ? 'text' : 'password'" />
+              <button mat-icon-button matSuffix type="button" (click)="showPassword.set(!showPassword())" tabindex="-1">
+                <mat-icon>{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+              </button>
+            </mat-form-field>
+          </div>
+
+          <div class="action-row">
+            <button mat-stroked-button color="primary" type="button" (click)="saveConfig()">
+              <mat-icon>cloud_upload</mat-icon> Sync
+            </button>
+            
+            <button mat-flat-button color="primary" class="generate-btn" type="button" (click)="generate()" [disabled]="generating()">
+              <mat-spinner *ngIf="generating()" diameter="20"></mat-spinner>
+              <mat-icon *ngIf="!generating()" inline>vpn_key</mat-icon>
+              <span *ngIf="!generating()">Generate Token</span>
+            </button>
+          </div>
+        </form>
+        
+        <div *ngIf="!selectedEnv()" class="empty-state">
+          <mat-icon>storage</mat-icon>
+          <p>Please select an environment from the radios above to construct and populate its native Keycloak IAM variables securely.</p>
+        </div>
+      </mat-card>
+    </div>
+
+    <!-- Right Column: Token Result -->
+    <div class="right-col">
+      <mat-card class="result-card fade-in-up" [class.active-result]="tokenResult()">
+        <div class="card-header">
+          <div class="title"><mat-icon inline>lock_open</mat-icon> Token Extractor</div>
+          <button mat-icon-button color="primary" (click)="copyToClipboard(tokenResult())" matTooltip="Force Re-Copy" [disabled]="!tokenResult()">
+            <mat-icon>content_copy</mat-icon>
+          </button>
+        </div>
+        
+        <div class="token-container" *ngIf="tokenResult()">
+          <textarea readonly class="token-text" [value]="tokenResult()"></textarea>
+          <div class="status-chip mt-16"><mat-icon inline>done_all</mat-icon> Extracted & Copied to Clipboard</div>
+        </div>
+
+        <div class="empty-token" *ngIf="!tokenResult()">
+          <mat-icon>key_off</mat-icon>
+          <p>Awaiting payload generation.<br>Select an IAM matrix and authorize to reveal Bearer.</p>
+        </div>
+      </mat-card>
+    </div>
+  </div>
+</div>

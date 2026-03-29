@@ -1,0 +1,287 @@
+// ─── Angular Material Dark Theme ────────────────────────────────────────────
+@use '@angular/material' as mat;
+
+// Include Material core once
+@include mat.core();
+
+// Define custom dark palette using deep blue-teal
+$primary-palette: mat.m2-define-palette(mat.$m2-cyan-palette, 400, 200, 700);
+$accent-palette: mat.m2-define-palette(mat.$m2-teal-palette, A200, A100, A400);
+$warn-palette: mat.m2-define-palette(mat.$m2-red-palette);
+
+$dark-theme: mat.m2-define-dark-theme((
+  color: (
+    primary: $primary-palette,
+    accent: $accent-palette,
+    warn: $warn-palette,
+  ),
+  typography: mat.m2-define-typography-config(
+    $font-family: "'Inter', 'Roboto', sans-serif",
+  ),
+  density: 0,
+));
+
+@include mat.all-component-themes($dark-theme);
+
+// ─── Global Reset & Tokens ──────────────────────────────────────────────────
+:root {
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-card: #1c2128;
+  --bg-elevated: #21262d;
+  --border-color: #30363d;
+  --border-subtle: #21262d;
+
+  --text-primary: #e6edf3;
+  --text-secondary: #7d8590;
+  --text-muted: #484f58;
+
+  --accent-cyan: #39c5cf;
+  --accent-teal: #3fb950;
+  --accent-blue: #58a6ff;
+  --accent-purple: #bc8cff;
+  --accent-orange: #f0883e;
+  --accent-red: #f85149;
+  --accent-yellow: #d29922;
+
+  --status-done: #3fb950;
+  --status-progress: var(--accent-yellow);
+  --status-todo: #7d8590;
+  --status-blocked: #f85149;
+  --status-review: #bc8cff;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.4);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.45);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,.55);
+
+  --transition: 0.2s ease;
+  --sidebar-width: 240px;
+  --topbar-height: 60px;
+}
+
+// ─── Base reset ─────────────────────────────────────────────────────────────
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', 'Roboto', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+// ─── Google Font ────────────────────────────────────────────────────────────
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+
+// ─── Scrollbar styling ───────────────────────────────────────────────────────
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-secondary); }
+::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+// ─── Material overrides ──────────────────────────────────────────────────────
+.mat-mdc-card {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+.mat-mdc-form-field {
+  width: 100%;
+  .mdc-text-field--outlined:not(.mdc-text-field--disabled) { background: var(--bg-elevated); }
+}
+
+// ─── Snackbar Custom Styles ──────────────────────────────────────────────────
+.mat-mdc-snack-bar-container {
+  &.snack-success .mdc-snackbar__surface {
+    background-color: var(--status-done) !important;
+  }
+  &.snack-error .mdc-snackbar__surface {
+    background-color: var(--status-blocked) !important;
+  }
+  &.snack-info .mdc-snackbar__surface {
+    background-color: var(--accent-blue) !important;
+  }
+  &.snack-warn .mdc-snackbar__surface {
+    background-color: var(--status-progress) !important;
+  }
+
+  /* Force white text and buttons on colored snackbars */
+  &.snack-success, &.snack-error, &.snack-info, &.snack-warn {
+    .mdc-snackbar__label, .mat-mdc-snack-bar-label {
+      color: #ffffff !important;
+    }
+    .mat-mdc-button, .mdc-snackbar__action, .mat-mdc-snack-bar-action {
+      color: #ffffff !important;
+    }
+  }
+}
+
+// ─── Search Dropdown Input ───────────────────────────────────────────────────
+.select-search-container {
+  padding: 8px 16px; position: sticky; top: 0; z-index: 10;
+  background: var(--bg-card); border-bottom: 1px solid var(--border-color);
+}
+.select-search-input {
+  width: 100%; padding: 8px 12px; background: var(--bg-elevated);
+  border: 1px solid var(--border-color); color: var(--text-primary);
+  border-radius: var(--radius-sm); outline: none;
+  font-family: 'Inter', sans-serif; font-size: 13px;
+  &:focus { border-color: var(--accent-blue); }
+}
+
+.issue-icon { width: 14px; height: 14px; margin-right: 4px; vertical-align: middle; border-radius: 2px; }
+
+// ─── Utility classes ─────────────────────────────────────────────────────────
+.flex { display: flex; }
+.flex-col { display: flex; flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.gap-4 { gap: 16px; }
+.gap-6 { gap: 24px; }
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.text-muted { color: var(--text-secondary); }
+.text-sm { font-size: 12px; }
+.font-mono { font-family: 'Consolas', 'Fira Code', monospace; }
+
+// ─── Status chip colors ───────────────────────────────────────────────────────
+.status-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.4px; text-transform: uppercase;
+
+  &.done     { background: rgba(63,185,80,.15);  color: var(--status-done); }
+  &.progress { background: rgba(210,153,34,.15); color: var(--status-progress); }
+  &.todo     { background: rgba(125,133,144,.15);color: var(--status-todo); }
+  &.blocked  { background: rgba(248,81,73,.15);  color: var(--status-blocked); }
+  &.review   { background: rgba(188,140,255,.15);color: var(--status-review); }
+
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+}
+
+// ─── Page wrapper ─────────────────────────────────────────────────────────────
+.page-container {
+  padding: 24px 28px;
+  max-width: 1400px;
+  margin: 0 auto;
+
+  .page-header {
+    margin-bottom: 24px;
+    h1 { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+    p  { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+  }
+}
+
+// ─── Section card ─────────────────────────────────────────────────────────────
+.section-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 20px 24px;
+  box-shadow: var(--shadow-sm);
+
+  .section-title {
+    font-size: 13px; font-weight: 600; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 16px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle);
+    display: flex; align-items: center; gap: 8px;
+    mat-icon { font-size: 16px; height: 16px; width: 16px; }
+  }
+}
+
+// ─── Commit row ───────────────────────────────────────────────────────────────
+.commit-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid var(--border-subtle);
+  &:last-child { border-bottom: none; }
+
+  .commit-hash {
+    font-family: 'Consolas', monospace; font-size: 11px;
+    color: var(--accent-blue); background: rgba(88,166,255,.1);
+    padding: 2px 7px; border-radius: 4px; white-space: nowrap;
+    min-width: 72px; text-align: center;
+  }
+
+  .commit-msg {
+    flex: 1; font-size: 13px; color: var(--text-primary);
+    .author { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  }
+
+  .ticket-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 3px; }
+
+  .ticket-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(57,197,207,.1); border: 1px solid rgba(57,197,207,.25);
+    color: var(--accent-cyan); padding: 1px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600; cursor: pointer;
+    transition: background var(--transition);
+    &:hover { background: rgba(57,197,207,.2); }
+  }
+}
+
+// ─── Stat card ────────────────────────────────────────────────────────────────
+.stat-card {
+  background: var(--bg-card); border: 1px solid var(--border-color);
+  border-radius: var(--radius-md); padding: 20px;
+  display: flex; align-items: center; gap: 16px;
+  transition: box-shadow var(--transition);
+  &:hover { box-shadow: var(--shadow-md); }
+
+  .stat-icon {
+    width: 48px; height: 48px; border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    mat-icon { font-size: 24px; }
+  }
+
+  .stat-value { font-size: 28px; font-weight: 700; line-height: 1; }
+  .stat-label { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+}
+
+// ─── Gap item ─────────────────────────────────────────────────────────────────
+.gap-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 14px; border-radius: var(--radius-sm);
+  border-left: 3px solid; margin-bottom: 8px;
+  background: var(--bg-elevated);
+
+  &.warn  { border-color: var(--accent-yellow); }
+  &.error { border-color: var(--accent-red); }
+  &.info  { border-color: var(--accent-blue); }
+
+  mat-icon { font-size: 18px; margin-top: 1px; }
+  .gap-text { font-size: 13px; }
+  .gap-sub  { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+}
+
+// ─── Loader skeleton ─────────────────────────────────────────────────────────
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--border-color) 50%, var(--bg-elevated) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: var(--radius-sm);
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+// ─── Animations ──────────────────────────────────────────────────────────────
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.fade-in-up { animation: fadeInUp 0.3s ease both; }

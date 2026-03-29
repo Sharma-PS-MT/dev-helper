@@ -1,0 +1,97 @@
+.viewer-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: stretch;
+  height: calc(100vh - 160px); 
+}
+
+::ng-deep .textarea-field.mat-mdc-form-field {
+  flex: 1;
+  display: flex;
+  .mdc-text-field { padding: 0; min-height: 100%; border-radius: var(--radius-sm); }
+  .mat-mdc-form-field-flex { height: 100%; }
+  .mat-mdc-form-field-infix { height: 100%; padding: 0 !important; }
+  textarea {
+    box-sizing: border-box;
+    padding: 16px !important;
+    height: 100% !important;
+    font-family: 'Consolas', 'Fira Code', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    background: transparent;
+    resize: none;
+  }
+}
+
+.display-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.code-container {
+  flex: 1;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  overflow: auto;
+  position: relative;
+}
+
+.json-pre {
+  margin: 0;
+  padding: 16px;
+  font-family: 'Consolas', 'Fira Code', monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-primary);
+  
+  // Syntax Highlighting RegEx Mapping
+  ::ng-deep {
+    .key { color: var(--accent-cyan); font-weight: 500; }
+    .string { color: var(--accent-teal); }
+    .number { color: var(--accent-orange); }
+    .boolean { color: var(--accent-purple); font-weight: 600; }
+    .null { color: var(--text-secondary); font-style: italic; }
+
+    .json-block {
+      &.collapsed {
+        .json-toggle { transform: rotate(-90deg); display: inline-block; }
+        .json-content { display: none; }
+        .json-close-bracket::before { content: '...'; color: var(--text-secondary); margin: 0 4px; letter-spacing: 2px; }
+      }
+    }
+    .json-toggle {
+      display: inline-block; cursor: pointer; user-select: none;
+      font-size: 10px; color: var(--text-secondary);
+      padding: 2px 4px; margin-right: 4px;
+      border-radius: 4px;
+      transition: transform 0.15s ease, background 0.15s ease;
+      vertical-align: middle;
+      &:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.1); }
+    }
+  }
+}
+
+.empty-state {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center;
+  gap: 12px; color: var(--text-secondary);
+  mat-icon { font-size: 48px; width: 48px; height: 48px; opacity: 0.5; }
+  p { font-size: 14px; }
+}
+
+@media (max-width: 1024px) {
+  .viewer-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  
+  .display-pane, .section-card {
+    min-height: 500px;
+  }
+}

@@ -1,0 +1,211 @@
+<div class="page-container fade-in-up">
+  <div class="page-header">
+    <h1>Branch & Tag Compare</h1>
+    <p>Compare commits between two refs and analyze JIRA ticket progress</p>
+  </div>
+
+  <mat-card class="compare-config-card">
+    <div class="repo-row">
+      <mat-form-field appearance="outline" class="w-full">
+        <mat-label>Project</mat-label>
+        <mat-select [ngModel]="selectedProject()" (ngModelChange)="onProjectChange($event)"
+          [disabled]="loadingProjects()">
+          <div class="select-search-container" (keydown)="$event.stopPropagation()">
+            <input placeholder="Search project..." class="select-search-input" [ngModel]="projectSearch()"
+              (ngModelChange)="projectSearch.set($event)" (click)="$event.stopPropagation()">
+          </div>
+          <mat-option *ngIf="loadingProjects()">Loading...</mat-option>
+          <mat-option *ngFor="let p of filteredProjects()" [value]="p.key">{{ p.name }}</mat-option>
+        </mat-select>
+        <mat-spinner *ngIf="loadingProjects()" matSuffix diameter="20"></mat-spinner>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="w-full">
+        <mat-label>Repository</mat-label>
+        <mat-select [ngModel]="selectedRepo()" (ngModelChange)="onRepoChange($event)"
+          [disabled]="!selectedProject() || loadingRepos()">
+          <div class="select-search-container" (keydown)="$event.stopPropagation()">
+            <input placeholder="Search repo..." class="select-search-input" [ngModel]="repoSearch()"
+              (ngModelChange)="repoSearch.set($event)" (click)="$event.stopPropagation()">
+          </div>
+          <mat-option *ngIf="loadingRepos()">Loading...</mat-option>
+          <mat-option *ngFor="let r of filteredRepos()" [value]="r.slug">{{ r.name }}</mat-option>
+        </mat-select>
+        <mat-spinner *ngIf="loadingRepos()" matSuffix diameter="20"></mat-spinner>
+      </mat-form-field>
+    </div>
+
+    <!-- Disabled until a repo is loaded -->
+    <div class="compare-row" [class.disabled]="!selectedRepo() || loadingRefs()">
+      <!-- Source -->
+      <div class="ref-selector">
+        <div class="ref-header">Destination Ref (Into)</div>
+        <div class="ref-controls">
+          <mat-form-field appearance="outline" class="type-sel">
+            <mat-select [(ngModel)]="fromType" (ngModelChange)="fromRef.set('')">
+              <mat-option value="branch">Branch</mat-option>
+              <mat-option value="tag">Tag</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="ref-sel">
+            <mat-select [(ngModel)]="fromRef">
+              <div class="select-search-container" (keydown)="$event.stopPropagation()">
+                <input placeholder="Search ref..." class="select-search-input" [ngModel]="fromSearch()"
+                  (ngModelChange)="fromSearch.set($event)" (click)="$event.stopPropagation()">
+              </div>
+              <mat-option *ngFor="let o of filteredFromOptions()" [value]="o.name">{{ o.name }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+      </div>
+
+      <!-- Swap -->
+      <button mat-icon-button class="swap-btn" (click)="swapRefs()" [disabled]="!selectedRepo() || loadingRefs()"
+        matTooltip="Swap source and destination">
+        <mat-icon>swap_horiz</mat-icon>
+      </button>
+
+      <!-- Destination -->
+      <div class="ref-selector">
+        <div class="ref-header">Source Ref (From)</div>
+        <div class="ref-controls">
+          <mat-form-field appearance="outline" class="type-sel">
+            <mat-select [(ngModel)]="toType" (ngModelChange)="toRef.set('')">
+              <mat-option value="branch">Branch</mat-option>
+              <mat-option value="tag">Tag</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="ref-sel">
+            <mat-select [(ngModel)]="toRef">
+              <div class="select-search-container" (keydown)="$event.stopPropagation()">
+                <input placeholder="Search ref..." class="select-search-input" [ngModel]="toSearch()"
+                  (ngModelChange)="toSearch.set($event)" (click)="$event.stopPropagation()">
+              </div>
+              <mat-option *ngFor="let o of filteredToOptions()" [value]="o.name">{{ o.name }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+      </div>
+
+      <!-- Action -->
+      <button mat-flat-button color="primary" class="compare-btn" (click)="compare()"
+        [disabled]="!fromRef() || !toRef() || fromRef() === toRef() || comparing()">
+        <mat-spinner *ngIf="comparing()" diameter="20"></mat-spinner>
+        <span *ngIf="!comparing()">Compare</span>
+      </button>
+      <button mat-icon-button (click)="clear()" matTooltip="Clear All">
+        <mat-icon>clear</mat-icon>
+      </button>
+    </div>
+  </mat-card>
+
+  <div *ngIf="comparing()" class="loading-state fade-in-up">
+    <mat-spinner diameter="40"></mat-spinner>
+    <p>Comparing refs and validating tickets...</p>
+    <div class="skeleton-list mt-20">
+      <div class="skeleton" style="height:40px; width:100%; margin-bottom:10px;"></div>
+      <div class="skeleton" style="height:40px; width:100%; margin-bottom:10px;"></div>
+    </div>
+  </div>
+
+  <ng-container *ngIf="result() as res">
+    <div class="results-layout fade-in-up mt-24">
+
+      <!-- Summary Sidebar -->
+      <div class="summary-col">
+        <mat-card class="ticket-summary">
+          <div class="card-title">Ticket Summary</div>
+
+          <!-- Total stats loop -->
+          <div class="stat-rings">
+            <div class="ring-container">
+              <svg viewBox="0 0 36 36" class="circular-chart">
+                <path class="circle-bg"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                <path class="circle" [attr.stroke-dasharray]="donePct + ', 100'"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                <text x="18" y="20.35" class="percentage">{{ donePct }}%</text>
+              </svg>
+              <div class="ring-label">Coverage (Done)</div>
+            </div>
+          </div>
+
+          <div class="status-list mt-20">
+            <div class="status-row">
+              <div class="status-dot done"></div>
+              <span>Done / Resolved</span>
+              <span class="count">{{ res.ticketSummary.done }}</span>
+            </div>
+            <div class="status-row">
+              <div class="status-dot progress"></div>
+              <span>In Progress</span>
+              <span class="count">{{ res.ticketSummary.inProgress }}</span>
+            </div>
+            <div class="status-row">
+              <div class="status-dot review"></div>
+              <span>In Review</span>
+              <span class="count">{{ res.ticketSummary.other }}</span>
+            </div>
+            <div class="status-row">
+              <div class="status-dot todo"></div>
+              <span>To Do</span>
+              <span class="count">{{ res.ticketSummary.todo }}</span>
+            </div>
+            <div class="status-row">
+              <div class="status-dot blocked"></div>
+              <span>Blocked</span>
+              <span class="count">{{ res.ticketSummary.blocked }}</span>
+            </div>
+          </div>
+        </mat-card>
+      </div>
+
+      <!-- Main Commit List -->
+      <div class="commits-col">
+        <mat-card class="timeline-card">
+          <div class="card-title">
+            Commits ({{ res.fromRef }} &larr; {{ res.toRef }})
+            <span class="ml-auto text-muted font-normal">{{ res.commits.length }} total</span>
+          </div>
+
+          <div *ngIf="res.commits.length === 0" class="empty-state">
+            <mat-icon>done_all</mat-icon>
+            <p>No new commits to show. Refs are identical or {{ res.toRef }} is behind.</p>
+          </div>
+
+          <div class="commits-list">
+            <div *ngFor="let cwt of paginatedCommits()" class="commit-item">
+              <div class="commit-hash" [title]="cwt.commit.hash">{{ cwt.commit.hash | slice:0:7 }}</div>
+              <div class="commit-msg">
+                <div class="msg-text">{{ cwt.commit.message.split('\n')[0] }}</div>
+                <div class="author">
+                  {{ cwt.commit.author.user?.display_name || cwt.commit.author.raw.split('<')[0] }} &bull; {{
+                    cwt.commit.date | date:'MMM d, HH:mm' }} </div>
+                    <div class="ticket-chips">
+                      <!-- Custom component, maps IDs that don't have matching tickets too -->
+                      <app-ticket-badge *ngFor="let t of cwt.tickets" [ticket]="t">
+                      </app-ticket-badge>
+
+                      <ng-container *ngFor="let id of cwt.ticketIds">
+                        <!-- If ticket was not found (maybe no permissions or typo) -->
+                        <app-ticket-badge *ngIf="!cwt.tickets.some(x => x.key === id)" [ticketId]="id">
+                        </app-ticket-badge>
+                      </ng-container>
+
+                      <!-- No tickets at all -->
+                      <span class="status-chip warn" *ngIf="cwt.ticketIds.length === 0">
+                        <span class="dot"></span> No Ticket
+                      </span>
+                    </div>
+                </div>
+              </div>
+            </div>
+            <mat-paginator [length]="res.commits.length" [pageSize]="pageSize()" [pageSizeOptions]="[5, 10, 25, 50]"
+              (page)="onPageChange($event)">
+            </mat-paginator>
+        </mat-card>
+      </div>
+
+    </div>
+  </ng-container>
+</div>

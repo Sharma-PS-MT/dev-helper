@@ -1,0 +1,70 @@
+.page-container {
+  padding: 32px; max-width: 1400px; margin: 0 auto;
+}
+.page-header {
+  margin-bottom: 24px;
+  h1 { font-size: 28px; font-weight: 700; color: var(--text-primary); margin: 0 0 8px 0; }
+  p { color: var(--text-secondary); margin: 0; font-size: 15px; }
+}
+
+.split-layout {
+  display: grid; grid-template-columns: 1fr 450px; gap: 24px; align-items: start;
+}
+
+.token-card {
+  padding: 24px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px;
+}
+
+.env-groups {
+  display: flex; flex-direction: column; gap: 24px; margin-bottom: 32px;
+  .env-group {
+    background: var(--bg-secondary); padding: 16px; border-radius: 6px; border: 1px solid var(--border-subtle);
+    h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; color: var(--text-primary); margin: 0 0 16px 0; display: flex; align-items: center; gap: 8px; }
+  }
+}
+
+.radio-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px;
+  .env-radio { font-size: 12px; font-weight: 500; font-family: monospace; white-space: nowrap; }
+}
+
+.w-full { width: 100%; display: block; }
+.form-row { display: flex; gap: 24px; margin-bottom: 8px; }
+
+::ng-deep .config-form .mat-mdc-text-field-wrapper { background-color: var(--bg-card) !important; }
+
+.empty-state {
+  padding: 40px 20px; text-align: center; color: var(--text-secondary);
+  mat-icon { font-size: 48px; width: 48px; height: 48px; color: var(--border-subtle); margin-bottom: 16px; }
+}
+
+.action-row {
+  display: flex; gap: 16px; justify-content: flex-end; margin-top: 16px; padding-top: 24px; border-top: 1px solid var(--border-subtle);
+  .generate-btn { height: 44px; font-weight: 600; padding: 0 24px; display: flex; align-items: center; gap: 8px; }
+}
+
+.mt-24 { margin-top: 24px; }
+.mt-16 { margin-top: 16px; }
+
+.result-card {
+  padding: 0; background: var(--bg-card); border: 1px solid var(--border-subtle); position: sticky; top: 32px;
+  &.active-result { border-color: var(--status-done); box-shadow: 0 4px 20px rgba(63,185,80,0.1); }
+  .card-header {
+    padding: 16px 20px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;
+    .title { font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px; font-size: 14px; }
+  }
+  .token-container {
+    padding: 20px;
+    .token-text {
+      width: 100%; height: 350px; background: var(--bg-body); color: var(--accent-cyan); font-family: 'Consolas', monospace;
+      font-size: 13px; border: 1px solid var(--border-color); border-radius: 6px; padding: 16px; resize: none; line-height: 1.5; outline: none;
+      word-break: break-all; margin: 0; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+    }
+  }
+  .empty-token {
+    padding: 60px 20px; text-align: center; color: var(--text-secondary);
+    mat-icon { font-size: 40px; width: 40px; height: 40px; color: var(--text-muted); margin-bottom: 16px; opacity: 0.5; }
+    p { font-size: 13px; line-height: 1.6; }
+  }
+}
+.status-chip { display: inline-flex; align-items: center; gap: 6px; background: rgba(63,185,80,0.1); color: var(--status-done); padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }

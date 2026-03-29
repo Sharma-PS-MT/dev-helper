@@ -1,0 +1,57 @@
+<div class="page-container fade-in-up">
+  <div class="page-header">
+    <h1>Dashboard</h1>
+    <p>Your developer productivity hub</p>
+  </div>
+
+  <!-- Config warning -->
+  <div class="config-alert" *ngIf="!isConfigured()">
+    <mat-icon>warning_amber</mat-icon>
+    <div>
+      <strong>Setup Required</strong>
+      <p>Please configure your Bitbucket and JIRA credentials to unlock all features.</p>
+    </div>
+    <a mat-flat-button color="primary" routerLink="/settings">Go to Settings</a>
+  </div>
+
+  <!-- Connected info -->
+  <div class="connected-bar" *ngIf="isConfigured()">
+    <div class="connected-item">
+      <mat-icon>cloud_done</mat-icon>
+      <span>Bitbucket: <strong>{{ workspace() }}</strong></span>
+    </div>
+    <div class="connected-item">
+      <mat-icon>done_all</mat-icon>
+      <span>JIRA: <strong>{{ jiraUrl() }}</strong></span>
+    </div>
+  </div>
+
+  <!-- Feature cards -->
+  <div class="features-grid">
+    <a
+      *ngFor="let f of features"
+      [routerLink]="f.route"
+      class="feature-card"
+      [style.--card-accent]="f.color"
+    >
+      <div class="feature-icon" [style.background]="f.color + '20'" [style.color]="f.color">
+        <mat-icon>{{ f.icon }}</mat-icon>
+      </div>
+      <div class="feature-content">
+        <h3>{{ f.title }}</h3>
+        <p>{{ f.description }}</p>
+      </div>
+      <mat-icon class="arrow-icon">arrow_forward</mat-icon>
+    </a>
+  </div>
+
+  <!-- Quick tips -->
+  <div class="section-card tips-card">
+    <div class="section-title"><mat-icon>lightbulb</mat-icon> Quick Tips</div>
+    <ul class="tips-list">
+      <li><strong>PR Review:</strong> Paste a full Bitbucket PR URL or select repo + PR ID to detect gaps.</li>
+      <li><strong>Branch Compare:</strong> Select two branches or tags to see all commits and JIRA ticket statuses.</li>
+      <li><strong>Ticket Pattern:</strong> Customize the JIRA ticket regex in Settings for your project key format.</li>
+    </ul>
+  </div>
+</div>

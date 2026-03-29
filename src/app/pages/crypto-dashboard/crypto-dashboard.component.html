@@ -1,0 +1,114 @@
+<div class="page-container fade-in-up">
+  <div class="page-header">
+    <div class="header-left">
+      <h1>Crypto AI Dashboard</h1>
+      <div class="live-price" [class.up]="prediction()?.trend === 'UP'" [class.down]="prediction()?.trend === 'DOWN'">
+        <span class="price-value">{{ livePriceStr() }}</span>
+        <span class="symbol-badge">{{ selectedSymbol() }}</span>
+        <span class="ws-dot" [class.connected]="binance.wsConnected()"></span>
+      </div>
+    </div>
+    <div class="header-controls">
+      <mat-form-field appearance="outline" class="compact-select">
+        <mat-label>Symbol</mat-label>
+        <mat-select [ngModel]="selectedSymbol()" (ngModelChange)="onSymbolChange($event)">
+          <mat-option *ngFor="let s of symbols" [value]="s">{{ s }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="compact-select">
+        <mat-label>Interval</mat-label>
+        <mat-select [ngModel]="selectedInterval()" (ngModelChange)="onIntervalChange($event)">
+          <mat-option *ngFor="let i of intervals" [value]="i">{{ i }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+  </div>
+
+  <div class="dashboard-layout">
+    <!-- Chart Area -->
+    <div class="chart-area">
+      <mat-card class="chart-card">
+        <div #chartContainer class="chart-wrapper"></div>
+        <div class="chart-legend">
+          <span class="legend-item"><span class="legend-dot" style="background:#f0883e"></span> MA20</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#58a6ff"></span> AI Prediction</span>
+        </div>
+      </mat-card>
+    </div>
+
+    <!-- Side Panel -->
+    <div class="side-panel">
+      <!-- AI Source Toggle -->
+      <mat-card class="panel-card">
+        <div class="panel-title"><mat-icon inline>psychology</mat-icon> AI Engine</div>
+        <mat-button-toggle-group [value]="aiSource()" (change)="aiSource.set($event.value)" class="source-toggle">
+          <mat-button-toggle value="gemini">
+            <mat-icon>auto_awesome</mat-icon> Gemini
+          </mat-button-toggle>
+          <mat-button-toggle value="python">
+            <mat-icon>terminal</mat-icon> Python ML
+          </mat-button-toggle>
+        </mat-button-toggle-group>
+        <p class="source-hint" *ngIf="aiSource() === 'gemini'">Uses Gemini 2.5 Flash Lite via your API key</p>
+        <p class="source-hint" *ngIf="aiSource() === 'python'">Requires Python FastAPI server on port 8000</p>
+
+        <button mat-flat-button color="primary" class="predict-btn" (click)="runPrediction()" [disabled]="predicting()">
+          <mat-spinner *ngIf="predicting()" diameter="18"></mat-spinner>
+          <mat-icon *ngIf="!predicting()">insights</mat-icon>
+          <span>{{ predicting() ? 'Analyzing...' : 'Run Prediction' }}</span>
+        </button>
+      </mat-card>
+
+      <!-- Prediction Result -->
+      <mat-card class="panel-card prediction-result" *ngIf="prediction()">
+        <div class="panel-title">
+          <mat-icon inline>trending_up</mat-icon> Prediction
+          <span class="source-badge">{{ prediction()!.source }}</span>
+        </div>
+        
+        <div class="trend-display" [class.up]="prediction()!.trend === 'UP'" [class.down]="prediction()!.trend === 'DOWN'">
+          <mat-icon>{{ prediction()!.trend === 'UP' ? 'arrow_upward' : prediction()!.trend === 'DOWN' ? 'arrow_downward' : 'swap_vert' }}</mat-icon>
+          <span class="trend-label">{{ prediction()!.trend }}</span>
+        </div>
+
+        <div class="price-prediction">
+          <div class="price-row">
+            <span class="label">Current</span>
+            <span class="value">${{ prediction()!.currentPrice.toLocaleString() }}</span>
+          </div>
+          <div class="price-row predicted">
+            <span class="label">Predicted</span>
+            <span class="value">${{ prediction()!.predictedPrice.toLocaleString() }}</span>
+          </div>
+        </div>
+
+        <div class="confidence-section">
+          <div class="confidence-header">
+            <span>Confidence</span>
+            <span>{{ (prediction()!.confidence * 100).toFixed(0) }}%</span>
+          </div>
+          <mat-progress-bar mode="determinate" [value]="prediction()!.confidence * 100"
+            [color]="prediction()!.confidence > 0.6 ? 'primary' : 'warn'">
+          </mat-progress-bar>
+        </div>
+      </mat-card>
+
+      <!-- Reasoning Panel -->
+      <mat-card class="panel-card" *ngIf="prediction()?.reasons?.length">
+        <div class="panel-title"><mat-icon inline>lightbulb</mat-icon> AI Reasoning</div>
+        <ul class="reason-list">
+          <li *ngFor="let reason of prediction()!.reasons" class="reason-item">
+            <mat-icon class="reason-icon">chevron_right</mat-icon>
+            <span>{{ reason }}</span>
+          </li>
+        </ul>
+      </mat-card>
+
+      <!-- Disclaimer -->
+      <div class="disclaimer">
+        <mat-icon inline>warning_amber</mat-icon>
+        Not financial advice. AI predictions are probability estimations only.
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,14 @@
+<div class="topbar">
+  <div class="topbar-left">
+    <h2 class="page-title">{{ pageTitle() }}</h2>
+  </div>
+  <div class="topbar-right">
+    <div class="workspace-chip" *ngIf="workspace()">
+      <mat-icon>work_outline</mat-icon>
+      <span>{{ workspace() }}</span>
+    </div>
+    <button mat-icon-button routerLink="/settings" matTooltip="Settings">
+      <mat-icon>settings</mat-icon>
+    </button>
+  </div>
+</div>

@@ -1,0 +1,65 @@
+<div class="page-container fade-in-up">
+  <div class="page-header">
+    <h1>JSON Beautifier</h1>
+    <p>Format, highlight, and analyze your raw JSON payloads</p>
+  </div>
+
+  <div class="viewer-grid">
+    <!-- Left Pane: Input -->
+    <div class="section-card flex-col gap-4">
+      <div class="section-title justify-between">
+        <span><mat-icon>terminal</mat-icon> Raw JSON Input</span>
+        <div class="actions flex gap-2">
+          <button mat-stroked-button (click)="formatJson()">
+            <mat-icon>auto_fix_high</mat-icon> Format
+          </button>
+          <button mat-stroked-button (click)="minifyJson()">
+            <mat-icon>compress</mat-icon> Minify
+          </button>
+          <button mat-icon-button matTooltip="Clear All" (click)="clear()">
+            <mat-icon>delete_outline</mat-icon>
+          </button>
+        </div>
+      </div>
+
+      <mat-form-field appearance="outline" class="w-full textarea-field">
+        <textarea matInput rows="20" [(ngModel)]="rawJson" (ngModelChange)="onInputChange($event)" (paste)="onPaste($event)" placeholder="Paste your raw JSON array or object here..."></textarea>
+      </mat-form-field>
+
+      <div *ngIf="!isValid()" class="gap-item error fade-in-up">
+        <mat-icon>error_outline</mat-icon>
+        <div class="flex-col">
+          <span class="gap-text">Syntax Error</span>
+          <span class="gap-sub">{{ errorMsg() }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Pane: Highlighted Output -->
+    <div class="section-card display-pane flex-col">
+      <div class="section-title justify-between">
+        <span><mat-icon>data_object</mat-icon> Beautiful Viewer</span>
+        
+        <div class="flex items-center gap-4">
+          <!-- Stats Indicator -->
+          <div class="status-chip" [ngClass]="isValid() && parsedObj() ? 'done' : 'todo'">
+            <div class="dot"></div>
+            <span>{{ parsedObj() ? (dataType() + ' (' + itemCount() + ' items)') : 'Waiting for Input' }}</span>
+          </div>
+
+          <button mat-icon-button matTooltip="Copy to Clipboard" (click)="copyToClipboard()" [disabled]="!parsedObj()">
+            <mat-icon>content_copy</mat-icon>
+          </button>
+        </div>
+      </div>
+
+      <div class="code-container">
+        <pre *ngIf="highlightedHtml()" class="json-pre"><code [innerHTML]="highlightedHtml()" (click)="onCodeClick($event)"></code></pre>
+        <div *ngIf="!highlightedHtml()" class="empty-state">
+          <mat-icon>code</mat-icon>
+          <p>JSON structure will render here</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

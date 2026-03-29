@@ -1,0 +1,182 @@
+<div class="page-container fade-in-up">
+  <div class="page-header">
+    <h1>PR Review & Gap Analysis</h1>
+    <p>Analyze pull requests for missing Jira tickets and open issues</p>
+  </div>
+
+  <!-- Search Card -->
+  <mat-card class="search-card">
+    <div class="search-grid">
+      <mat-form-field appearance="outline" class="w-full">
+        <mat-label>Project</mat-label>
+        <mat-select [ngModel]="selectedProject()" (ngModelChange)="onProjectChange($event)"
+          [disabled]="loadingProjects()">
+          <div class="select-search-container" (keydown)="$event.stopPropagation()">
+            <input placeholder="Search project..." class="select-search-input" [ngModel]="projectSearch()"
+              (ngModelChange)="projectSearch.set($event)" (click)="$event.stopPropagation()">
+          </div>
+          <mat-option *ngIf="loadingProjects()">Loading...</mat-option>
+          <mat-option *ngFor="let p of filteredProjects()" [value]="p.key">{{ p.name }}</mat-option>
+        </mat-select>
+        <mat-spinner *ngIf="loadingProjects()" matSuffix diameter="20"></mat-spinner>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="w-full">
+        <mat-label>Repository</mat-label>
+        <mat-select [ngModel]="selectedRepo()" (ngModelChange)="onRepoChange($event)"
+          [disabled]="!selectedProject() || loadingRepos()">
+          <div class="select-search-container" (keydown)="$event.stopPropagation()">
+            <input placeholder="Search repo..." class="select-search-input" [ngModel]="repoSearch()"
+              (ngModelChange)="repoSearch.set($event)" (click)="$event.stopPropagation()">
+          </div>
+          <mat-option *ngIf="loadingRepos()">Loading...</mat-option>
+          <mat-option *ngFor="let r of filteredRepos()" [value]="r.slug">{{ r.name }}</mat-option>
+        </mat-select>
+        <mat-spinner *ngIf="loadingRepos()" matSuffix diameter="20"></mat-spinner>
+      </mat-form-field>
+
+      <div class="pr-input-group">
+        <mat-form-field appearance="outline" class="pr-input">
+          <mat-label>PR ID or URL</mat-label>
+          <input matInput [(ngModel)]="prInput" placeholder="e.g. 123 or https://bitbucket.org/..."
+            (keyup.enter)="analyze()" />
+          <mat-icon matPrefix>link</mat-icon>
+        </mat-form-field>
+        <button mat-flat-button color="primary" class="analyze-btn" (click)="analyze()"
+          [disabled]="analyzing() || !prInput()">
+          <mat-spinner *ngIf="analyzing()" diameter="20"></mat-spinner>
+          <span *ngIf="!analyzing()">Analyze PR</span>
+        </button>
+        <button mat-icon-button (click)="clear()" matTooltip="Clear All">
+          <mat-icon>clear</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <!-- Dynamic PR List Drawer -->
+    <div class="open-prs-list mt-24" *ngIf="selectedRepo()">
+      <div class="list-header">Open Pull Requests</div>
+      <mat-spinner *ngIf="loadingPRs()" diameter="30" class="mt-16"></mat-spinner>
+      <div *ngIf="!loadingPRs() && openPRs().length === 0" class="text-muted text-sm mt-10">No open pull requests found
+        for this repository.</div>
+
+      <div class="pr-cards mt-16" *ngIf="openPRs().length > 0">
+        <div *ngFor="let pr of openPRs()" class="pr-mini-card" (click)="selectAndAnalyzePR(pr.id)">
+          <div class="pr-title">#{{ pr.id }} - {{ pr.title }}</div>
+          <div class="pr-meta text-muted text-sm">
+            <mat-icon inline>person</mat-icon> {{ pr.author.display_name }} &bull;
+            <span class="branch-pill">{{ pr.source.branch.name }}</span> &rarr; <span class="branch-pill">{{
+              pr.destination.branch.name }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </mat-card>
+
+  <!-- Analysis Loading State -->
+  <div *ngIf="analyzing()" class="loading-state fade-in-up">
+    <mat-spinner diameter="40"></mat-spinner>
+    <p>Analyzing commits and fetching Jira tickets...</p>
+    <div class="skeleton-list mt-20">
+      <div class="skeleton" style="height:40px; width:100%; margin-bottom:10px;"></div>
+      <div class="skeleton" style="height:40px; width:100%; margin-bottom:10px;"></div>
+      <div class="skeleton" style="height:40px; width:100%; margin-bottom:10px;"></div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <ng-container *ngIf="result() as res">
+    <div class="results-grid fade-in-up mt-24">
+
+      <!-- Left Column: PR Info & Gaps -->
+      <div class="left-col">
+        <!-- PR Summary -->
+        <mat-card class="pr-summary-card">
+          <div class="pr-header">
+            <h2 class="pr-title">
+              <a [href]="res.pr.links.html.href" target="_blank">{{ res.pr.title }}</a>
+              <span class="pr-state" [class]="res.pr.state.toLowerCase()">{{ res.pr.state }}</span>
+            </h2>
+            <div class="pr-meta text-muted text-sm">
+              <mat-icon inline>person</mat-icon> {{ res.pr.author.display_name }} &bull;
+              Created {{ res.pr.created_on | date:'short' }}
+            </div>
+            <div class="branch-flow mt-10">
+              <span class="branch-pill target">{{ res.pr.source.branch.name }}</span>
+              <mat-icon class="arrow">arrow_right_alt</mat-icon>
+              <span class="branch-pill dest">{{ res.pr.destination.branch.name }}</span>
+            </div>
+
+            <div class="ai-controls mt-20">
+              <button mat-stroked-button color="accent" (click)="initiateAIReview()" [disabled]="aiReviewing()">
+                <mat-icon>auto_awesome</mat-icon> {{ aiReviewing() ? 'Gemini is Analyzing...' : 'Initiate AI Review' }}
+              </button>
+            </div>
+
+            <div *ngIf="aiReviewResult()" class="ai-review-box mt-16 fade-in-up">
+              <div class="ai-header"><mat-icon inline>auto_awesome</mat-icon> Gemini Analysis Status</div>
+              <pre>{{ aiReviewResult() }}</pre>
+            </div>
+          </div>
+        </mat-card>
+
+        <!-- Gap Analysis -->
+        <mat-card class="gaps-card mt-20">
+          <div class="card-title">
+            <mat-icon>report_problem</mat-icon> Gap Analysis
+            <span class="badge" [class.success]="res.gaps.length === 0">{{ res.gaps.length }}</span>
+          </div>
+
+          <div class="gaps-body">
+            <div *ngIf="res.gaps.length === 0" class="no-gaps">
+              <mat-icon>check_circle</mat-icon>
+              <p>Everything looks great! No gaps found.</p>
+            </div>
+
+            <div *ngFor="let gap of res.gaps" class="gap-item" [class]="gap.severity">
+              <mat-icon>{{ gap.severity === 'error' ? 'cancel' : (gap.severity === 'warn' ? 'warning' : 'info')
+                }}</mat-icon>
+              <div class="gap-content">
+                <div class="gap-text">{{ gap.message }}</div>
+                <div class="gap-sub" *ngIf="gap.detail">{{ gap.detail }}</div>
+              </div>
+            </div>
+          </div>
+        </mat-card>
+      </div>
+
+      <!-- Right Column: Commits -->
+      <div class="right-col">
+        <mat-card class="commits-card">
+          <div class="card-title">
+            <mat-icon>commit</mat-icon> Commits
+            <span class="text-muted ml-auto font-normal text-sm">{{ res.commits.length }} commits</span>
+          </div>
+
+          <div class="commits-list">
+            <div *ngFor="let commit of paginatedCommits()" class="commit-item">
+              <div class="commit-hash" [title]="commit.hash">{{ commit.hash | slice:0:7 }}</div>
+              <div class="commit-msg">
+                <div class="msg-text">{{ commit.message.split('\n')[0] }}</div>
+                <div class="author">{{ commit.author.user?.display_name || commit.author.raw.split('<')[0].trim() }}
+                    &bull; {{ commit.date | date:'MMM d, y' }}</div>
+
+                    <div class="ticket-chips">
+                      <!-- Custom component for each Jira ticket found in this commit -->
+                      <app-ticket-badge *ngFor="let tid of (commit['ticketIds'] || [])" [ticket]="getTicket(tid)"
+                        [ticketId]="tid">
+                      </app-ticket-badge>
+                    </div>
+                </div>
+              </div>
+            </div>
+
+            <mat-paginator [length]="res.commits.length" [pageSize]="pageSize()" [pageSizeOptions]="[5, 10, 25, 50]"
+              (page)="onPageChange($event)">
+            </mat-paginator>
+        </mat-card>
+      </div>
+
+    </div>
+  </ng-container>
+</div>

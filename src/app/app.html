@@ -1,0 +1,65 @@
+<ng-container *ngIf="session.isLoggedIn()">
+  <mat-sidenav-container class="sidenav-container">
+    <mat-sidenav #drawer class="sidenav" mode="side" [opened]="true">
+      <div class="sidebar-logo">
+        <div class="logo-icon">
+          <mat-icon>developer_mode</mat-icon>
+        </div>
+        <div class="logo-text">
+          <span class="logo-name">Dev Helper</span>
+          <span class="logo-sub">{{ session.session().domain === 'work' ? 'Enterprise Shell' : 'Personal Container' }}</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav" *ngIf="session.session().domain === 'work'">
+        <a
+          *ngFor="let item of navItems"
+          [routerLink]="item.path"
+          routerLinkActive="active"
+          class="nav-item"
+          [title]="item.label"
+        >
+          <mat-icon>{{ item.icon }}</mat-icon>
+          <span>{{ item.label }}</span>
+          <span *ngIf="item.badge" class="nav-badge">{{ item.badge }}</span>
+        </a>
+      </nav>
+
+      <nav class="sidebar-nav" *ngIf="session.session().domain === 'personal'">
+        <a class="nav-item" routerLink="/crypto-dashboard" routerLinkActive="active" title="Crypto AI">
+          <mat-icon>candlestick_chart</mat-icon><span>Crypto AI</span>
+        </a>
+        <a class="nav-item" routerLink="/settings" routerLinkActive="active" title="Settings">
+          <mat-icon>settings</mat-icon><span>Settings</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="config-status" (click)="switchDomain()" style="cursor: pointer; margin-bottom: 8px;">
+          <mat-icon>swap_horiz</mat-icon>
+          <span>Switch to {{ session.session().domain === 'work' ? 'Personal' : 'Work' }}</span>
+        </div>
+        <div class="config-status" [class.configured]="isConfigured()" style="cursor: pointer;" (click)="session.logout()">
+          <mat-icon>logout</mat-icon>
+          <span>{{ session.session().username }} (Log Out)</span>
+        </div>
+      </div>
+    </mat-sidenav>
+
+    <mat-sidenav-content class="main-content">
+      <app-topbar></app-topbar>
+      <div class="content-area">
+        <ng-container *ngIf="session.session().domain === 'work'">
+          <router-outlet></router-outlet>
+        </ng-container>
+        <ng-container *ngIf="session.session().domain === 'personal'">
+          <router-outlet></router-outlet>
+        </ng-container>
+      </div>
+    </mat-sidenav-content>
+  </mat-sidenav-container>
+</ng-container>
+
+<ng-container *ngIf="!session.isLoggedIn()">
+  <app-login></app-login>
+</ng-container>

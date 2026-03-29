@@ -1,0 +1,87 @@
+.sidenav-container {
+  height: 100vh;
+  display: flex;
+}
+
+.sidenav {
+  width: var(--sidebar-width);
+  background: var(--bg-secondary) !important;
+  border-right: 1px solid var(--border-color) !important;
+  display: flex;
+  flex-direction: column;
+
+  .sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+
+    .logo-icon {
+      width: 38px; height: 38px;
+      background: linear-gradient(135deg, var(--accent-cyan), #2196f3);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 12px rgba(57,197,207,.35);
+      mat-icon { color: #fff; font-size: 20px; }
+    }
+
+    .logo-name { display: block; font-size: 15px; font-weight: 700; color: var(--text-primary); }
+    .logo-sub  { display: block; font-size: 10px; color: var(--text-muted); letter-spacing: 0.5px; }
+  }
+
+  .sidebar-nav {
+    flex: 1; padding: 12px 8px; display: flex; flex-direction: column; gap: 2px;
+
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: var(--radius-sm);
+      color: var(--text-secondary); text-decoration: none;
+      font-size: 13px; font-weight: 500;
+      transition: background var(--transition), color var(--transition);
+      position: relative;
+
+      mat-icon { font-size: 20px; width: 20px; height: 20px; }
+
+      &:hover {
+        background: var(--bg-elevated);
+        color: var(--text-primary);
+      }
+
+      &.active {
+        background: rgba(57,197,207,.12);
+        color: var(--accent-cyan);
+        &::before {
+          content: ''; position: absolute; left: 0; top: 50%;
+          transform: translateY(-50%); height: 60%; width: 3px;
+          background: var(--accent-cyan); border-radius: 0 3px 3px 0;
+        }
+      }
+
+      .nav-badge {
+        margin-left: auto; background: var(--accent-red);
+        color: white; font-size: 10px; padding: 1px 6px;
+        border-radius: 10px; font-weight: 700;
+      }
+    }
+  }
+
+  .sidebar-footer {
+    padding: 12px 16px; border-top: 1px solid var(--border-subtle);
+
+    .config-status {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 11px; color: var(--status-todo);
+      mat-icon { font-size: 14px; width: 14px; height: 14px; }
+
+      &.configured { color: var(--status-done); }
+    }
+  }
+}
+
+.main-content {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--bg-primary);
+
+  .content-area { flex: 1; overflow-y: auto; }
+}

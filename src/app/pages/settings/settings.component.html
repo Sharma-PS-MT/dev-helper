@@ -1,0 +1,146 @@
+<div class="page-container fade-in-up">
+  <div class="page-header">
+    <h1>Settings</h1>
+    <p>Configure your Bitbucket and JIRA API credentials</p>
+    
+    <div style="margin-top: 12px; display: flex; align-items: center; gap: 8px;">
+      <span style="font-size: 13px; color: var(--text-secondary);">Storage Sync:</span>
+      <div class="status-chip" [ngClass]="{
+        'done': firebase.status() === 'connected',
+        'progress': firebase.status() === 'syncing',
+        'blocked': firebase.status() === 'error'
+      }">
+        <mat-icon *ngIf="firebase.status() === 'connected'" style="font-size: 14px; width: 14px; height: 14px;">cloud_done</mat-icon>
+        <mat-spinner *ngIf="firebase.status() === 'syncing'" diameter="12" style="margin-right: 4px;"></mat-spinner>
+        <mat-icon *ngIf="firebase.status() === 'error'" style="font-size: 14px; width: 14px; height: 14px;">cloud_off</mat-icon>
+        <span *ngIf="firebase.status() === 'connected'">Firebase Active</span>
+        <span *ngIf="firebase.status() === 'syncing'">Syncing...</span>
+        <span *ngIf="firebase.status() === 'error'">Firebase Error</span>
+      </div>
+    </div>
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="save()">
+    <div class="settings-grid">
+      <!-- Bitbucket Card -->
+      <div class="section-card" *ngIf="session.session().domain === 'work'">
+        <div class="section-title">
+          <mat-icon>cloud</mat-icon> Bitbucket Configuration
+          <span class="status-dot" [class]="'status-dot--' + bitbucketStatus()">
+            <mat-icon *ngIf="bitbucketStatus() === 'ok'">check_circle</mat-icon>
+            <mat-icon *ngIf="bitbucketStatus() === 'fail'">error</mat-icon>
+          </span>
+        </div>
+
+        <div class="field-group">
+          <mat-form-field appearance="outline">
+            <mat-label>Workspace / Username</mat-label>
+            <input matInput formControlName="bitbucketWorkspace" placeholder="your-workspace" />
+            <mat-icon matSuffix>group</mat-icon>
+            <mat-error>{{ getError('bitbucketWorkspace', 'Workspace') }}</mat-error>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Base URL</mat-label>
+            <input matInput formControlName="bitbucketBaseUrl" />
+            <mat-error>{{ getError('bitbucketBaseUrl', 'Base URL') }}</mat-error>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Access Token / App Password</mat-label>
+            <input matInput formControlName="bitbucketToken"
+              [type]="showBitToken() ? 'text' : 'password'" placeholder="ATB••••••••" />
+            <button mat-icon-button matSuffix type="button" (click)="showBitToken.set(!showBitToken())">
+              <mat-icon>{{ showBitToken() ? 'visibility_off' : 'visibility' }}</mat-icon>
+            </button>
+            <mat-error>{{ getError('bitbucketToken', 'Token') }}</mat-error>
+          </mat-form-field>
+        </div>
+
+        <div class="card-actions">
+          <button mat-stroked-button type="button" (click)="testBitbucket()" [disabled]="bitbucketTesting()">
+            <mat-spinner *ngIf="bitbucketTesting()" diameter="16"></mat-spinner>
+            <mat-icon *ngIf="!bitbucketTesting()">wifi</mat-icon>
+            Test Connection
+          </button>
+        </div>
+      </div>
+
+      <!-- JIRA Card -->
+      <div class="section-card" *ngIf="session.session().domain === 'work'">
+        <div class="section-title">
+          <mat-icon>bug_report</mat-icon> JIRA Configuration
+          <span class="status-dot" [class]="'status-dot--' + jiraStatus()">
+            <mat-icon *ngIf="jiraStatus() === 'ok'">check_circle</mat-icon>
+            <mat-icon *ngIf="jiraStatus() === 'fail'">error</mat-icon>
+          </span>
+        </div>
+
+        <div class="field-group">
+          <mat-form-field appearance="outline">
+            <mat-label>JIRA Base URL</mat-label>
+            <input matInput formControlName="jiraBaseUrl" placeholder="https://company.atlassian.net" />
+            <mat-error>{{ getError('jiraBaseUrl', 'JIRA Base URL') }}</mat-error>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>JIRA Email</mat-label>
+            <input matInput formControlName="jiraEmail" placeholder="you@company.com" />
+            <mat-icon matSuffix>email</mat-icon>
+            <mat-error>{{ getError('jiraEmail', 'Email') }}</mat-error>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>JIRA API Token</mat-label>
+            <input matInput formControlName="jiraToken"
+              [type]="showJiraToken() ? 'text' : 'password'" placeholder="••••••••" />
+            <button mat-icon-button matSuffix type="button" (click)="showJiraToken.set(!showJiraToken())">
+              <mat-icon>{{ showJiraToken() ? 'visibility_off' : 'visibility' }}</mat-icon>
+            </button>
+            <mat-error>{{ getError('jiraToken', 'Token') }}</mat-error>
+          </mat-form-field>
+        </div>
+
+        <div class="card-actions">
+          <button mat-stroked-button type="button" (click)="testJira()" [disabled]="jiraTesting()">
+            <mat-spinner *ngIf="jiraTesting()" diameter="16"></mat-spinner>
+            <mat-icon *ngIf="!jiraTesting()">wifi</mat-icon>
+            Test Connection
+          </button>
+        </div>
+      </div>
+
+      <!-- Advanced Card -->
+      <div class="section-card advanced-card" *ngIf="session.session().domain === 'work'">
+        <div class="section-title"><mat-icon>tune</mat-icon> Advanced</div>
+        <mat-form-field appearance="outline">
+          <mat-label>JIRA Ticket Pattern (Regex)</mat-label>
+          <input matInput formControlName="jiraTicketPattern" />
+          <mat-hint>Regex pattern to extract ticket IDs from commit messages</mat-hint>
+        </mat-form-field>
+      </div>
+
+      <!-- Gemini AI Card -->
+      <div class="section-card">
+        <div class="section-title">
+          <mat-icon>auto_awesome</mat-icon> Gemini AI Configuration
+        </div>
+        <div class="field-group">
+          <mat-form-field appearance="outline">
+            <mat-label>Gemini API Key</mat-label>
+            <input matInput formControlName="geminiApiKey" [type]="showGeminiToken() ? 'text' : 'password'" placeholder="AIzaSy..." />
+            <button mat-icon-button matSuffix type="button" (click)="showGeminiToken.set(!showGeminiToken())">
+              <mat-icon>{{ showGeminiToken() ? 'visibility_off' : 'visibility' }}</mat-icon>
+            </button>
+          </mat-form-field>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button mat-flat-button color="primary" type="submit">
+        <mat-icon>save</mat-icon> Save Configuration
+      </button>
+    </div>
+  </form>
+</div>
