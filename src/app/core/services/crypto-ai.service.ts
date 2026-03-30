@@ -5,6 +5,36 @@ import { AuthConfigService } from './auth-config.service';
 import { BinanceCandle } from './binance.service';
 import { computeIndicators, formatIndicatorsForPrompt } from './technical-indicators';
 
+export interface FeatureImportance {
+  feature: string;
+  importance: number;
+  value: number;
+}
+
+export interface BacktestMetrics {
+  totalTrades: number;
+  winningTrades: number;
+  losingTrades: number;
+  winRate: number;
+  totalReturn: number;
+  totalPnl: number;
+  avgWinPct: number;
+  avgLossPct: number;
+  profitFactor: number;
+  sharpeRatio: number;
+  maxDrawdown: number;
+  longestWinStreak: number;
+  longestLoseStreak: number;
+  finalEquity: number;
+  equityCurve: number[];
+}
+
+export interface SentimentResult {
+  score: number;
+  summary: string;
+  factors: string[];
+}
+
 export interface AiPrediction {
   currentPrice: number;
   predictedPrice: number;
@@ -12,15 +42,30 @@ export interface AiPrediction {
   confidence: number;
   reasons: string[];
   futureCandles: { time: number; value: number }[];
-  source: 'gemini' | 'python';
+  source: string;
+  mode?: string;
+  confluenceScore?: number;
+  indicators?: Record<string, number>;
+  featureImportances?: FeatureImportance[];
+  trainingMetrics?: Record<string, any>;
+  geminiInterpretation?: string;
+  sentiment?: SentimentResult;
 }
+
+export interface BacktestResult {
+  trades: any[];
+  metrics: BacktestMetrics;
+  config: Record<string, any>;
+}
+
+export type PredictionMode = 'gemini' | 'rule' | 'ml';
 
 @Injectable({ providedIn: 'root' })
 export class CryptoAiService {
 
   constructor(private http: HttpClient, private authConfig: AuthConfigService) {}
 
-  // --- Option A: Gemini-Powered Prediction ---
+  // --- Option A: Gemini-Powered Prediction (frontend-direct) ---
   predictWithGemini(candles: BinanceCandle[], symbol: string, interval: string): Observable<AiPrediction> {
     const key = this.authConfig.config().geminiApiKey;
     if (!key) return of(this.fallbackPrediction(candles, 'gemini'));
@@ -28,7 +73,6 @@ export class CryptoAiService {
     const indicators = computeIndicators(candles);
     const indicatorSummary = formatIndicatorsForPrompt(candles, indicators);
 
-    // Build last 30 candle summary
     const recentCandles = candles.slice(-30).map(c =>
       `T=${c.time} O=${c.open} H=${c.high} L=${c.low} C=${c.close}`
     ).join('\n');
@@ -59,7 +103,6 @@ Predict the next 5 candle close prices. Base your confidence on indicator alignm
     }).pipe(
       map(res => {
         const text = res.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        // Extract JSON from response
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (!jsonMatch) return this.fallbackPrediction(candles, 'gemini');
 
@@ -73,7 +116,7 @@ Predict the next 5 candle close prices. Base your confidence on indicator alignm
           reasons: parsed.reasons || [],
           futureCandles: parsed.futureCandles || [],
           source: 'gemini' as const
-        };
+        } as AiPrediction;
       }),
       catchError(err => {
         console.error('Gemini prediction failed:', err);
@@ -82,27 +125,53 @@ Predict the next 5 candle close prices. Base your confidence on indicator alignm
     );
   }
 
-  // --- Option B: Python Microservice Prediction ---
-  predictWithPython(candles: BinanceCandle[], symbol: string, interval: string): Observable<AiPrediction> {
+  // --- Option B: Python Server Prediction (rule or ml mode) ---
+  predictWithPython(candles: BinanceCandle[], symbol: string, interval: string,
+                    mode: 'rule' | 'ml' = 'rule'): Observable<AiPrediction> {
+    const geminiApiKey = this.authConfig.config().geminiApiKey || '';
     const payload = {
       symbol,
       interval,
-      candles: candles.slice(-100).map(c => ({
+      mode,
+      geminiApiKey,
+      candles: candles.slice(-200).map(c => ({
         time: c.time, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume
       }))
     };
 
     return this.http.post<AiPrediction>('/python-ai/predict', payload).pipe(
-      map(res => ({ ...res, source: 'python' as const })),
+      map(res => ({ ...res, source: res.source || (mode === 'ml' ? 'xgboost-ml' : 'rule-based') })),
       catchError(err => {
         console.error('Python prediction failed:', err);
-        return of(this.fallbackPrediction(candles, 'python'));
+        return of(this.fallbackPrediction(candles, mode === 'ml' ? 'xgboost-ml' : 'rule-based'));
+      })
+    );
+  }
+
+  // --- Train ML Model ---
+  trainModel(symbol: string, interval: string): Observable<any> {
+    return this.http.post<any>('/python-ai/train', { symbol, interval, limit: 2000 }).pipe(
+      catchError(err => {
+        console.error('Training failed:', err);
+        return of({ error: 'Training request failed' });
+      })
+    );
+  }
+
+  // --- Run Backtest ---
+  runBacktest(symbol: string, interval: string, mode: string): Observable<BacktestResult> {
+    return this.http.post<BacktestResult>('/python-ai/backtest', {
+      symbol, interval, mode, limit: 1000
+    }).pipe(
+      catchError(err => {
+        console.error('Backtest failed:', err);
+        return of({ trades: [], metrics: {} as BacktestMetrics, config: {} });
       })
     );
   }
 
   // Rule-based fallback when APIs fail
-  private fallbackPrediction(candles: BinanceCandle[], source: 'gemini' | 'python'): AiPrediction {
+  private fallbackPrediction(candles: BinanceCandle[], source: string): AiPrediction {
     const indicators = computeIndicators(candles);
     const last = candles.length - 1;
     const current = candles[last].close;

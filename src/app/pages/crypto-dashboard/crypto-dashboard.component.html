@@ -38,25 +38,42 @@
 
     <!-- Side Panel -->
     <div class="side-panel">
-      <!-- AI Source Toggle -->
+      <!-- AI Source Toggle — 3-way -->
       <mat-card class="panel-card">
         <div class="panel-title"><mat-icon inline>psychology</mat-icon> AI Engine</div>
-        <mat-button-toggle-group [value]="aiSource()" (change)="aiSource.set($event.value)" class="source-toggle">
+        <mat-button-toggle-group [value]="aiSource()" (change)="aiSource.set($event.value)"
+          class="source-toggle three-way">
           <mat-button-toggle value="gemini">
             <mat-icon>auto_awesome</mat-icon> Gemini
           </mat-button-toggle>
-          <mat-button-toggle value="python">
-            <mat-icon>terminal</mat-icon> Python ML
+          <mat-button-toggle value="rule">
+            <mat-icon>tune</mat-icon> Rule-Based
+          </mat-button-toggle>
+          <mat-button-toggle value="ml">
+            <mat-icon>model_training</mat-icon> ML (XGBoost)
           </mat-button-toggle>
         </mat-button-toggle-group>
-        <p class="source-hint" *ngIf="aiSource() === 'gemini'">Uses Gemini 2.5 Flash Lite via your API key</p>
-        <p class="source-hint" *ngIf="aiSource() === 'python'">Requires Python FastAPI server on port 8000</p>
+        <p class="source-hint">{{ getSourceHint() }}</p>
 
-        <button mat-flat-button color="primary" class="predict-btn" (click)="runPrediction()" [disabled]="predicting()">
-          <mat-spinner *ngIf="predicting()" diameter="18"></mat-spinner>
-          <mat-icon *ngIf="!predicting()">insights</mat-icon>
-          <span>{{ predicting() ? 'Analyzing...' : 'Run Prediction' }}</span>
-        </button>
+        <div class="action-buttons">
+          <button mat-flat-button color="primary" class="predict-btn" (click)="runPrediction()"
+            [disabled]="predicting()">
+            <mat-spinner *ngIf="predicting()" diameter="18"></mat-spinner>
+            <mat-icon *ngIf="!predicting()">insights</mat-icon>
+            <span>{{ predicting() ? 'Analyzing...' : 'Run Prediction' }}</span>
+          </button>
+          <button mat-stroked-button class="secondary-btn" (click)="runBacktest()" [disabled]="backtesting()">
+            <mat-spinner *ngIf="backtesting()" diameter="16"></mat-spinner>
+            <mat-icon *ngIf="!backtesting()">history</mat-icon>
+            <span>{{ backtesting() ? 'Testing...' : 'Backtest' }}</span>
+          </button>
+          <button mat-stroked-button class="secondary-btn" (click)="trainModel()" [disabled]="training()"
+            *ngIf="aiSource() === 'ml'">
+            <mat-spinner *ngIf="training()" diameter="16"></mat-spinner>
+            <mat-icon *ngIf="!training()">model_training</mat-icon>
+            <span>{{ training() ? 'Training...' : 'Train Model' }}</span>
+          </button>
+        </div>
       </mat-card>
 
       <!-- Prediction Result -->
@@ -65,9 +82,11 @@
           <mat-icon inline>trending_up</mat-icon> Prediction
           <span class="source-badge">{{ prediction()!.source }}</span>
         </div>
-        
-        <div class="trend-display" [class.up]="prediction()!.trend === 'UP'" [class.down]="prediction()!.trend === 'DOWN'">
-          <mat-icon>{{ prediction()!.trend === 'UP' ? 'arrow_upward' : prediction()!.trend === 'DOWN' ? 'arrow_downward' : 'swap_vert' }}</mat-icon>
+
+        <div class="trend-display" [class.up]="prediction()!.trend === 'UP'"
+          [class.down]="prediction()!.trend === 'DOWN'">
+          <mat-icon>{{ prediction()!.trend === 'UP' ? 'arrow_upward' : prediction()!.trend === 'DOWN' ? 'arrow_downward'
+            : 'swap_vert' }}</mat-icon>
           <span class="trend-label">{{ prediction()!.trend }}</span>
         </div>
 
@@ -79,6 +98,10 @@
           <div class="price-row predicted">
             <span class="label">Predicted</span>
             <span class="value">${{ prediction()!.predictedPrice.toLocaleString() }}</span>
+          </div>
+          <div class="price-row" *ngIf="prediction()!.confluenceScore !== undefined">
+            <span class="label">Confluence</span>
+            <span class="value">{{ prediction()!.confluenceScore }}</span>
           </div>
         </div>
 
@@ -93,6 +116,45 @@
         </div>
       </mat-card>
 
+      <!-- Gemini NL Interpretation -->
+      <mat-card class="panel-card" *ngIf="prediction()?.geminiInterpretation">
+        <div class="panel-title"><mat-icon inline>auto_awesome</mat-icon> Gemini Analysis</div>
+        <p class="gemini-text">{{ prediction()!.geminiInterpretation }}</p>
+      </mat-card>
+
+      <!-- Sentiment -->
+      <mat-card class="panel-card" *ngIf="prediction()?.sentiment?.summary">
+        <div class="panel-title"><mat-icon inline>sentiment_satisfied</mat-icon> Market Sentiment</div>
+        <div class="sentiment-row">
+          <span class="sentiment-score" [class.positive]="prediction()!.sentiment!.score > 0"
+            [class.negative]="prediction()!.sentiment!.score < 0">
+            {{ prediction()!.sentiment!.score > 0 ? '+' : '' }}{{ (prediction()!.sentiment!.score * 100).toFixed(0) }}%
+          </span>
+          <span class="sentiment-summary">{{ prediction()!.sentiment!.summary }}</span>
+        </div>
+        <ul class="factor-list" *ngIf="prediction()!.sentiment!.factors?.length">
+          <li *ngFor="let f of prediction()!.sentiment!.factors">{{ f }}</li>
+        </ul>
+      </mat-card>
+
+      <!-- Feature Importances (ML mode) -->
+      <mat-card class="panel-card" *ngIf="prediction()?.featureImportances?.length">
+        <div class="panel-title"><mat-icon inline>bar_chart</mat-icon> Feature Importances</div>
+        <div class="fi-list">
+          <div class="fi-item" *ngFor="let fi of prediction()!.featureImportances!.slice(0, 8)">
+            <div class="fi-header">
+              <span class="fi-name">{{ fi.feature }}</span>
+              <span class="fi-value">{{ fi.value }}</span>
+            </div>
+            <div class="fi-bar-bg">
+              <div class="fi-bar"
+                [style.width.%]="fi.importance * 100 / (prediction()!.featureImportances![0]?.importance || 1) * 100">
+              </div>
+            </div>
+          </div>
+        </div>
+      </mat-card>
+
       <!-- Reasoning Panel -->
       <mat-card class="panel-card" *ngIf="prediction()?.reasons?.length">
         <div class="panel-title"><mat-icon inline>lightbulb</mat-icon> AI Reasoning</div>
@@ -102,6 +164,54 @@
             <span>{{ reason }}</span>
           </li>
         </ul>
+      </mat-card>
+
+      <!-- Backtest Results -->
+      <mat-card class="panel-card backtest-card" *ngIf="backtestResult()?.metrics">
+        <div class="panel-title"><mat-icon inline>history</mat-icon> Backtest Results</div>
+        <div class="metrics-grid">
+          <div class="metric-item">
+            <span class="metric-label">Sharpe Ratio</span>
+            <span class="metric-value" [class.positive]="backtestResult()!.metrics.sharpeRatio > 0"
+              [class.negative]="backtestResult()!.metrics.sharpeRatio < 0">
+              {{ backtestResult()!.metrics.sharpeRatio }}
+            </span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Win Rate</span>
+            <span class="metric-value">{{ backtestResult()!.metrics.winRate }}%</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Max Drawdown</span>
+            <span class="metric-value negative">-{{ backtestResult()!.metrics.maxDrawdown }}%</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Total Return</span>
+            <span class="metric-value" [class.positive]="backtestResult()!.metrics.totalReturn > 0"
+              [class.negative]="backtestResult()!.metrics.totalReturn < 0">
+              {{ backtestResult()!.metrics.totalReturn }}%
+            </span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Profit Factor</span>
+            <span class="metric-value">{{ backtestResult()!.metrics.profitFactor }}</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Total Trades</span>
+            <span class="metric-value">{{ backtestResult()!.metrics.totalTrades }}</span>
+          </div>
+        </div>
+      </mat-card>
+
+      <!-- Train Result -->
+      <mat-card class="panel-card" *ngIf="trainResult()">
+        <div class="panel-title"><mat-icon inline>model_training</mat-icon> Training Complete</div>
+        <p class="source-hint" *ngIf="trainResult()?.walk_forward_accuracy">
+          Walk-forward accuracy: {{ (trainResult()!.walk_forward_accuracy * 100).toFixed(1) }}%
+        </p>
+        <p class="source-hint" *ngIf="trainResult()?.total_samples">
+          Trained on {{ trainResult()!.total_samples }} samples with {{ trainResult()!.n_features }} features
+        </p>
       </mat-card>
 
       <!-- Disclaimer -->

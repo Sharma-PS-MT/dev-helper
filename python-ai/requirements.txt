@@ -2,3 +2,7 @@ fastapi
 uvicorn
 numpy
 pandas
+xgboost
+scikit-learn
+optuna
+requests
