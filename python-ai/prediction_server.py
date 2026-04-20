@@ -80,7 +80,7 @@ async def predict(req: PredictionRequest):
     Optionally adds Gemini NL interpretation if API key is provided.
     """
     # Convert candles to DataFrame
-    candle_dicts = [c.model_dump() for c in req.candles]
+    candle_dicts = [c.dict() for c in req.candles]
     df = candles_from_request(candle_dicts)
 
     if len(df) < 30:
@@ -111,7 +111,7 @@ async def train_model(req: TrainRequest):
     Can use provided candles or fetch from Binance.
     """
     if req.candles:
-        candle_dicts = [c.model_dump() for c in req.candles]
+        candle_dicts = [c.dict() for c in req.candles]
         df = candles_from_request(candle_dicts)
     else:
         df = fetch_candles(req.symbol, req.interval, req.limit)
@@ -155,5 +155,5 @@ async def health():
         "status": "ok",
         "version": "2.0.0",
         "modes": ["rule-based", "xgboost-ml"],
-        "endpoints": ["/predict", "/train", "/backtest", "/sentiment", "/health"],
+        "endpoints": ["/predict", "/train", "/backtest", "/sentiment"],
     }

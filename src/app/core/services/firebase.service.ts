@@ -1,7 +1,8 @@
 import { Injectable, signal } from '@angular/core';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
-import { AppConfig } from './auth-config.service';
+import { KeycloakEnvConfig } from './auth-config.service';
+import { AppConfig, ArgocdEnvConfig } from './auth-config.service';
 
 const firebaseConfig = {
   apiKey: "AIzaSyC3EMTK56OnUCc8hEWbrqIrDxmpwfri_A0",
@@ -36,6 +37,76 @@ export class FirebaseService {
     } catch (e) {
       console.error('Firebase sync failed', e);
       this.status.set('error');
+    }
+  }
+
+  // =========================================================================
+  // GLOBAL KEYCLOAK ENVS — shared across all users (global/keycloak doc)
+  // =========================================================================
+
+  private get globalKeycloakDoc() {
+    return doc(this.db, 'global', 'keycloak');
+  }
+
+  async saveGlobalKeycloakEnvs(envs: KeycloakEnvConfig[]): Promise<void> {
+    this.status.set('syncing');
+    try {
+      await setDoc(this.globalKeycloakDoc, { keycloakEnvs: envs }, { merge: true });
+      this.status.set('connected');
+    } catch (e) {
+      console.error('Firebase global keycloak save failed', e);
+      this.status.set('error');
+    }
+  }
+
+  async loadGlobalKeycloakEnvs(): Promise<KeycloakEnvConfig[]> {
+    try {
+      const snap = await getDoc(this.globalKeycloakDoc);
+      if (snap.exists()) {
+        const data = snap.data();
+        this.status.set('connected');
+        return (data['keycloakEnvs'] as KeycloakEnvConfig[]) || [];
+      }
+      return [];
+    } catch (e) {
+      console.error('Firebase global keycloak load failed', e);
+      this.status.set('error');
+      return [];
+    }
+  }
+
+  // =========================================================================
+  // GLOBAL ARGOCD ENVS — shared across all users (global/argocd doc)
+  // =========================================================================
+
+  private get globalArgocdDoc() {
+    return doc(this.db, 'global', 'argocd');
+  }
+
+  async saveGlobalArgocdEnvs(envs: ArgocdEnvConfig[]): Promise<void> {
+    this.status.set('syncing');
+    try {
+      await setDoc(this.globalArgocdDoc, { argocdEnvs: envs }, { merge: true });
+      this.status.set('connected');
+    } catch (e) {
+      console.error('Firebase global argocd save failed', e);
+      this.status.set('error');
+    }
+  }
+
+  async loadGlobalArgocdEnvs(): Promise<ArgocdEnvConfig[]> {
+    try {
+      const snap = await getDoc(this.globalArgocdDoc);
+      if (snap.exists()) {
+        const data = snap.data();
+        this.status.set('connected');
+        return (data['argocdEnvs'] as ArgocdEnvConfig[]) || [];
+      }
+      return [];
+    } catch (e) {
+      console.error('Firebase global argocd load failed', e);
+      this.status.set('error');
+      return [];
     }
   }
 

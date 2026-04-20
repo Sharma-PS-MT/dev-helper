@@ -1,0 +1,178 @@
+<div class="page-container fade-in-up">
+  <!-- ── Header ──────────────────────────────────────────────────────────── -->
+  <div class="page-header" style="display: flex; justify-content: space-between; align-items: start;">
+    <div>
+      <h1>ArgoCD Applications</h1>
+      <p>Select environments to aggregate and monitor your deployments.</p>
+    </div>
+    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+      <!-- Branch Compare navigation: 1 or 2 apps -->
+      <button *ngIf="selectedRows.size >= 1" mat-flat-button class="branch-btn" (click)="navigateToCompare()"
+              [matTooltip]="selectedRows.size === 1 ? 'Compare tag vs main branch' : 'Compare tags between these two apps'">
+        <mat-icon>compare_arrows</mat-icon>
+        {{ selectedRows.size === 2 ? 'Compare Tags' : 'vs main branch' }}
+      </button>
+
+      <!-- Side-by-side detail dialog: 2 apps only -->
+      <button *ngIf="canCompare" mat-flat-button class="compare-btn" (click)="openCompare()">
+        <mat-icon>compare</mat-icon> Side-by-Side
+      </button>
+
+      <span *ngIf="selectedRows.size === 1" class="select-hint">+1 more for side-by-side</span>
+      <button *ngIf="hasActiveFilters" mat-stroked-button (click)="clearFilters()">
+        <mat-icon>filter_list_off</mat-icon> Clear Filters
+      </button>
+      <button mat-flat-button color="primary" (click)="refresh()">
+        <mat-icon>refresh</mat-icon> Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Environment Selector ────────────────────────────────────────────── -->
+  <mat-card class="env-card">
+    <div class="env-chips">
+      <span style="font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-right: 8px;">
+        Environments:
+      </span>
+      <div *ngIf="envs().length === 0" style="color: var(--text-muted); font-size: 13px;">
+        No environments configured. <a routerLink="/settings/argocd" style="color: var(--accent-cyan);">Go to Settings</a>
+      </div>
+
+      <div *ngFor="let env of envs()"
+           class="env-chip"
+           [class.selected]="env.selected"
+           [class.error]="!!env.error"
+           (click)="toggleEnv(env)"
+           [matTooltip]="env.error || ''">
+        <mat-checkbox [checked]="env.selected" (click)="$event.stopPropagation(); toggleEnv(env)" color="primary"></mat-checkbox>
+        <span class="chip-name">{{ env.config.name }}</span>
+        <mat-spinner *ngIf="env.loading" diameter="14"></mat-spinner>
+        <mat-icon *ngIf="env.error" class="error-icon" inline>error</mat-icon>
+      </div>
+    </div>
+  </mat-card>
+
+  <!-- ── Applications Table ──────────────────────────────────────────────── -->
+  <mat-card class="table-card" *ngIf="envs().length > 0">
+    <div class="table-wrapper">
+      <table mat-table [dataSource]="dataSource" class="mat-elevation-z0 argocd-table">
+
+        <!-- Select Column -->
+        <ng-container matColumnDef="select">
+          <th mat-header-cell *matHeaderCellDef style="width: 52px;">
+            <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap;">
+              {{ selectedRows.size }}/2
+            </div>
+            <div style="height: 24px;"></div>
+          </th>
+          <td mat-cell *matCellDef="let row" style="width: 52px;">
+            <mat-checkbox
+              [checked]="isRowSelected(row)"
+              [disabled]="!isRowSelected(row) && selectedRows.size >= 2"
+              (change)="toggleRowSelection(row)"
+              color="accent">
+            </mat-checkbox>
+          </td>
+        </ng-container>
+
+        <!-- Environment Column -->
+        <ng-container matColumnDef="envName">
+          <th mat-header-cell *matHeaderCellDef>
+            <div>Environment</div>
+            <input class="filter-input" placeholder="Filter..." [(ngModel)]="filterValues['envName']" (keyup)="applyFilter()">
+          </th>
+          <td mat-cell *matCellDef="let app">{{ app.envName }}</td>
+        </ng-container>
+
+        <!-- Application Name Column -->
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef>
+            <div>Application Name</div>
+            <input class="filter-input" placeholder="Filter..." [(ngModel)]="filterValues['name']" (keyup)="applyFilter()">
+          </th>
+          <td mat-cell *matCellDef="let app" class="primary-text">{{ app.name }}</td>
+        </ng-container>
+
+        <!-- Namespace Column -->
+        <ng-container matColumnDef="namespace">
+          <th mat-header-cell *matHeaderCellDef>
+            <div>Namespace</div>
+            <input class="filter-input" placeholder="Filter..." [(ngModel)]="filterValues['namespace']" (keyup)="applyFilter()">
+          </th>
+          <td mat-cell *matCellDef="let app">{{ app.namespace }}</td>
+        </ng-container>
+
+        <!-- Sync Status Column -->
+        <ng-container matColumnDef="syncStatus">
+          <th mat-header-cell *matHeaderCellDef>
+            <div>Sync Status</div>
+            <select class="filter-select" [(ngModel)]="filterValues['syncStatus']" (change)="applyFilter()">
+              <option value="">All</option>
+              <option *ngFor="let s of syncStatuses" [value]="s">{{ s }}</option>
+            </select>
+          </th>
+          <td mat-cell *matCellDef="let app">
+            <span class="status-badge" [ngClass]="'sync-' + app.syncStatus.toLowerCase()">
+              {{ app.syncStatus }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Health Status Column -->
+        <ng-container matColumnDef="healthStatus">
+          <th mat-header-cell *matHeaderCellDef>
+            <div>Health Status</div>
+            <select class="filter-select" [(ngModel)]="filterValues['healthStatus']" (change)="applyFilter()">
+              <option value="">All</option>
+              <option *ngFor="let h of healthStatuses" [value]="h">{{ h }}</option>
+            </select>
+          </th>
+          <td mat-cell *matCellDef="let app">
+            <span class="status-badge" [ngClass]="'health-' + app.healthStatus.toLowerCase()">
+              {{ app.healthStatus }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Sync Tag Column -->
+        <ng-container matColumnDef="syncTag">
+          <th mat-header-cell *matHeaderCellDef>
+            <div>Current Sync Tag</div>
+            <input class="filter-input" placeholder="Filter..." [(ngModel)]="filterValues['syncTag']" (keyup)="applyFilter()">
+          </th>
+          <td mat-cell *matCellDef="let app" class="code-text">{{ app.syncTag }}</td>
+        </ng-container>
+
+        <!-- Last Synced Column -->
+        <ng-container matColumnDef="lastSyncedAt">
+          <th mat-header-cell *matHeaderCellDef>
+            <div>Last Synced At</div>
+            <div style="height: 24px;"></div>
+          </th>
+          <td mat-cell *matCellDef="let app">{{ formatDate(app.lastSyncedAt) }}</td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"
+            [class.row-selected]="isRowSelected(row)"></tr>
+
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell" [attr.colspan]="displayedColumns.length"
+              style="text-align: center; padding: 24px; color: var(--text-muted);">
+            No applications match the active filters or no environments are selected.
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Table Footer -->
+    <div class="table-footer">
+      <span *ngIf="selectedRows.size > 0" class="selection-info">
+        <mat-icon inline>check_box</mat-icon>
+        {{ selectedRows.size }} row(s) selected
+        <span *ngIf="selectedRows.size === 2"> — ready to compare</span>
+      </span>
+      <span class="row-count">Showing {{ totalRows }} applications</span>
+    </div>
+  </mat-card>
+</div>

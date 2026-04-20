@@ -40,7 +40,7 @@ export class TokenGenComponent implements OnInit {
 
   form: FormGroup;
   showPassword = signal(false);
-  
+
   generating = signal(false);
   tokenResult = signal<string>('');
 
@@ -59,14 +59,14 @@ export class TokenGenComponent implements OnInit {
     });
   }
 
-  ngOnInit() {}
+  ngOnInit() { }
 
   onEnvChange(env: string) {
     this.selectedEnv.set(env);
     this.tokenResult.set('');
-    const savedEnvs = this.authConfig.config().keycloakEnvs || [];
-    const match = savedEnvs.find(e => e.envName === env);
-    
+    const savedEnvs = this.authConfig.keycloakEnvs();
+    const match = savedEnvs.find((e: any) => e.envName === env);
+
     if (match) {
       this.form.patchValue({
         baseUrl: match.baseUrl,
@@ -85,7 +85,7 @@ export class TokenGenComponent implements OnInit {
       this.notify.error('Please select an environment and fill all required fields.');
       return;
     }
-    
+
     const val = this.form.value;
     const newConfig: KeycloakEnvConfig = {
       envName: this.selectedEnv(),
@@ -96,7 +96,7 @@ export class TokenGenComponent implements OnInit {
       password: val.password
     };
 
-    const currentEnvs = [...(this.authConfig.config().keycloakEnvs || [])];
+    const currentEnvs = [...(this.authConfig.keycloakEnvs() || [])];
     const idx = currentEnvs.findIndex(e => e.envName === this.selectedEnv());
     if (idx > -1) {
       currentEnvs[idx] = newConfig;
@@ -104,8 +104,8 @@ export class TokenGenComponent implements OnInit {
       currentEnvs.push(newConfig);
     }
 
-    this.authConfig.save({ keycloakEnvs: currentEnvs });
-    this.notify.success(`Configuration for ${this.selectedEnv()} successfully bound to Firebase & Cache!`);
+    this.authConfig.saveGlobalKeycloak(currentEnvs);
+    this.notify.success(`Configuration for ${this.selectedEnv()} saved globally — visible to all team members!`);
   }
 
   generate() {
@@ -113,7 +113,7 @@ export class TokenGenComponent implements OnInit {
       this.form.markAllAsTouched();
       return;
     }
-    
+
     // Auto-save prior to generation explicitly saving clicks for the user
     this.saveConfig();
 
@@ -128,9 +128,10 @@ export class TokenGenComponent implements OnInit {
     this.keycloak.generateToken(config).subscribe({
       next: (res) => {
         if (res.access_token) {
-          this.tokenResult.set(res.access_token);
-          this.copyToClipboard(res.access_token);
-          this.notify.success('Keycloak Token generated and securely copied directly to your clipboard!');
+          const bearerToken = `Bearer ${res.access_token}`;
+          this.tokenResult.set(bearerToken);
+          this.copyToClipboard(bearerToken);
+          this.notify.success('Keycloak Bearer Token generated and securely copied directly to your clipboard!');
         } else {
           this.notify.error('Response payload was valid but stripped of an access_token matrix.');
         }

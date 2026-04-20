@@ -48,7 +48,6 @@ export class JiraService {
 
   getIssues(keys: string[]): Observable<JiraTicket[]> {
     if (!keys.length) return of([]);
-    // Batch via JQL (up to 100)
     const batches: string[][] = [];
     for (let i = 0; i < keys.length; i += 50) batches.push(keys.slice(i, i + 50));
 
@@ -73,6 +72,36 @@ export class JiraService {
     return this.http.get(`${this.base}/rest/api/2/myself`, { headers: this.headers }).pipe(
       map(() => true),
       catchError(() => of(false))
+    );
+  }
+
+  /** Fetch the current user's Jira profile (includes accountId). */
+  getMyself(): Observable<{ accountId: string; displayName: string; emailAddress: string } | null> {
+    return this.http.get<any>(`${this.base}/rest/api/2/myself`, { headers: this.headers }).pipe(
+      map(res => ({ accountId: res.accountId, displayName: res.displayName, emailAddress: res.emailAddress })),
+      catchError(() => of(null))
+    );
+  }
+
+  /** Run an arbitrary JQL query and return raw issues (up to maxResults). */
+  searchJql(jql: string, maxResults = 100): Observable<JiraIssueRaw[]> {
+    return this.http.get<JiraSearchResult>(`${this.base}/rest/api/3/search/jql`, {
+      headers: this.headers,
+      params: new HttpParams()
+        .set('jql', jql)
+        .set('maxResults', maxResults)
+        .set('fields', 'summary,status,priority,assignee,reporter,issuetype,created,updated,timespent'),
+    }).pipe(
+      map(r => r.issues || []),
+      catchError(() => of([] as JiraIssueRaw[]))
+    );
+  }
+
+  /** Fetch all worklogs for an issue key; returns raw Jira worklog entries. */
+  getWorklogsForIssue(issueKey: string): Observable<any[]> {
+    return this.http.get<any>(`${this.base}/rest/api/2/issue/${issueKey}/worklog`, { headers: this.headers }).pipe(
+      map(res => res.worklogs || []),
+      catchError(() => of([]))
     );
   }
 

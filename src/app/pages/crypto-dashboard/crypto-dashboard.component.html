@@ -132,7 +132,7 @@
           </span>
           <span class="sentiment-summary">{{ prediction()!.sentiment!.summary }}</span>
         </div>
-        <ul class="factor-list" *ngIf="prediction()!.sentiment!.factors?.length">
+        <ul class="factor-list" *ngIf="prediction()!.sentiment!.factors.length">
           <li *ngFor="let f of prediction()!.sentiment!.factors">{{ f }}</li>
         </ul>
       </mat-card>

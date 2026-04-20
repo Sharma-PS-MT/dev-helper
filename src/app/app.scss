@@ -64,6 +64,40 @@
         border-radius: 10px; font-weight: 700;
       }
     }
+
+    .nav-group-title {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: var(--radius-sm);
+      color: var(--text-secondary); cursor: pointer;
+      font-size: 13px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.5px; margin-top: 8px; margin-bottom: 2px;
+      transition: color var(--transition);
+
+      .group-icon { font-size: 18px; width: 18px; height: 18px; }
+      .chevron { margin-left: auto; font-size: 18px; width: 18px; height: 18px; opacity: 0.7; }
+      
+      &:hover { color: var(--text-primary); }
+    }
+
+    .nav-children {
+      display: flex; flex-direction: column; gap: 2px;
+      padding-left: 24px;
+      border-left: 1px dashed var(--border-color);
+      margin-left: 20px;
+      margin-bottom: 8px;
+
+      .child-item {
+        padding: 8px 12px;
+        font-size: 12px;
+        
+        mat-icon { font-size: 16px; width: 16px; height: 16px; }
+        
+        &.active::before {
+          height: 100%; border-radius: 2px;
+          left: -25px; /* Pull back to the dashed border */
+        }
+      }
+    }
   }
 
   .sidebar-footer {

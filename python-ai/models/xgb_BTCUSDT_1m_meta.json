@@ -1,0 +1,105 @@
+{
+  "timestamp": 1774844899.3775983,
+  "symbol": "BTCUSDT",
+  "interval": "1m",
+  "metrics": {
+    "walk_forward_accuracy": 0.492,
+    "walk_forward_details": [
+      {
+        "fold": 1,
+        "train_size": 1601,
+        "test_size": 200,
+        "accuracy": 0.43,
+        "confusion_matrix": [
+          [
+            79,
+            10
+          ],
+          [
+            104,
+            7
+          ]
+        ]
+      },
+      {
+        "fold": 2,
+        "train_size": 1401,
+        "test_size": 200,
+        "accuracy": 0.475,
+        "confusion_matrix": [
+          [
+            9,
+            102
+          ],
+          [
+            3,
+            86
+          ]
+        ]
+      },
+      {
+        "fold": 3,
+        "train_size": 1201,
+        "test_size": 200,
+        "accuracy": 0.48,
+        "confusion_matrix": [
+          [
+            21,
+            75
+          ],
+          [
+            29,
+            75
+          ]
+        ]
+      },
+      {
+        "fold": 4,
+        "train_size": 1001,
+        "test_size": 200,
+        "accuracy": 0.515,
+        "confusion_matrix": [
+          [
+            27,
+            84
+          ],
+          [
+            13,
+            76
+          ]
+        ]
+      },
+      {
+        "fold": 5,
+        "train_size": 801,
+        "test_size": 200,
+        "accuracy": 0.56,
+        "confusion_matrix": [
+          [
+            57,
+            49
+          ],
+          [
+            39,
+            55
+          ]
+        ]
+      }
+    ],
+    "total_samples": 1801,
+    "n_features": 83,
+    "best_params": {
+      "n_estimators": 263,
+      "max_depth": 4,
+      "learning_rate": 0.010073480623274665,
+      "subsample": 0.9156681432630986,
+      "colsample_bytree": 0.805973109581942,
+      "min_child_weight": 8,
+      "gamma": 0.6519236639367221,
+      "reg_alpha": 0.22508701839715684,
+      "reg_lambda": 0.9954050143861413
+    },
+    "trained_at": 1774844899.3682275
+  },
+  "n_features": 83
+}

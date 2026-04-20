@@ -1,4 +1,5 @@
-import { Component, OnInit, signal, inject, effect } from '@angular/core';
+import { Component, OnInit, signal, inject, effect, computed } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, Validators, AbstractControl } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -9,7 +10,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { AuthConfigService, AppConfig } from '../../core/services/auth-config.service';
+import { MatTableModule } from '@angular/material/table';
+import { AuthConfigService, AppConfig, ArgocdEnvConfig } from '../../core/services/auth-config.service';
 import { JiraService } from '../../core/services/jira.service';
 import { BitbucketService } from '../../core/services/bitbucket.service';
 import { NotificationService } from '../../core/services/notification.service';
@@ -25,15 +27,18 @@ import { AuthSessionService } from '../../core/services/auth-session.service';
     CommonModule, FormsModule, ReactiveFormsModule,
     MatCardModule, MatFormFieldModule, MatInputModule,
     MatButtonModule, MatIconModule, MatDividerModule,
-    MatProgressSpinnerModule, MatTooltipModule,
+    MatProgressSpinnerModule, MatTooltipModule, MatTableModule,
   ],
   templateUrl: './settings.component.html',
   styleUrls: ['./settings.component.scss'],
 })
 export class SettingsComponent implements OnInit {
   private fb = inject(FormBuilder);
+  private route = inject(ActivatedRoute);
   firebase = inject(FirebaseService);
   
+  activeCategory = signal<string>('bitbucket');
+
   form = this.fb.group({
     bitbucketWorkspace: [''],
     bitbucketToken: [''],
@@ -52,6 +57,13 @@ export class SettingsComponent implements OnInit {
   jiraTesting = signal(false);
   bitbucketStatus = signal<'idle' | 'ok' | 'fail'>('idle');
   jiraStatus = signal<'idle' | 'ok' | 'fail'>('idle');
+
+  // ArgoCD Global table logic
+  argocdColumns = ['name', 'url', 'username', 'password', 'actions'];
+  argocdEnvs = computed(() => this.authConfig.argocdEnvs());
+  
+  newArgoEnv: ArgocdEnvConfig = this.emptyArgoEnv();
+  showArgoPwd: { [key: string]: boolean } = {};
 
   constructor(
     private authConfig: AuthConfigService,
@@ -74,6 +86,11 @@ export class SettingsComponent implements OnInit {
         jiraTicketPattern: c.jiraTicketPattern || '[A-Z]+-\\d+',
         geminiApiKey: c.geminiApiKey || '',
       });
+    });
+
+    this.route.paramMap.subscribe(params => {
+      const cat = params.get('category');
+      if (cat) this.activeCategory.set(cat);
     });
   }
 
@@ -113,13 +130,68 @@ export class SettingsComponent implements OnInit {
     if (!this.save()) return;
     this.jiraTesting.set(true);
     this.jiraStatus.set('idle');
-    this.jira.testConnection().subscribe(ok => {
+    this.jira.getMyself().subscribe(profile => {
       this.jiraTesting.set(false);
-      this.jiraStatus.set(ok ? 'ok' : 'fail');
-      ok
-        ? this.notify.success('JIRA connection successful!')
-        : this.notify.error('JIRA connection failed. Check base URL, email, and token.');
+      if (profile) {
+        this.jiraStatus.set('ok');
+        // Save the fetched accountId back to config & Firebase
+        const currentConfig = this.authConfig.config();
+        this.authConfig.save({ ...currentConfig, jiraAccountId: profile.accountId });
+        this.notify.success('JIRA connection successful! Account ID synced.');
+      } else {
+        this.jiraStatus.set('fail');
+        this.notify.error('JIRA connection failed. Check base URL, email, and token.');
+      }
     });
+  }
+
+  // ===========================================================================
+  // ArgoCD Config Logic
+  // ===========================================================================
+  
+  private emptyArgoEnv(): ArgocdEnvConfig {
+    return { id: '', name: '', url: '', username: '', password: '' };
+  }
+
+  addArgoEnv() {
+    if (!this.newArgoEnv.name || !this.newArgoEnv.url || !this.newArgoEnv.username || !this.newArgoEnv.password) {
+      this.notify.error('All fields are required for ArgoCD environment');
+      return;
+    }
+    // basic URL validation
+    if (!this.newArgoEnv.url.startsWith('http')) {
+      this.notify.error('Base URL must start with http:// or https://');
+      return;
+    }
+
+    const newEnv = {
+      ...this.newArgoEnv,
+      id: Date.now().toString()
+    };
+    
+    const updated = [...this.argocdEnvs(), newEnv];
+    this.authConfig.saveGlobalArgocd(updated);
+    this.newArgoEnv = this.emptyArgoEnv();
+    this.notify.success('ArgoCD Environment Added (Global)');
+  }
+
+  removeArgoEnv(envId: string) {
+    if (confirm('Are you sure you want to remove this ArgoCD environment?')) {
+      const updated = this.argocdEnvs().filter((e: ArgocdEnvConfig) => e.id !== envId);
+      this.authConfig.saveGlobalArgocd(updated);
+      this.notify.success('ArgoCD Environment Removed');
+    }
+  }
+
+  saveArgoEnv(env: ArgocdEnvConfig) {
+    // Save triggered (changes update in-place normally but we flush explicitly)
+    const updated = this.argocdEnvs().map((e: ArgocdEnvConfig) => e.id === env.id ? env : e);
+    this.authConfig.saveGlobalArgocd(updated);
+    this.notify.success('ArgoCD Environment Updated (Global)');
+  }
+
+  toggleArgoPwd(id: string) {
+    this.showArgoPwd[id] = !this.showArgoPwd[id];
   }
 
   getError(ctrl: string, label: string): string {

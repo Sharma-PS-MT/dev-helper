@@ -12,10 +12,11 @@
 ## ✨ Key Features
 
 ### 🏢 Work Domain (Professional)
+*   **ArgoCD Multi-Environment Dashboard:** Aggregate applications across multiple ArgoCD clusters with real-time sync/health status and deep client-side filtering.
 *   **Bitbucket & Jira Integration:** Deep integration with Atlassian suite for real-time tracking.
 *   **PR Review & Gap Analysis:** Automated identification of missing Jira tickets or open issues in Pull Requests.
 *   **Branch & Tag Comparison:** Visual comparison of repository states with associated Jira ticket statuses.
-*   **Project Dashboard:** High-level overview of project health and repository activity.
+*   **Worked Tickets Report:** Comprehensive analysis of your worklogs and Jira activity within custom date ranges.
 
 ### 🏠 Personal Domain (Private)
 *   **AI Crypto Prediction:** Advanced price forecasting using FastAPI-based ML models.
@@ -23,6 +24,7 @@
 *   **Trend Confidence:** AI-driven confidence scores and trend analysis (UP/DOWN/NEUTRAL).
 
 ### 🔒 Core Platform
+*   **Categorized Configuration:** Nested sidebar menu for intuitive management of Bitbucket, Jira, Gemini, and ArgoCD settings.
 *   **Multi-Tenancy:** Complete isolation between Work and Personal configurations.
 *   **Secure Auth:** Firebase-powered authentication with username-based credential management.
 *   **Sleek Dark UI:** Modern, responsive interface optimized for developer workflows.
@@ -32,9 +34,10 @@
 ## 🛠️ Tech Stack
 
 - **Frontend:** Angular 19+ with SCSS (Dark Mode Optimized)
-- **AI Backend:** Python 3.10+ & FastAPI
+- **Backend Microservices:** Python 3.10+ & FastAPI
 - **Authentication:** Firebase Auth
-- **API Services:** Jira REST API, Bitbucket API, Crypto Exchange APIs
+- **Data Persistence:** Cloud Firestore (User-isolated and Global configs)
+- **External Integration Proxy:** Server-side proxy for ArgoCD to bypass browser CORS.
 
 ---
 
@@ -57,21 +60,17 @@ npm install
 # Start development server
 npm run start
 ```
-The app will be available at `http://localhost:4200`.
+The app will be available at `http://localhost:4201`.
 
-### 3. AI Prediction Server Setup
+### 3. Backend Microservice Setup
 ```bash
 cd python-ai
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # Install requirements
 pip install -r requirements.txt
 
-# Run the server
-uvicorn prediction_server:app --reload --port 8000
+# Run the unified server
+uvicorn main:app --reload --port 8000
 ```
 
 ---
@@ -85,35 +84,78 @@ graph TD
     subgraph "Frontend (Angular)"
         UI[Dashboard UI]
         Auth[Firebase Auth]
-        Proxy[Proxy Service]
+        Store[State Management]
     end
     
-    subgraph "External APIs"
+    subgraph "Backend Proxy (Python)"
+        FastAPI[FastAPI Server]
+        ArgoProxy[ArgoCD Proxy Router]
+        AI[Crypto AI Engine]
+    end
+
+    subgraph "External Systems"
         Jira[Jira Cloud API]
         BB[Bitbucket API]
-    end
-    
-    subgraph "AI Microservice (Python)"
-        FastAPI[FastAPI Server]
-        Model[Rule-based AI Model]
+        Argo[ArgoCD API]
+        Firebase[Firebase Firestore]
     end
     
     User --> Auth
     Auth --> UI
-    UI --> Proxy
-    Proxy --> Jira
-    Proxy --> BB
-    UI --> FastAPI
-    FastAPI --> Model
+    UI --> Store
+    Store --> Firebase
+    
+    %% Direct API calls (CORS handled by proxy.conf.json or domain config)
+    UI --> Jira
+    UI --> BB
+    
+    %% Proxied calls (CORS handled by Python backend)
+    UI --> ArgoProxy
+    ArgoProxy --> Argo
+    
+    %% Prediction service
+    UI --> AI
 ```
 
 ---
 
 ## ⚙️ Configuration
 
-1.  **Firebase:** Update your Firebase configuration in `src/environments/environment.ts` (or relevant config file).
-2.  **Jira/Bitbucket:** Use the **Settings** page within the app to securely store your API tokens (managed via Firebase).
-3.  **Proxy:** CORS issues are handled via `proxy.conf.json` for local development.
+1.  **Firebase:** Global configurations and user-isolated credentials are stored in Firebase Firestore.
+2.  **Settings:** Use the categorized **Configurations** menu to manage:
+    - **Bitbucket:** App Passwords and workspace settings.
+    - **JIRA:** Base URL, email, and API tokens.
+    - **Gemini AI:** API keys for code review and prediction interpretation.
+    - **ArgoCD:** Global environment definitions (URLs, credentials).
+3.  **CORS:** Browser CORS issues for sensitive integrations (like ArgoCD) are handled via the Python proxy at `/python-ai/argocd`.
+
+---
+
+## 🔧 Service Registry
+
+The `SERVICE_REGISTRY` is a central configuration that maps ArgoCD application names (and image aliases) to Bitbucket projects and repositories. This enables automated navigation from the ArgoCD dashboard to the **Branch & Tag Compare** page.
+
+### Configuration Path
+`src/app/core/config/service-registry.ts`
+
+### Example Entry
+```typescript
+BM_INVOICE: {
+  displayName: 'BM Invoice',
+  project: 'BM',
+  repository: 'csi-bm-invoice-java-service',
+  aliases: [
+    'csi-bm-invoice-java-service',
+    'prod-bminvoicejava',
+    'bminvoicejava',
+  ]
+}
+```
+
+### Automation Flow
+1.  **Single Selection:** Selecting one app in the dashboard allows comparing its current sync tag against the `main` branch.
+2.  **Dual Selection:** Selecting two apps from the same service allows comparing their tags side-by-side. 
+3.  **Validation:** The system prevents cross-service comparisons and provides toast notifications if a service is missing from the registry.
 
 ---
 

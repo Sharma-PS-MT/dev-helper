@@ -12,14 +12,15 @@ export interface AppConfig {
   jiraBaseUrl: string;              // e.g. https://company.atlassian.net
   jiraEmail: string;
   jiraToken: string;
+  jiraAccountId: string;
 
   jiraTicketPattern: string;        // Regex pattern, default [A-Z]+-\d+
 
   // Gemini AI Code Review
   geminiApiKey: string;
 
-  // Keycloak IAM
-  keycloakEnvs: KeycloakEnvConfig[];
+  // NOTE: keycloakEnvs intentionally removed — now globally shared.
+  // Access via AuthConfigService.keycloakEnvs signal.
 }
 
 export interface KeycloakEnvConfig {
@@ -27,6 +28,14 @@ export interface KeycloakEnvConfig {
   baseUrl: string;
   realm: string;
   clientId: string;
+  username: string;
+  password?: string;
+}
+
+export interface ArgocdEnvConfig {
+  id: string;
+  name: string;
+  url: string;
   username: string;
   password?: string;
 }
@@ -40,18 +49,24 @@ const DEFAULTS: AppConfig = {
   jiraBaseUrl: '/jira-api',
   jiraEmail: '',
   jiraToken: '',
+  jiraAccountId: '',
   jiraTicketPattern: '[A-Z]+-\\d+',
   geminiApiKey: '',
-  keycloakEnvs: [],
 };
 
 @Injectable({ providedIn: 'root' })
 export class AuthConfigService {
   private _config = signal<AppConfig>({ ...DEFAULTS });
+  /** Global shared Keycloak environments — accessible to every logged-in user. */
+  private _keycloakEnvs = signal<KeycloakEnvConfig[]>([]);
+  private _argocdEnvs = signal<ArgocdEnvConfig[]>([]);
 
   config = this._config.asReadonly();
+  keycloakEnvs = this._keycloakEnvs.asReadonly();
+  argocdEnvs = this._argocdEnvs.asReadonly();
+
   private firebase = inject(FirebaseService);
-  private sessionLoader: AuthSessionService | null = null; // injected manually on layout loads
+  private sessionLoader: AuthSessionService | null = null;
 
   constructor() { }
 
@@ -76,13 +91,43 @@ export class AuthConfigService {
     // Reset base memory immediately on user switch
     this._config.set({ ...DEFAULTS });
 
-    // Attempt Firebase override if network accessible
+    // 1. Load per-user private config from Firebase
     this.firebase.loadCredentials(s.username, s.domain).then(cloud => {
       if (cloud && Object.keys(cloud).length > 0) {
         const merged = { ...this._config(), ...cloud };
         this._config.set(merged);
       }
     }).catch();
+
+    // 2. Load global shared Keycloak app envs (independent of user)
+    this.loadGlobalKeycloak();
+    this.loadGlobalArgocd();
+  }
+
+  /** Reload global Keycloak envs from Firebase global/keycloak document. */
+  loadGlobalKeycloak(): void {
+    this.firebase.loadGlobalKeycloakEnvs().then(envs => {
+      this._keycloakEnvs.set(envs);
+    }).catch();
+  }
+
+  /** Save global Keycloak envs — persists to shared global/keycloak document. */
+  saveGlobalKeycloak(envs: KeycloakEnvConfig[]): void {
+    this._keycloakEnvs.set(envs);
+    this.firebase.saveGlobalKeycloakEnvs(envs);
+  }
+
+  /** Reload global ArgoCD envs from Firebase global/argocd document. */
+  loadGlobalArgocd(): void {
+    this.firebase.loadGlobalArgocdEnvs().then(envs => {
+      this._argocdEnvs.set(envs);
+    }).catch();
+  }
+
+  /** Save global ArgoCD envs — persists to shared global/argocd document. */
+  saveGlobalArgocd(envs: ArgocdEnvConfig[]): void {
+    this._argocdEnvs.set(envs);
+    this.firebase.saveGlobalArgocdEnvs(envs);
   }
 
   save(config: Partial<AppConfig>): void {
@@ -92,8 +137,9 @@ export class AuthConfigService {
     const merged = { ...this._config(), ...config };
     this._config.set(merged);
 
-    // Asynchronously synchronize with Firebase Storage exclusively
-    this.firebase.saveCredentials(merged, s.username, s.domain);
+    // Persist only private user config — keycloakEnvs excluded
+    const { ...privateConfig } = merged;
+    this.firebase.saveCredentials(privateConfig, s.username, s.domain);
   }
 
   isConfigured(): boolean {

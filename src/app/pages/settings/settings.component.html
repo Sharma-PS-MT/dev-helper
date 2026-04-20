@@ -1,7 +1,10 @@
 <div class="page-container fade-in-up">
   <div class="page-header">
-    <h1>Settings</h1>
-    <p>Configure your Bitbucket and JIRA API credentials</p>
+    <h1 style="text-transform: capitalize">{{ activeCategory() }} Configuration</h1>
+    <p *ngIf="activeCategory() === 'bitbucket'">Configure your Bitbucket App Passwords</p>
+    <p *ngIf="activeCategory() === 'jira'">Configure your JIRA API credentials</p>
+    <p *ngIf="activeCategory() === 'gemini'">Configure Gemini API keys for code review</p>
+    <p *ngIf="activeCategory() === 'argocd'">Manage ArgoCD environment deployments globally</p>
     
     <div style="margin-top: 12px; display: flex; align-items: center; gap: 8px;">
       <span style="font-size: 13px; color: var(--text-secondary);">Storage Sync:</span>
@@ -23,7 +26,7 @@
   <form [formGroup]="form" (ngSubmit)="save()">
     <div class="settings-grid">
       <!-- Bitbucket Card -->
-      <div class="section-card" *ngIf="session.session().domain === 'work'">
+      <div class="section-card" *ngIf="session.session().domain === 'work' && activeCategory() === 'bitbucket'">
         <div class="section-title">
           <mat-icon>cloud</mat-icon> Bitbucket Configuration
           <span class="status-dot" [class]="'status-dot--' + bitbucketStatus()">
@@ -67,7 +70,7 @@
       </div>
 
       <!-- JIRA Card -->
-      <div class="section-card" *ngIf="session.session().domain === 'work'">
+      <div class="section-card" *ngIf="session.session().domain === 'work' && activeCategory() === 'jira'">
         <div class="section-title">
           <mat-icon>bug_report</mat-icon> JIRA Configuration
           <span class="status-dot" [class]="'status-dot--' + jiraStatus()">
@@ -110,8 +113,8 @@
         </div>
       </div>
 
-      <!-- Advanced Card -->
-      <div class="section-card advanced-card" *ngIf="session.session().domain === 'work'">
+      <!-- Advanced Card (JIRA only) -->
+      <div class="section-card advanced-card" *ngIf="session.session().domain === 'work' && activeCategory() === 'jira'">
         <div class="section-title"><mat-icon>tune</mat-icon> Advanced</div>
         <mat-form-field appearance="outline">
           <mat-label>JIRA Ticket Pattern (Regex)</mat-label>
@@ -121,7 +124,7 @@
       </div>
 
       <!-- Gemini AI Card -->
-      <div class="section-card">
+      <div class="section-card" *ngIf="activeCategory() === 'gemini'">
         <div class="section-title">
           <mat-icon>auto_awesome</mat-icon> Gemini AI Configuration
         </div>
@@ -135,10 +138,114 @@
           </mat-form-field>
         </div>
       </div>
+      <!-- ArgoCD Global Card -->
+      <div class="section-card global-card" style="grid-column: 1 / -1;" *ngIf="activeCategory() === 'argocd'">
+        <div class="section-title">
+          <mat-icon>public</mat-icon> Global ArgoCD Configurations
+          <span style="font-size: 12px; font-weight: normal; margin-left: 12px; color: var(--text-muted);">
+            (Shared globally across all users)
+          </span>
+        </div>
+
+        <div class="table-container">
+          <table mat-table [dataSource]="argocdEnvs()" class="mat-elevation-z0" *ngIf="argocdEnvs().length > 0">
+            <!-- Name Column -->
+            <ng-container matColumnDef="name">
+              <th mat-header-cell *matHeaderCellDef> Name </th>
+              <td mat-cell *matCellDef="let element">
+                <mat-form-field appearance="outline" class="inline-field">
+                  <input matInput [(ngModel)]="element.name" [ngModelOptions]="{standalone: true}" (change)="saveArgoEnv(element)">
+                </mat-form-field>
+              </td>
+            </ng-container>
+
+            <!-- URL Column -->
+            <ng-container matColumnDef="url">
+              <th mat-header-cell *matHeaderCellDef> Base URL </th>
+              <td mat-cell *matCellDef="let element">
+                <mat-form-field appearance="outline" class="inline-field wide-field">
+                  <input matInput [(ngModel)]="element.url" [ngModelOptions]="{standalone: true}" (change)="saveArgoEnv(element)">
+                </mat-form-field>
+              </td>
+            </ng-container>
+
+            <!-- Username Column -->
+            <ng-container matColumnDef="username">
+              <th mat-header-cell *matHeaderCellDef> Username </th>
+              <td mat-cell *matCellDef="let element">
+                <mat-form-field appearance="outline" class="inline-field">
+                  <input matInput [(ngModel)]="element.username" [ngModelOptions]="{standalone: true}" (change)="saveArgoEnv(element)">
+                </mat-form-field>
+              </td>
+            </ng-container>
+
+            <!-- Password Column -->
+            <ng-container matColumnDef="password">
+              <th mat-header-cell *matHeaderCellDef> Password </th>
+              <td mat-cell *matCellDef="let element">
+                <mat-form-field appearance="outline" class="inline-field pwd-field">
+                  <input matInput [type]="showArgoPwd[element.id] ? 'text' : 'password'" [(ngModel)]="element.password" [ngModelOptions]="{standalone: true}" (change)="saveArgoEnv(element)">
+                  <button mat-icon-button matSuffix type="button" (click)="toggleArgoPwd(element.id)">
+                    <mat-icon>{{ showArgoPwd[element.id] ? 'visibility_off' : 'visibility' }}</mat-icon>
+                  </button>
+                </mat-form-field>
+              </td>
+            </ng-container>
+
+            <!-- Actions Column -->
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef class="actions-cell"> Actions </th>
+              <td mat-cell *matCellDef="let element" class="actions-cell">
+                <button mat-icon-button color="warn" type="button" (click)="removeArgoEnv(element.id)" matTooltip="Remove">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="argocdColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: argocdColumns;"></tr>
+          </table>
+
+          <div *ngIf="argocdEnvs().length === 0" class="empty-state">
+            No ArgoCD environments configured globally.
+          </div>
+        </div>
+
+        <mat-divider style="margin: 16px 0;"></mat-divider>
+
+        <div class="add-row">
+          <mat-form-field appearance="outline">
+            <mat-label>Environment Name</mat-label>
+            <input matInput [(ngModel)]="newArgoEnv.name" [ngModelOptions]="{standalone: true}" placeholder="e.g. Production">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="wide-field">
+            <mat-label>ArgoCD Base URL</mat-label>
+            <input matInput [(ngModel)]="newArgoEnv.url" [ngModelOptions]="{standalone: true}" placeholder="https://argocd.example.com">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Username</mat-label>
+            <input matInput [(ngModel)]="newArgoEnv.username" [ngModelOptions]="{standalone: true}">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="pwd-field">
+            <mat-label>Password</mat-label>
+            <input matInput [type]="showArgoPwd['new'] ? 'text' : 'password'" [(ngModel)]="newArgoEnv.password" [ngModelOptions]="{standalone: true}">
+            <button mat-icon-button matSuffix type="button" (click)="toggleArgoPwd('new')">
+              <mat-icon>{{ showArgoPwd['new'] ? 'visibility_off' : 'visibility' }}</mat-icon>
+            </button>
+          </mat-form-field>
+
+          <button mat-flat-button color="accent" type="button" (click)="addArgoEnv()" style="margin-top: 4px;">
+            <mat-icon>add</mat-icon> Add Environment
+          </button>
+        </div>
+      </div>
     </div>
 
     <div class="form-actions">
-      <button mat-flat-button color="primary" type="submit">
+      <button mat-flat-button color="primary" type="submit" *ngIf="activeCategory() !== 'argocd'">
         <mat-icon>save</mat-icon> Save Configuration
       </button>
     </div>

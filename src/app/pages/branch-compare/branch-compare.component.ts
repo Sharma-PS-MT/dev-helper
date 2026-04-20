@@ -11,6 +11,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { BitbucketService } from '../../core/services/bitbucket.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { BranchCompareStateService } from '../../core/services/branch-compare-state.service';
 import { BitbucketProject, BitbucketRepo, BitbucketBranch, BitbucketTag, BranchComparison } from '../../core/models/bitbucket.models';
 import { TicketBadgeComponent } from '../../shared/components/ticket-badge/ticket-badge.component';
 import { catchError, finalize } from 'rxjs/operators';
@@ -89,10 +90,78 @@ export class BranchCompareComponent implements OnInit {
   constructor(
     private bitbucket: BitbucketService,
     private notify: NotificationService,
+    private compareState: BranchCompareStateService,
   ) {}
 
   ngOnInit(): void {
     this.loadProjects();
+
+    // Consume pre-fill from ArgoCD dashboard (if any)
+    const preFill = this.compareState.consume();
+    if (preFill) {
+      this._applyPreFill(preFill);
+    }
+  }
+
+  /**
+   * Applies ArgoCD pre-fill state:
+   * 1. Sets project + triggers repo load
+   * 2. After repos load, sets repo + triggers ref load
+   * 3. After refs load, sets fromRef/toRef
+   */
+  private _applyPreFill(state: import('../../core/services/branch-compare-state.service').BranchComparePreFill) {
+    const { project, repository, fromRef, fromType, toRef, toType } = state;
+
+    // Wait for projects to load, then auto-select
+    this.bitbucket.getProjects().subscribe(projects => {
+      this.projects.set(projects);
+      this.loadingProjects.set(false);
+
+      const proj = projects.find(p => p.key?.toLowerCase() === project.toLowerCase());
+      if (!proj) {
+        this.notify.error(`Project "${project}" not found in Bitbucket.`);
+        return;
+      }
+
+      this.selectedProject.set(proj.key);
+
+      // Load repos for the project
+      this.bitbucket.getRepositories(proj.key).subscribe(repos => {
+        this.repos.set(repos);
+        this.loadingRepos.set(false);
+
+        const repo = repos.find(r =>
+          r.slug?.toLowerCase() === repository.toLowerCase() ||
+          r.name?.toLowerCase() === repository.toLowerCase()
+        );
+
+        if (!repo) {
+          this.notify.error(`Repository "${repository}" not found in project "${project}".`);
+          return;
+        }
+
+        this.selectedRepo.set(repo.slug);
+
+        // Load branches + tags, then set refs
+        const slug = repo.slug;
+        const b$ = this.bitbucket.getBranches(slug, proj.key);
+        const t$ = this.bitbucket.getTags(slug, proj.key);
+
+        b$.subscribe(bx => this.branches.set(bx));
+        t$.subscribe(tx => {
+          this.tags.set(tx);
+          this.loadingRefs.set(false);
+
+          // Set the refs after branches/tags are loaded
+          this.fromType.set(fromType);
+          this.toType.set(toType);
+          this.fromRef.set(fromRef);
+          this.toRef.set(toRef);
+
+          this.notify.success(`Pre-filled: ${project}/${repository} — ${fromRef} → ${toRef}`);
+        });
+      });
+    });
   }
 
   loadProjects(): void {

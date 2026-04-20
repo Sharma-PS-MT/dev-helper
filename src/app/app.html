@@ -12,17 +12,42 @@
       </div>
 
       <nav class="sidebar-nav" *ngIf="session.session().domain === 'work'">
-        <a
-          *ngFor="let item of navItems"
-          [routerLink]="item.path"
-          routerLinkActive="active"
-          class="nav-item"
-          [title]="item.label"
-        >
-          <mat-icon>{{ item.icon }}</mat-icon>
-          <span>{{ item.label }}</span>
-          <span *ngIf="item.badge" class="nav-badge">{{ item.badge }}</span>
-        </a>
+        <ng-container *ngFor="let item of navItems">
+          <!-- Normal Link -->
+          <a
+            *ngIf="!item.children"
+            [routerLink]="item.path"
+            routerLinkActive="active"
+            class="nav-item"
+            [title]="item.label"
+          >
+            <mat-icon>{{ item.icon }}</mat-icon>
+            <span>{{ item.label }}</span>
+            <span *ngIf="item.badge" class="nav-badge">{{ item.badge }}</span>
+          </a>
+
+          <!-- Group Link -->
+          <ng-container *ngIf="item.children">
+            <div class="nav-group-title" (click)="toggleExpand(item)" [class.expanded]="item.expanded">
+              <mat-icon class="group-icon">{{ item.icon }}</mat-icon>
+              <span>{{ item.label }}</span>
+              <mat-icon class="chevron">{{ item.expanded ? 'expand_less' : 'expand_more' }}</mat-icon>
+            </div>
+            
+            <div class="nav-children" *ngIf="item.expanded">
+              <a
+                *ngFor="let child of item.children"
+                [routerLink]="child.path"
+                routerLinkActive="active"
+                class="nav-item child-item"
+                [title]="child.label"
+              >
+                <mat-icon>{{ child.icon }}</mat-icon>
+                <span>{{ child.label }}</span>
+              </a>
+            </div>
+          </ng-container>
+        </ng-container>
       </nav>
 
       <nav class="sidebar-nav" *ngIf="session.session().domain === 'personal'">

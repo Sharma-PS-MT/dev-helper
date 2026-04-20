@@ -1,0 +1,217 @@
+.page-container {
+  padding: 24px 32px;
+  background-color: var(--bg-surface);
+  min-height: 100vh;
+}
+
+.page-header {
+  margin-bottom: 24px;
+  h1 { margin: 0 0 8px; font-size: 28px; font-weight: 600; color: var(--text-primary); }
+  p { margin: 0; font-size: 14px; color: var(--text-secondary); }
+}
+
+.env-card {
+  margin-bottom: 24px;
+  background-color: var(--bg-surface-elevated);
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.env-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.env-chip {
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--bg-surface-active);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 4px 12px 4px 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 32px;
+
+  &:hover {
+    background-color: var(--bg-surface-hover);
+    border-color: var(--accent-cyan);
+  }
+
+  &.selected {
+    background-color: rgba(var(--accent-cyan-rgb, 0, 255, 255), 0.1);
+    border-color: var(--accent-cyan);
+  }
+
+  &.error {
+    border-color: #f44336;
+    background-color: rgba(244, 67, 54, 0.1);
+  }
+
+  .chip-name {
+    margin: 0 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .error-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    color: #f44336;
+    margin-left: 4px;
+  }
+}
+
+.table-card {
+  background-color: var(--bg-surface-elevated);
+  border-radius: 8px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.table-wrapper {
+  max-height: calc(100vh - 250px);
+  overflow: auto;
+}
+
+.argocd-table {
+  width: 100%;
+  background: transparent;
+
+  th {
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--bg-surface-elevated);
+    
+    // Sub-header filter elements
+    > div {
+      margin-bottom: 8px;
+    }
+  }
+
+  td {
+    color: var(--text-secondary);
+    font-size: 13px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+  }
+
+  .primary-text {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .code-text {
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+    color: var(--accent-cyan);
+    background-color: var(--bg-surface-active);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+}
+
+.filter-input, .filter-select {
+  width: 100%;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+  &:focus {
+    border-color: var(--accent-cyan);
+  }
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+
+  // Sync Status
+  &.sync-synced { background-color: rgba(76, 175, 80, 0.1); color: #4CAF50; }
+  &.sync-outofsync { background-color: rgba(255, 152, 0, 0.1); color: #FF9800; }
+  &.sync-unknown { background-color: rgba(158, 158, 158, 0.1); color: #9E9E9E; }
+
+  // Health Status
+  &.health-healthy { background-color: rgba(76, 175, 80, 0.1); color: #4CAF50; }
+  &.health-degraded { background-color: rgba(244, 67, 54, 0.1); color: #F44336; }
+  &.health-progressing { background-color: rgba(33, 150, 243, 0.1); color: #2196F3; }
+  &.health-suspended { background-color: rgba(255, 152, 0, 0.1); color: #FF9800; }
+  &.health-missing { background-color: rgba(158, 158, 158, 0.1); color: #9E9E9E; }
+}
+
+.table-footer {
+  padding: 16px;
+  border-top: 1px solid var(--border-color);
+  background-color: var(--bg-surface-active);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  .row-count {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+
+  .selection-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--accent-cyan);
+    font-weight: 500;
+
+    mat-icon { font-size: 16px; width: 16px; height: 16px; }
+  }
+}
+
+// Highlighted selected row
+.row-selected td {
+  background: rgba(var(--accent-cyan-rgb, 0, 229, 255), 0.06) !important;
+}
+
+// Compare button (accent orange-ish)
+.compare-btn {
+  background: linear-gradient(135deg, #FF9800, #F44336);
+  color: #fff;
+  font-weight: 600;
+  &:hover { opacity: 0.9; }
+}
+
+// Branch compare navigation button
+.branch-btn {
+  background: linear-gradient(135deg, var(--accent-cyan, #00e5ff), #2196F3);
+  color: #000;
+  font-weight: 600;
+  &:hover { opacity: 0.9; }
+}
+
+.select-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 4px 10px;
+  border: 1px dashed var(--border-color);
+  border-radius: 12px;
+}
+
+// Global: make Angular Material dialogs honour the dark theme
+::ng-deep .dark-dialog .mat-mdc-dialog-container {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}

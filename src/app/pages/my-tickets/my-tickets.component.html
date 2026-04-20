@@ -1,0 +1,172 @@
+<div class="page-container fade-in-up">
+
+  <!-- ── Header ──────────────────────────────────────────────────────────── -->
+  <div class="page-header">
+    <div class="header-left">
+      <h1>My Worked Tickets</h1>
+      <p *ngIf="displayName()">
+        Showing activity for <strong>{{ displayName() }}</strong>
+      </p>
+      <p *ngIf="!displayName()">Track all Jira tickets you worked on within a date range.</p>
+    </div>
+    <button mat-flat-button color="primary" (click)="load()" [disabled]="loading() || !isConfigured()" class="refresh-btn">
+      <mat-spinner *ngIf="loading()" diameter="18"></mat-spinner>
+      <mat-icon *ngIf="!loading()">refresh</mat-icon>
+      {{ loading() ? 'Loading…' : 'Refresh' }}
+    </button>
+  </div>
+
+  <!-- ── Not Configured ──────────────────────────────────────────────────── -->
+  <mat-card class="unconfigured-card" *ngIf="!isConfigured()">
+    <mat-icon>warning_amber</mat-icon>
+    <h3>Jira not configured</h3>
+    <p>Please go to <strong>Settings</strong> and enter your Jira Base URL, email, and API token, then test the connection.</p>
+    <a mat-stroked-button routerLink="/settings">Go to Settings</a>
+  </mat-card>
+
+  <!-- ── Filters ─────────────────────────────────────────────────────────── -->
+  <mat-card class="filter-card" *ngIf="isConfigured()">
+    <div class="filter-row">
+      <span class="filter-label"><mat-icon inline>date_range</mat-icon> Period</span>
+
+      <div class="quick-chips">
+        <button mat-flat-button
+          [class.active]="quickFilter() === 'today'"
+          (click)="onQuickFilterChange('today')">Today</button>
+        <button mat-flat-button
+          [class.active]="quickFilter() === 'last-week'"
+          (click)="onQuickFilterChange('last-week')">Last 7 Days</button>
+        <button mat-flat-button
+          [class.active]="quickFilter() === 'last-month'"
+          (click)="onQuickFilterChange('last-month')">Last 30 Days</button>
+      </div>
+
+      <div class="custom-range">
+        <mat-form-field appearance="outline" class="date-field">
+          <mat-label>Enter a date range</mat-label>
+          <mat-date-range-input [rangePicker]="picker">
+            <input matStartDate [(ngModel)]="customFrom" (dateChange)="onCustomDateChange()" placeholder="From">
+            <input matEndDate [(ngModel)]="customTo" (dateChange)="onCustomDateChange()" placeholder="To">
+          </mat-date-range-input>
+          <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+          <mat-date-range-picker #picker></mat-date-range-picker>
+        </mat-form-field>
+      </div>
+    </div>
+  </mat-card>
+
+  <!-- ── Error ───────────────────────────────────────────────────────────── -->
+  <div class="error-banner" *ngIf="errorMsg()">
+    <mat-icon>error_outline</mat-icon>
+    {{ errorMsg() }}
+  </div>
+
+  <!-- ── Loading Skeleton ────────────────────────────────────────────────── -->
+  <div class="skeleton-rows" *ngIf="loading()">
+    <div class="skeleton-row" *ngFor="let i of [1,2,3,4,5]"></div>
+  </div>
+
+  <!-- ── Results ─────────────────────────────────────────────────────────── -->
+  <ng-container *ngIf="!loading() && isConfigured()">
+
+    <!-- Empty state -->
+    <mat-card class="empty-card" *ngIf="tickets().length === 0 && !errorMsg()">
+      <mat-icon>inbox</mat-icon>
+      <h3>No tickets found</h3>
+      <p>You haven't worked on any Jira tickets in this date range.</p>
+    </mat-card>
+
+    <!-- Table -->
+    <mat-card class="table-card" *ngIf="tickets().length > 0">
+      <div class="table-wrapper">
+        <table mat-table [dataSource]="tickets()" class="tickets-table">
+
+          <!-- Key column -->
+          <ng-container matColumnDef="key">
+            <th mat-header-cell *matHeaderCellDef>Ticket</th>
+            <td mat-cell *matCellDef="let row">
+              <a class="ticket-key" [href]="row.url" target="_blank" rel="noopener">
+                {{ row.key }}
+                <mat-icon class="ext-icon" inline>open_in_new</mat-icon>
+              </a>
+            </td>
+          </ng-container>
+
+          <!-- Summary column -->
+          <ng-container matColumnDef="summary">
+            <th mat-header-cell *matHeaderCellDef>Summary</th>
+            <td mat-cell *matCellDef="let row" class="summary-cell"
+                [matTooltip]="row.summary" matTooltipShowDelay="800">
+              {{ row.summary }}
+            </td>
+          </ng-container>
+
+          <!-- Status column -->
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>Status</th>
+            <td mat-cell *matCellDef="let row">
+              <span class="status-chip" [class]="'sc-' + row.statusCategory">
+                {{ row.status }}
+              </span>
+            </td>
+          </ng-container>
+
+          <!-- Worklogs column -->
+          <ng-container matColumnDef="worklogs">
+            <th mat-header-cell *matHeaderCellDef>Worklog Entries</th>
+            <td mat-cell *matCellDef="let row" class="worklogs-cell">
+              <div class="wl-entry" *ngFor="let wl of row.worklogEntries">
+                <span class="wl-date">{{ formatDate(wl.date) }}</span>
+                <span class="wl-time">{{ wl.timeSpent }}</span>
+              </div>
+              <div *ngIf="row.worklogEntries.length === 0" class="wl-empty">—</div>
+            </td>
+          </ng-container>
+
+          <!-- Time Logged column -->
+          <ng-container matColumnDef="logged">
+            <th mat-header-cell *matHeaderCellDef class="right-align">Time Logged</th>
+            <td mat-cell *matCellDef="let row" class="logged-cell right-align">
+              <span class="logged-badge" [class.has-time]="row.loggedSeconds > 0">
+                {{ formatLogged(row.loggedSeconds) }}
+              </span>
+            </td>
+          </ng-container>
+
+          <!-- Last Updated column -->
+          <ng-container matColumnDef="updated">
+            <th mat-header-cell *matHeaderCellDef class="right-align">Last Updated</th>
+            <td mat-cell *matCellDef="let row" class="date-cell right-align">
+              {{ formatDate(row.updated) }}
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="columns; sticky: true"></tr>
+          <tr mat-row *matRowDef="let row; columns: columns;" class="ticket-row"></tr>
+        </table>
+      </div>
+
+      <!-- Summary Footer -->
+      <div class="summary-footer">
+        <div class="summary-item">
+          <mat-icon>confirmation_number</mat-icon>
+          <span class="summary-label">Total Tickets</span>
+          <span class="summary-val">{{ tickets().length }}</span>
+        </div>
+        <div class="summary-divider"></div>
+        <div class="summary-item">
+          <mat-icon>schedule</mat-icon>
+          <span class="summary-label">Total Time Logged</span>
+          <span class="summary-val highlight">{{ formatLogged(totalLogged()) }}</span>
+        </div>
+        <div class="summary-divider"></div>
+        <div class="summary-item">
+          <mat-icon>check_circle_outline</mat-icon>
+          <span class="summary-label">With Worklogs</span>
+          <span class="summary-val">{{ withWorklogsCount() }} / {{ tickets().length }}</span>
+        </div>
+      </div>
+    </mat-card>
+  </ng-container>
+
+</div>

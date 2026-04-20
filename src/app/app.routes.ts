@@ -15,9 +15,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/branch-compare/branch-compare.component').then(m => m.BranchCompareComponent),
   },
   {
-    path: 'settings',
+    path: 'settings/:category',
     loadComponent: () => import('./pages/settings/settings.component').then(m => m.SettingsComponent),
   },
+  { path: 'settings', redirectTo: 'settings/bitbucket', pathMatch: 'full' },
   {
     path: 'json-viewer',
     loadComponent: () => import('./pages/json-viewer/json-viewer.component').then(m => m.JsonViewerComponent),
@@ -33,6 +34,14 @@ export const routes: Routes = [
   {
     path: 'crypto-dashboard',
     loadComponent: () => import('./pages/crypto-dashboard/crypto-dashboard.component').then(m => m.CryptoDashboardComponent),
+  },
+  {
+    path: 'my-tickets',
+    loadComponent: () => import('./pages/my-tickets/my-tickets.component').then(m => m.MyTicketsComponent),
+  },
+  {
+    path: 'argocd-dashboard',
+    loadComponent: () => import('./pages/argocd-dashboard/argocd-dashboard.component').then(m => m.ArgocdDashboardComponent),
   },
   { path: '**', redirectTo: 'dashboard' },
 ];
