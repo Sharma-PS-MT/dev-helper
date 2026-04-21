@@ -9,9 +9,12 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { BitbucketService } from '../../core/services/bitbucket.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { BranchCompareStateService } from '../../core/services/branch-compare-state.service';
+import { AuthConfigService } from '../../core/services/auth-config.service';
 import { BitbucketProject, BitbucketRepo, BitbucketBranch, BitbucketTag, BranchComparison } from '../../core/models/bitbucket.models';
 import { TicketBadgeComponent } from '../../shared/components/ticket-badge/ticket-badge.component';
 import { catchError, finalize } from 'rxjs/operators';
@@ -23,7 +26,7 @@ import { of } from 'rxjs';
   imports: [
     CommonModule, FormsModule, MatCardModule, MatFormFieldModule,
     MatSelectModule, MatInputModule, MatButtonModule, MatIconModule,
-    MatProgressSpinnerModule, MatPaginatorModule, TicketBadgeComponent,
+    MatProgressSpinnerModule, MatPaginatorModule, MatTooltipModule, MatSlideToggleModule, TicketBadgeComponent,
   ],
   templateUrl: './branch-compare.component.html',
   styleUrls: ['./branch-compare.component.scss'],
@@ -77,20 +80,65 @@ export class BranchCompareComponent implements OnInit {
 
   result = signal<BranchComparison | null>(null);
 
+  /** When true, commits whose message starts with common branch-merge patterns are hidden */
+  excludeMergeCommits = signal(true);
+
+  /** When true, commits whose message is a Pull Request merge are hidden */
+  excludePullRequests = signal(true);
+
+  private static readonly MERGE_PATTERNS = [
+    // GitHub / Git standard — branch merges (NOT PR merges)
+    /^merge branch /i,
+    /^merge remote-tracking branch /i,
+    /^merge tag /i,
+    // Bitbucket Server — "Merged feature/branch into master" (branch merge, not PR)
+    /^merged .+ into /i,
+    // Revert of a merge
+    /^revert "?merge /i,
+    // Auto-merge bots
+    /^auto-merge /i,
+  ];
+
+  private static readonly PR_PATTERNS = [
+    // GitHub / Bitbucket Cloud — "Merge pull request #N ..."
+    /^merge pull request /i,
+    /^merge pull request #/i,
+    // Bitbucket Server — "Merged in feature/branch (pull request #N)"
+    /^merged in /i,
+    // Bitbucket Server — "Pull request #N: ..."  ← this is the actual PR merge commit title
+    /^pull request #\d+:/i,
+    // Bitbucket old-style — "merged (pull|...) ..."
+    /^merged (pull|remote)/i,
+  ];
+
+  /** All commits after applying the merge-commit and PR exclusion filters */
+  filteredCommits = computed(() => {
+    const res = this.result();
+    if (!res) return [];
+    const excludeMerges = this.excludeMergeCommits();
+    const excludePRs = this.excludePullRequests();
+    return res.commits.filter(cwt => {
+      const msg = cwt.commit.message.trim();
+      if (excludeMerges && BranchCompareComponent.MERGE_PATTERNS.some(p => p.test(msg))) return false;
+      if (excludePRs && BranchCompareComponent.PR_PATTERNS.some(p => p.test(msg))) return false;
+      return true;
+    });
+  });
+
   pageSize = signal(50);
   pageIndex = signal(0);
 
   paginatedCommits = computed(() => {
-    const res = this.result();
-    if (!res) return [];
+    const commits = this.filteredCommits();
     const start = this.pageIndex() * this.pageSize();
-    return res.commits.slice(start, start + this.pageSize());
+    return commits.slice(start, start + this.pageSize());
   });
 
   constructor(
     private bitbucket: BitbucketService,
     private notify: NotificationService,
     private compareState: BranchCompareStateService,
+    private authConfig: AuthConfigService,
   ) {}
 
   ngOnInit(): void {
@@ -271,4 +319,135 @@ export class BranchCompareComponent implements OnInit {
     if (tot === 0) return 0;
     return Math.round(((this.result()?.ticketSummary.done || 0) / tot) * 100);
   }
+
+  copySuccess = signal(false);
+
+  copyAsTable(): void {
+    const commits = this.filteredCommits();
+    if (commits.length === 0) return;
+
+    const res      = this.result();
+    const repoName = this.selectedRepo() || 'Unknown Repository';
+    const fromRef  = res?.fromRef || this.fromRef();
+    const toRef    = res?.toRef   || this.toRef();
+
+    // ── Group by unique ticket key — one row per ticket ────────────────────
+    type TicketRow = {
+      key: string;
+      url: string;
+      status: string;
+      author: string;
+      hashes: string[];   // short commit hashes that reference this ticket
+    };
+
+    const ticketMap = new Map<string, TicketRow>();
+
+    for (const cwt of commits) {
+      const author = (cwt.commit.author.user?.display_name || cwt.commit.author.raw.split('<')[0]).trim();
+      const hash = cwt.commit.hash.slice(0, 7);
+
+      // Tickets resolved via JIRA API
+      for (const t of cwt.tickets) {
+        if (ticketMap.has(t.key)) {
+          ticketMap.get(t.key)!.hashes.push(hash);
+        } else {
+          ticketMap.set(t.key, {
+            key: t.key,
+            url: t.url || '',
+            status: t.status?.name || 'Unknown',
+            author,
+            hashes: [hash],
+          });
+        }
+      }
+
+      // Ticket IDs mentioned in commit message but not resolved via JIRA
+      for (const id of cwt.ticketIds) {
+        if (cwt.tickets.some(t => t.key === id)) continue; // already handled above
+        if (ticketMap.has(id)) {
+          ticketMap.get(id)!.hashes.push(hash);
+        } else {
+          ticketMap.set(id, { key: id, url: '', status: 'Not Found', author, hashes: [hash] });
+        }
+      }
+    }
+
+    if (ticketMap.size === 0) {
+      this.notify.error('No tickets found in the filtered commits.');
+      return;
+    }
+
+    const rows = Array.from(ticketMap.values());
+    const jiraBase = (this.authConfig.config().jiraBaseUrl || '').replace(/\/$/, '');
+
+    // ── Build HTML table ───────────────────────────────────────────────────
+    const thStyle = 'border:1px solid #ccc;padding:6px 10px;background:#f4f5f7;font-weight:600;text-align:left;';
+    const tdStyle = 'border:1px solid #ccc;padding:6px 10px;vertical-align:top;';
+
+    const headerCells = ['#', 'Ticket', 'Status', 'Author', 'Commits']
+      .map(h => `<th style="${thStyle}">${h}</th>`).join('');
+
+    const rowsHtml = rows.map((r, i) => {
+      const resolvedUrl = r.url || (jiraBase ? `${jiraBase}/browse/${r.key}` : '');
+      // Use URL as BOTH href AND visible text → Confluence Smart Link renders ticket status inline
+      const ticketCell = resolvedUrl
+        ? `<a href="${resolvedUrl}" target="_blank" rel="noopener">${resolvedUrl}</a>`
+        : r.key;
+      const hashesCell = r.hashes.map(h => `<code>${h}</code>`).join(', ');
+
+      return `<tr>
+        <td style="${tdStyle}">${i + 1}</td>
+        <td style="${tdStyle}">${ticketCell}</td>
+        <td style="${tdStyle}">${r.status}</td>
+        <td style="${tdStyle}">${r.author}</td>
+        <td style="${tdStyle}">${hashesCell}</td>
+      </tr>`;
+    }).join('');
+
+    // ── Title block + table ────────────────────────────────────────────────
+    const titleHtml = `
+      <h3 style="font-family:sans-serif;margin:0 0 4px 0;font-size:16px;">${repoName}</h3>
+      <p style="font-family:sans-serif;margin:0 0 12px 0;font-size:13px;color:#555;">
+        Version Diff: <strong>${fromRef}</strong> &rarr; <strong>${toRef}</strong>
+      </p>`;
+
+    const html = `${titleHtml}
+    <table style="border-collapse:collapse;width:100%;font-family:sans-serif;font-size:13px;">
+      <thead><tr>${headerCells}</tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>`;
+
+    // ── Plain-text fallback (tab-separated) ────────────────────────────────
+    // Use full URL as ticket cell so pasting plain text also triggers Confluence Smart Links
+    const plain = [
+      `Repository: ${repoName}`,
+      `Version Diff: ${fromRef} → ${toRef}`,
+      '',
+      '#\tTicket\tStatus\tAuthor\tCommits',
+      ...rows.map((r, i) => {
+        const resolvedUrl = r.url || (jiraBase ? `${jiraBase}/browse/${r.key}` : r.key);
+        return `${i + 1}\t${resolvedUrl}\t${r.status}\t${r.author}\t${r.hashes.join(', ')}`;
+      })
+    ].join('\n');
+
+    // ── Write to clipboard ─────────────────────────────────────────────────
+    try {
+      const item = new ClipboardItem({
+        'text/html':  new Blob([html],  { type: 'text/html' }),
+        'text/plain': new Blob([plain], { type: 'text/plain' }),
+      });
+      navigator.clipboard.write([item]).then(() => {
+        this.copySuccess.set(true);
+        this.notify.success(`Copied ${rows.length} tickets — paste into Confluence as a rich table!`);
+        setTimeout(() => this.copySuccess.set(false), 2500);
+      }).catch(() => this.notify.error('Failed to copy to clipboard.'));
+    } catch {
+      navigator.clipboard.writeText(plain).then(() => {
+        this.copySuccess.set(true);
+        this.notify.success(`Copied ${rows.length} tickets (plain text fallback).`);
+        setTimeout(() => this.copySuccess.set(false), 2500);
+      }).catch(() => this.notify.error('Failed to copy to clipboard.'));
+    }
+  }
+
 }

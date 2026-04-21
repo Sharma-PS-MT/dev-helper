@@ -5,6 +5,7 @@
     <p *ngIf="activeCategory() === 'jira'">Configure your JIRA API credentials</p>
     <p *ngIf="activeCategory() === 'gemini'">Configure Gemini API keys for code review</p>
     <p *ngIf="activeCategory() === 'argocd'">Manage ArgoCD environment deployments globally</p>
+    <p *ngIf="activeCategory() === 'service-registry'">Manage service-to-repository mappings for ArgoCD branch compare globally</p>
     
     <div style="margin-top: 12px; display: flex; align-items: center; gap: 8px;">
       <span style="font-size: 13px; color: var(--text-secondary);">Storage Sync:</span>
@@ -242,10 +243,171 @@
           </button>
         </div>
       </div>
+
+      <!-- ═══════════════════════════════════════════════════════════════════ -->
+      <!-- Service Registry Global Card                                        -->
+      <!-- ═══════════════════════════════════════════════════════════════════ -->
+      <div class="section-card global-card svc-registry-card" style="grid-column: 1 / -1;"
+           *ngIf="activeCategory() === 'service-registry'">
+
+        <div class="section-title">
+          <mat-icon>hub</mat-icon> Global Service Registry
+          <span style="font-size: 12px; font-weight: normal; margin-left: 12px; color: var(--text-muted);">
+            (Shared globally — maps ArgoCD app names → Bitbucket repos)
+          </span>
+          <span class="svc-count-badge" style="margin-left: auto;">
+            {{ serviceRegistry().length }} services
+          </span>
+        </div>
+
+        <!-- ── Add New Service form ─────────────────────────────────────── -->
+        <div class="svc-add-section">
+          <div class="svc-add-title"><mat-icon>add_box</mat-icon> Add New Service</div>
+
+          <div class="svc-add-row">
+            <mat-form-field appearance="outline">
+              <mat-label>Display Name</mat-label>
+              <input matInput [(ngModel)]="newSvcEntry.displayName" [ngModelOptions]="{standalone: true}"
+                     placeholder="e.g. BM Approval">
+              <mat-hint>Key auto-generated: {{ newSvcEntry.displayName ? (newSvcEntry.displayName.trim().toUpperCase().replace(' ', '_')) : '…' }}</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="narrow-field">
+              <mat-label>Project Key</mat-label>
+              <input matInput [(ngModel)]="newSvcEntry.project" [ngModelOptions]="{standalone: true}"
+                     placeholder="BM">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="wide-field">
+              <mat-label>Repository Slug</mat-label>
+              <input matInput [(ngModel)]="newSvcEntry.repository" [ngModelOptions]="{standalone: true}"
+                     placeholder="csi-bm-approval-java-service">
+            </mat-form-field>
+          </div>
+
+          <!-- Alias builder -->
+          <div class="alias-builder">
+            <div class="alias-builder-label"><mat-icon>label</mat-icon> Aliases</div>
+            <div class="alias-chips">
+              <mat-chip-set>
+                <mat-chip *ngFor="let a of newSvcEntry.aliases" [removable]="true"
+                          (removed)="removeAliasFromNew(a)">
+                  {{ a }}
+                  <mat-icon matChipRemove>cancel</mat-icon>
+                </mat-chip>
+              </mat-chip-set>
+            </div>
+            <div class="alias-add-row">
+              <input class="alias-input" placeholder="Add alias (or comma-separated list)..."
+                     [(ngModel)]="newSvcAlias" [ngModelOptions]="{standalone: true}"
+                     (keyup.enter)="addAliasToNew()">
+              <button mat-stroked-button type="button" (click)="addAliasToNew()">
+                <mat-icon>add</mat-icon> Add Alias
+              </button>
+            </div>
+          </div>
+
+          <div class="svc-add-actions">
+            <button mat-flat-button color="accent" type="button" (click)="addSvcEntry()">
+              <mat-icon>save</mat-icon> Add to Registry
+            </button>
+          </div>
+        </div>
+
+        <mat-divider style="margin: 16px 0;"></mat-divider>
+
+        <!-- ── Existing services table ──────────────────────────────────── -->
+        <div class="table-container svc-table-wrap" *ngIf="serviceRegistry().length > 0">
+          <table mat-table [dataSource]="serviceRegistry()" class="mat-elevation-z0">
+
+            <!-- Display Name -->
+            <ng-container matColumnDef="displayName">
+              <th mat-header-cell *matHeaderCellDef>Service Name</th>
+              <td mat-cell *matCellDef="let svc">
+                <mat-form-field appearance="outline" class="inline-field">
+                  <input matInput [(ngModel)]="svc.displayName" [ngModelOptions]="{standalone: true}"
+                         (change)="saveSvcEntry(svc)">
+                </mat-form-field>
+              </td>
+            </ng-container>
+
+            <!-- Project -->
+            <ng-container matColumnDef="project">
+              <th mat-header-cell *matHeaderCellDef>Project</th>
+              <td mat-cell *matCellDef="let svc">
+                <mat-form-field appearance="outline" class="inline-field narrow-field">
+                  <input matInput [(ngModel)]="svc.project" [ngModelOptions]="{standalone: true}"
+                         (change)="saveSvcEntry(svc)" placeholder="e.g. BM">
+                </mat-form-field>
+              </td>
+            </ng-container>
+
+            <!-- Repository -->
+            <ng-container matColumnDef="repository">
+              <th mat-header-cell *matHeaderCellDef>Repository Slug</th>
+              <td mat-cell *matCellDef="let svc">
+                <mat-form-field appearance="outline" class="inline-field wide-field">
+                  <input matInput [(ngModel)]="svc.repository" [ngModelOptions]="{standalone: true}"
+                         (change)="saveSvcEntry(svc)" placeholder="csi-bm-invoice-java-service">
+                </mat-form-field>
+              </td>
+            </ng-container>
+
+            <!-- Aliases -->
+            <ng-container matColumnDef="aliases">
+              <th mat-header-cell *matHeaderCellDef>Aliases</th>
+              <td mat-cell *matCellDef="let svc" class="aliases-cell">
+                <div class="alias-chips">
+                  <mat-chip-set>
+                    <mat-chip *ngFor="let alias of svc.aliases" [removable]="true"
+                              (removed)="removeAlias(svc, alias)">
+                      {{ alias }}
+                      <mat-icon matChipRemove>cancel</mat-icon>
+                    </mat-chip>
+                  </mat-chip-set>
+                  <div class="alias-add-row">
+                    <input class="alias-input" placeholder="Add alias, comma-separated..."
+                           [(ngModel)]="newAliasInput[svc.key]" [ngModelOptions]="{standalone: true}"
+                           (keyup.enter)="addAliasToEntry(svc)">
+                    <button mat-icon-button type="button" (click)="addAliasToEntry(svc)"
+                            matTooltip="Add alias">
+                      <mat-icon>add_circle</mat-icon>
+                    </button>
+                  </div>
+                </div>
+              </td>
+            </ng-container>
+
+            <!-- Actions -->
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef class="actions-cell">Actions</th>
+              <td mat-cell *matCellDef="let svc" class="actions-cell">
+                <button mat-icon-button type="button" (click)="saveSvcEntry(svc)"
+                        matTooltip="Save changes" color="primary">
+                  <mat-icon>save</mat-icon>
+                </button>
+                <button mat-icon-button color="warn" type="button"
+                        (click)="removeSvcEntry(svc.key)" matTooltip="Remove">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="svcColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: svcColumns;"></tr>
+          </table>
+        </div>
+
+        <div *ngIf="serviceRegistry().length === 0" class="empty-state">
+          No services configured yet. Only hardcoded entries will be used for resolution.
+        </div>
+      </div>
+
     </div>
 
     <div class="form-actions">
-      <button mat-flat-button color="primary" type="submit" *ngIf="activeCategory() !== 'argocd'">
+    <button mat-flat-button color="primary" type="submit"
+            *ngIf="activeCategory() !== 'argocd' && activeCategory() !== 'service-registry'">
         <mat-icon>save</mat-icon> Save Configuration
       </button>
     </div>

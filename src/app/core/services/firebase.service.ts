@@ -2,7 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
 import { KeycloakEnvConfig } from './auth-config.service';
-import { AppConfig, ArgocdEnvConfig } from './auth-config.service';
+import { AppConfig, ArgocdEnvConfig, ServiceRegistryEntry } from './auth-config.service';
 
 const firebaseConfig = {
   apiKey: "AIzaSyC3EMTK56OnUCc8hEWbrqIrDxmpwfri_A0",
@@ -123,6 +123,41 @@ export class FirebaseService {
       console.error('Firebase load failed', e);
       this.status.set('error');
       return null;
+    }
+  }
+
+  // =========================================================================
+  // GLOBAL SERVICE REGISTRY — shared across all users (global/serviceRegistry doc)
+  // =========================================================================
+
+  private get globalServiceRegistryDoc() {
+    return doc(this.db, 'global', 'serviceRegistry');
+  }
+
+  async saveGlobalServiceRegistry(entries: ServiceRegistryEntry[]): Promise<void> {
+    this.status.set('syncing');
+    try {
+      await setDoc(this.globalServiceRegistryDoc, { entries }, { merge: true });
+      this.status.set('connected');
+    } catch (e) {
+      console.error('Firebase global service registry save failed', e);
+      this.status.set('error');
+    }
+  }
+
+  async loadGlobalServiceRegistry(): Promise<ServiceRegistryEntry[]> {
+    try {
+      const snap = await getDoc(this.globalServiceRegistryDoc);
+      if (snap.exists()) {
+        const data = snap.data();
+        this.status.set('connected');
+        return (data['entries'] as ServiceRegistryEntry[]) || [];
+      }
+      return [];
+    } catch (e) {
+      console.error('Firebase global service registry load failed', e);
+      this.status.set('error');
+      return [];
     }
   }
 }

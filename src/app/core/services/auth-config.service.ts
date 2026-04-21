@@ -40,6 +40,20 @@ export interface ArgocdEnvConfig {
   password?: string;
 }
 
+/** A single entry in the dynamic global Service Registry */
+export interface ServiceRegistryEntry {
+  /** Unique key, e.g. BM_INVOICE */
+  key: string;
+  /** Human-readable label shown in the UI */
+  displayName: string;
+  /** Bitbucket project KEY */
+  project: string;
+  /** Bitbucket repository slug */
+  repository: string;
+  /** Comma-separated alias names for matching */ 
+  aliases: string[];
+}
+
 const STORAGE_KEY = 'dev_helper_config';
 
 const DEFAULTS: AppConfig = {
@@ -60,15 +74,22 @@ export class AuthConfigService {
   /** Global shared Keycloak environments — accessible to every logged-in user. */
   private _keycloakEnvs = signal<KeycloakEnvConfig[]>([]);
   private _argocdEnvs = signal<ArgocdEnvConfig[]>([]);
+  private _serviceRegistry = signal<ServiceRegistryEntry[]>([]);
 
   config = this._config.asReadonly();
   keycloakEnvs = this._keycloakEnvs.asReadonly();
   argocdEnvs = this._argocdEnvs.asReadonly();
+  serviceRegistry = this._serviceRegistry.asReadonly();
 
   private firebase = inject(FirebaseService);
   private sessionLoader: AuthSessionService | null = null;
 
-  constructor() { }
+  constructor() { 
+    // Load global shared configurations once at app startup
+    this.loadGlobalKeycloak();
+    this.loadGlobalArgocd();
+    this.loadGlobalServiceRegistry();
+  }
 
   // Triggered right after Session connects mapping isolated payload domains
   bindSession(sessionSvc: AuthSessionService) {
@@ -102,6 +123,7 @@ export class AuthConfigService {
     // 2. Load global shared Keycloak app envs (independent of user)
     this.loadGlobalKeycloak();
     this.loadGlobalArgocd();
+    this.loadGlobalServiceRegistry();
   }
 
   /** Reload global Keycloak envs from Firebase global/keycloak document. */
@@ -128,6 +150,19 @@ export class AuthConfigService {
   saveGlobalArgocd(envs: ArgocdEnvConfig[]): void {
     this._argocdEnvs.set(envs);
     this.firebase.saveGlobalArgocdEnvs(envs);
+  }
+
+  /** Reload global Service Registry entries from Firebase global/serviceRegistry document. */
+  loadGlobalServiceRegistry(): void {
+    this.firebase.loadGlobalServiceRegistry().then(entries => {
+      this._serviceRegistry.set(entries);
+    }).catch();
+  }
+
+  /** Save global Service Registry entries — persists to shared global/serviceRegistry document. */
+  saveGlobalServiceRegistry(entries: ServiceRegistryEntry[]): void {
+    this._serviceRegistry.set(entries);
+    this.firebase.saveGlobalServiceRegistry(entries);
   }
 
   save(config: Partial<AppConfig>): void {

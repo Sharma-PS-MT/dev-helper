@@ -163,14 +163,53 @@
       <!-- Main Commit List -->
       <div class="commits-col">
         <mat-card class="timeline-card">
+
+          <!-- ── Card title row ───────────────────────────────────────── -->
           <div class="card-title">
             Commits ({{ res.fromRef }} &larr; {{ res.toRef }})
-            <span class="ml-auto text-muted font-normal">{{ res.commits.length }} total</span>
+
+            <span class="total-badge">
+              {{ filteredCommits().length }}
+              <ng-container *ngIf="(excludeMergeCommits() || excludePullRequests()) && filteredCommits().length !== res.commits.length">
+                / {{ res.commits.length }}
+              </ng-container>
+              commits
+            </span>
+
+            <!-- Merge-commit filter toggle -->
+            <label class="merge-filter-toggle" matTooltip="Toggle to hide/show branch merge commits">
+              <mat-slide-toggle
+                [ngModel]="excludeMergeCommits()"
+                (ngModelChange)="excludeMergeCommits.set($event); pageIndex.set(0)"
+                color="accent">
+              </mat-slide-toggle>
+              <span class="toggle-label">Exclude merges</span>
+            </label>
+
+            <!-- PR merge filter toggle -->
+            <label class="merge-filter-toggle" matTooltip="Toggle to hide/show Pull Request merge commits">
+              <mat-slide-toggle
+                [ngModel]="excludePullRequests()"
+                (ngModelChange)="excludePullRequests.set($event); pageIndex.set(0)"
+                color="warn">
+              </mat-slide-toggle>
+              <span class="toggle-label">Exclude PRs</span>
+            </label>
+
+            <!-- Copy as Confluence table -->
+            <button mat-stroked-button class="copy-table-btn" [class.copy-success]="copySuccess()"
+              (click)="copyAsTable()"
+              [disabled]="filteredCommits().length === 0"
+              matTooltip="Copy filtered commits as Confluence wiki table">
+              <mat-icon>{{ copySuccess() ? 'check_circle' : 'content_copy' }}</mat-icon>
+              {{ copySuccess() ? 'Copied!' : 'Confluence Table' }}
+            </button>
           </div>
 
-          <div *ngIf="res.commits.length === 0" class="empty-state">
+          <div *ngIf="filteredCommits().length === 0" class="empty-state">
             <mat-icon>done_all</mat-icon>
-            <p>No new commits to show. Refs are identical or {{ res.toRef }} is behind.</p>
+            <p *ngIf="res.commits.length === 0">No new commits to show. Refs are identical or {{ res.toRef }} is behind.</p>
+            <p *ngIf="res.commits.length > 0">All commits are merge commits — toggle <strong>Exclude merges</strong> off to see them.</p>
           </div>
 
           <div class="commits-list">
@@ -200,7 +239,7 @@
                 </div>
               </div>
             </div>
-            <mat-paginator [length]="res.commits.length" [pageSize]="pageSize()" [pageSizeOptions]="[5, 10, 25, 50]"
+            <mat-paginator [length]="filteredCommits().length" [pageSize]="pageSize()" [pageSizeOptions]="[5, 10, 25, 50]"
               (page)="onPageChange($event)">
             </mat-paginator>
         </mat-card>

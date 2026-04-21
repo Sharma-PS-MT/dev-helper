@@ -27,3 +27,104 @@
   display: flex; justify-content: flex-end;
   button { display: flex; align-items: center; gap: 8px; }
 }
+
+// ─── Service Registry ──────────────────────────────────────────────────────────
+
+.svc-registry-card {
+  .svc-count-badge {
+    font-size: 12px; font-weight: 600;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 999px;
+    padding: 2px 12px;
+    color: var(--text-secondary);
+  }
+
+  .svc-table-wrap {
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border-subtle);
+
+    table { width: 100%; min-width: 900px; }
+
+    .narrow-field { width: 90px; }
+    .wide-field   { width: 280px; }
+    .inline-field { width: 100%; min-width: 140px; }
+
+    .aliases-cell { min-width: 260px; padding: 8px 0; }
+
+    .alias-chips {
+      display: flex; flex-direction: column; gap: 6px;
+      mat-chip-set { flex-wrap: wrap; }
+      mat-chip { font-size: 11px; }
+    }
+  }
+
+  .alias-add-row {
+    display: flex; align-items: center; gap: 6px; margin-top: 4px;
+
+    .alias-input {
+      flex: 1;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 12px;
+      color: var(--text-primary);
+      outline: none;
+      transition: border-color 0.2s;
+      &:focus { border-color: var(--accent-cyan); }
+    }
+  }
+
+  // ── Add New Service section ────────────────────────────────────────────────
+  .svc-add-section {
+    background: var(--bg-secondary);
+    border: 1px dashed var(--border-subtle);
+    border-radius: 10px;
+    padding: 16px;
+    margin-top: 8px;
+  }
+
+  .svc-add-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 600; color: var(--text-secondary);
+    margin-bottom: 14px;
+    mat-icon { font-size: 18px; width: 18px; height: 18px; }
+  }
+
+  .svc-add-row {
+    display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;
+    mat-form-field { flex: 1; min-width: 160px; }
+    .narrow-field { flex: 0 0 110px; }
+    .wide-field   { flex: 2; }
+  }
+
+  .alias-builder {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+
+    .alias-builder-label {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 600; color: var(--text-secondary);
+      margin-bottom: 8px;
+      mat-icon { font-size: 15px; width: 15px; height: 15px; }
+    }
+
+    .alias-chips { margin-bottom: 10px; }
+
+    .alias-add-row {
+      display: flex; align-items: center; gap: 8px;
+      .alias-input { font-size: 13px; padding: 7px 12px; }
+      button { display: flex; align-items: center; gap: 4px; font-size: 13px; }
+    }
+  }
+
+  .svc-add-actions {
+    display: flex; justify-content: flex-end;
+    button { display: flex; align-items: center; gap: 6px; }
+  }
+}

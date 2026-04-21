@@ -11,7 +11,8 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatTableModule } from '@angular/material/table';
-import { AuthConfigService, AppConfig, ArgocdEnvConfig } from '../../core/services/auth-config.service';
+import { MatChipsModule } from '@angular/material/chips';
+import { AuthConfigService, AppConfig, ArgocdEnvConfig, ServiceRegistryEntry } from '../../core/services/auth-config.service';
 import { JiraService } from '../../core/services/jira.service';
 import { BitbucketService } from '../../core/services/bitbucket.service';
 import { NotificationService } from '../../core/services/notification.service';
@@ -27,7 +28,7 @@ import { AuthSessionService } from '../../core/services/auth-session.service';
     CommonModule, FormsModule, ReactiveFormsModule,
     MatCardModule, MatFormFieldModule, MatInputModule,
     MatButtonModule, MatIconModule, MatDividerModule,
-    MatProgressSpinnerModule, MatTooltipModule, MatTableModule,
+    MatProgressSpinnerModule, MatTooltipModule, MatTableModule, MatChipsModule,
   ],
   templateUrl: './settings.component.html',
   styleUrls: ['./settings.component.scss'],
@@ -64,6 +65,14 @@ export class SettingsComponent implements OnInit {
   
   newArgoEnv: ArgocdEnvConfig = this.emptyArgoEnv();
   showArgoPwd: { [key: string]: boolean } = {};
+
+  // Service Registry global table logic
+  svcColumns = ['displayName', 'project', 'repository', 'aliases', 'actions'];
+  serviceRegistry = computed(() => this.authConfig.serviceRegistry());
+  newSvcEntry: ServiceRegistryEntry = this.emptySvcEntry();
+  newAliasInput: { [key: string]: string } = {};
+  newSvcAlias = '';
+  editingAliases: { [key: string]: string } = {};
 
   constructor(
     private authConfig: AuthConfigService,
@@ -200,5 +209,88 @@ export class SettingsComponent implements OnInit {
     if (c.errors['required']) return `${label} is required`;
     if (c.errors['email']) return 'Enter a valid email address';
     return '';
+  }
+
+  // ===========================================================================
+  // Service Registry Logic
+  // ===========================================================================
+
+  private emptySvcEntry(): ServiceRegistryEntry {
+    return { key: '', displayName: '', project: '', repository: '', aliases: [] };
+  }
+
+  /** Derive registry key from displayName: uppercase, spaces→underscores */
+  private toKey(displayName: string): string {
+    return displayName.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+  }
+
+  addSvcEntry() {
+    const e = this.newSvcEntry;
+    if (!e.displayName || !e.project || !e.repository) {
+      this.notify.error('Display name, project and repository are required.');
+      return;
+    }
+    const key = this.toKey(e.displayName);
+    const existing = this.serviceRegistry().find(s => s.key === key);
+    if (existing) {
+      this.notify.error(`A service with key "${key}" already exists.`);
+      return;
+    }
+    const aliases = this.newSvcAlias
+      ? [...e.aliases, ...this.newSvcAlias.split(',').map(a => a.trim()).filter(Boolean)]
+      : e.aliases;
+    const entry: ServiceRegistryEntry = { ...e, key, aliases };
+    const updated = [...this.serviceRegistry(), entry];
+    this.authConfig.saveGlobalServiceRegistry(updated);
+    this.newSvcEntry = this.emptySvcEntry();
+    this.newSvcAlias = '';
+    this.notify.success(`Service "${entry.displayName}" added to registry (Global)`);
+  }
+
+  removeSvcEntry(key: string) {
+    if (confirm('Remove this service from the registry?')) {
+      const updated = this.serviceRegistry().filter(s => s.key !== key);
+      this.authConfig.saveGlobalServiceRegistry(updated);
+      this.notify.success('Service removed from registry');
+    }
+  }
+
+  saveSvcEntry(entry: ServiceRegistryEntry) {
+    // flush pending alias input
+    const pending = this.newAliasInput[entry.key]?.trim();
+    if (pending) {
+      const extra = pending.split(',').map(a => a.trim()).filter(Boolean);
+      entry.aliases = [...new Set([...entry.aliases, ...extra])];
+      this.newAliasInput[entry.key] = '';
+    }
+    const updated = this.serviceRegistry().map(s => s.key === entry.key ? { ...entry } : s);
+    this.authConfig.saveGlobalServiceRegistry(updated);
+    this.notify.success(`Service "${entry.displayName}" updated (Global)`);
+  }
+
+  addAliasToEntry(entry: ServiceRegistryEntry) {
+    const raw = (this.newAliasInput[entry.key] || '').trim();
+    if (!raw) return;
+    const extra = raw.split(',').map(a => a.trim()).filter(Boolean);
+    entry.aliases = [...new Set([...entry.aliases, ...extra])];
+    this.newAliasInput[entry.key] = '';
+    this.saveSvcEntry(entry);
+  }
+
+  removeAlias(entry: ServiceRegistryEntry, alias: string) {
+    entry.aliases = entry.aliases.filter(a => a !== alias);
+    this.saveSvcEntry(entry);
+  }
+
+  addAliasToNew() {
+    const raw = this.newSvcAlias.trim();
+    if (!raw) return;
+    const extra = raw.split(',').map(a => a.trim()).filter(Boolean);
+    this.newSvcEntry.aliases = [...new Set([...this.newSvcEntry.aliases, ...extra])];
+    this.newSvcAlias = '';
+  }
+
+  removeAliasFromNew(alias: string) {
+    this.newSvcEntry.aliases = this.newSvcEntry.aliases.filter(a => a !== alias);
   }
 }

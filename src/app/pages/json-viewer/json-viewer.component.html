@@ -23,7 +23,8 @@
       </div>
 
       <mat-form-field appearance="outline" class="w-full textarea-field">
-        <textarea matInput rows="20" [(ngModel)]="rawJson" (ngModelChange)="onInputChange($event)" (paste)="onPaste($event)" placeholder="Paste your raw JSON array or object here..."></textarea>
+        <textarea matInput rows="20" [(ngModel)]="rawJson" (ngModelChange)="onInputChange($event)"
+          (paste)="onPaste($event)" placeholder="Paste your raw JSON array or object here..."></textarea>
       </mat-form-field>
 
       <div *ngIf="!isValid()" class="gap-item error fade-in-up">
@@ -39,7 +40,7 @@
     <div class="section-card display-pane flex-col">
       <div class="section-title justify-between">
         <span><mat-icon>data_object</mat-icon> Beautiful Viewer</span>
-        
+
         <div class="flex items-center gap-4">
           <!-- Stats Indicator -->
           <div class="status-chip" [ngClass]="isValid() && parsedObj() ? 'done' : 'todo'">
@@ -54,7 +55,8 @@
       </div>
 
       <div class="code-container">
-        <pre *ngIf="highlightedHtml()" class="json-pre"><code [innerHTML]="highlightedHtml()" (click)="onCodeClick($event)"></code></pre>
+        <pre *ngIf="highlightedHtml()"
+          class="json-pre"><code [innerHTML]="highlightedHtml()" (click)="onCodeClick($event)"></code></pre>
         <div *ngIf="!highlightedHtml()" class="empty-state">
           <mat-icon>code</mat-icon>
           <p>JSON structure will render here</p>

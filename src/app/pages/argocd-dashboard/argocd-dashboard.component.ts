@@ -100,7 +100,7 @@ export class ArgocdDashboardComponent implements OnInit {
     };
   }
 
-  ngOnInit(): void {}
+  ngOnInit(): void { }
 
   // ── Environment chips ──────────────────────────────────────────────────────
 
@@ -142,7 +142,7 @@ export class ArgocdDashboardComponent implements OnInit {
     const apps = Array.from(this.selectedRows);
     // Resolve via registry — works for 1 or 2 apps
     const serviceNames = apps.map(a => a.name);
-    const resolved = resolveServices(serviceNames);
+    const resolved = resolveServices(serviceNames, this.authConfig.serviceRegistry());
 
     if (!resolved.ok) {
       this.notify.error(resolved.error);
@@ -152,22 +152,22 @@ export class ArgocdDashboardComponent implements OnInit {
     if (apps.length === 2) {
       // Two apps: compare their sync tags against each other
       this.compareState.set({
-        project:    resolved.result.project,
+        project: resolved.result.project,
         repository: resolved.result.repository,
-        fromRef:    apps[0].syncTag,
-        fromType:   'tag',
-        toRef:      apps[1].syncTag,
-        toType:     'tag',
+        fromRef: apps[0].syncTag,
+        fromType: 'tag',
+        toRef: apps[1].syncTag,
+        toType: 'tag',
       });
     } else {
       // One app: compare its sync tag against main
       this.compareState.set({
-        project:    resolved.result.project,
+        project: resolved.result.project,
         repository: resolved.result.repository,
-        fromRef:    apps[0].syncTag,
-        fromType:   'tag',
-        toRef:      'main',
-        toType:     'branch',
+        fromRef: apps[0].syncTag,
+        fromType: 'tag',
+        toRef: 'main',
+        toType: 'branch',
       });
     }
 
@@ -197,7 +197,21 @@ export class ArgocdDashboardComponent implements OnInit {
     });
 
     forkJoin(requests).subscribe(results => {
-      const allApps = results.flat();
+      const allApps = results.flatMap((apps, idx) => {
+        const envName = selectedEnvs[idx].config.name?.trim().toUpperCase();
+
+        // ── Hardcoded namespace rules ────────────────────────────────────────
+        if (envName === 'HMG PROD') {
+          return apps.filter(a => a.namespace === 'vida-prod');
+        }
+        if (envName === 'HMG PRE-PROD') {
+          return apps.filter(a => a.namespace === 'vida-uat');
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
+        return apps;
+      });
+
       this.dataSource.data = allApps;
       this.applyFilter();
 

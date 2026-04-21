@@ -59,7 +59,81 @@
 
 .timeline-card {
   padding: 0; background: var(--bg-card); border: 1px solid var(--border-color);
-  .card-title { padding: 16px 20px; border-bottom: 1px solid var(--border-subtle); display: flex; font-weight: 600; font-size: 14px; }
+  .card-title {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    font-weight: 600;
+    font-size: 14px;
+    gap: 12px;
+    flex-wrap: wrap;
+
+    .total-badge {
+      margin-left: auto;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: var(--bg-secondary);
+      padding: 2px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .merge-filter-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+
+      .toggle-label {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        white-space: nowrap;
+      }
+
+      ::ng-deep .mdc-switch { transform: scale(0.85); }
+    }
+
+    .copy-table-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      height: 34px;
+      padding: 0 14px;
+      border-radius: 8px;
+      border-color: var(--border-color);
+      color: var(--text-secondary);
+      transition: all 0.2s ease;
+      white-space: nowrap;
+
+      mat-icon { font-size: 16px; width: 16px; height: 16px; transition: transform 0.3s ease; }
+
+      &:hover:not([disabled]) {
+        border-color: var(--accent-cyan);
+        color: var(--accent-cyan);
+        background: rgba(57,197,207,.07);
+        mat-icon { transform: scale(1.1); }
+      }
+
+      &.copy-success {
+        border-color: var(--status-done) !important;
+        color: var(--status-done) !important;
+        background: rgba(63,185,80,.1) !important;
+        animation: pulse-success 0.4s ease;
+      }
+    }
+  }
+
+  @keyframes pulse-success {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.04); }
+    100% { transform: scale(1); }
+  }
 
   .empty-state {
     padding: 60px 20px; text-align: center; color: var(--text-secondary); display: flex; flex-direction: column; align-items: center; gap: 12px;
