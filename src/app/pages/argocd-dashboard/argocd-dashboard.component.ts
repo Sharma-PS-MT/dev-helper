@@ -30,6 +30,13 @@ interface EnvSelection {
   error: string | null;
 }
 
+export interface GroupedAppRow {
+  appName: string;
+  repository: string;
+  resolvedProject: string;
+  envs: { [envName: string]: ArgoAppModel };
+}
+
 @Component({
   selector: 'app-argocd-dashboard',
   standalone: true,
@@ -44,20 +51,16 @@ interface EnvSelection {
 })
 export class ArgocdDashboardComponent implements OnInit {
   envs = signal<EnvSelection[]>([]);
+  envColumns: string[] = [];
 
-  dataSource = new MatTableDataSource<ArgoAppModel>([]);
-  displayedColumns = ['select', 'envName', 'name', 'namespace', 'syncStatus', 'healthStatus', 'syncTag', 'lastSyncedAt'];
+  dataSource = new MatTableDataSource<GroupedAppRow>([]);
+  displayedColumns = ['select', 'appName'];
 
-  // Row selection — max 2
-  selectedRows: Set<ArgoAppModel> = new Set();
+  // Row selection — max 1
+  selectedRows: Set<GroupedAppRow> = new Set();
 
   // Filters
-  filterValues: { [key: string]: string } = {
-    envName: '', name: '', namespace: '', syncStatus: '', healthStatus: '', syncTag: ''
-  };
-
-  syncStatuses = ['Synced', 'OutOfSync', 'Unknown'];
-  healthStatuses = ['Healthy', 'Degraded', 'Progressing', 'Suspended', 'Missing', 'Unknown'];
+  filterValues: { [key: string]: string } = { appName: '' };
 
   // Plain number — updated manually after filter so it is always accurate
   totalRows = 0;
@@ -66,8 +69,20 @@ export class ArgocdDashboardComponent implements OnInit {
     return Object.values(this.filterValues).some(val => val !== '');
   }
 
+  hasExactlyTwoEnvs(): boolean {
+    if (this.selectedRows.size !== 1) return false;
+    const row = Array.from(this.selectedRows)[0];
+    return Object.keys(row.envs).length === 2;
+  }
+
+  hasMultipleEnvs(): boolean {
+    if (this.selectedRows.size !== 1) return false;
+    const row = Array.from(this.selectedRows)[0];
+    return Object.keys(row.envs).length >= 2;
+  }
+
   get canCompare(): boolean {
-    return this.selectedRows.size === 2;
+    return this.hasMultipleEnvs();
   }
 
   constructor(
@@ -90,12 +105,19 @@ export class ArgocdDashboardComponent implements OnInit {
     }, { allowSignalWrites: true });
 
     // Multi-column AND filter predicate
-    this.dataSource.filterPredicate = (data: ArgoAppModel, filter: string) => {
+    this.dataSource.filterPredicate = (data: GroupedAppRow, filter: string) => {
       const terms = JSON.parse(filter);
       return Object.keys(terms).every(col => {
         const term = terms[col]?.toString().toLowerCase() || '';
         if (!term) return true;
-        return (data as any)[col]?.toString().toLowerCase().includes(term);
+        
+        if (col === 'appName') {
+          return data.appName.toLowerCase().includes(term) || data.repository.toLowerCase().includes(term);
+        }
+        
+        const envApp = data.envs[col];
+        if (!envApp) return false;
+        return envApp.syncTag?.toLowerCase().includes(term) || false;
       });
     };
   }
@@ -109,17 +131,16 @@ export class ArgocdDashboardComponent implements OnInit {
     this.refresh();
   }
 
-  // ── Row selection (max 2) ──────────────────────────────────────────────────
+  // ── Row selection (max 1 row for comparison) ───────────────────────────────
 
-  isRowSelected(row: ArgoAppModel): boolean {
+  isRowSelected(row: GroupedAppRow): boolean {
     return this.selectedRows.has(row);
   }
 
-  toggleRowSelection(row: ArgoAppModel) {
+  toggleRowSelection(row: GroupedAppRow) {
     if (this.selectedRows.has(row)) {
       this.selectedRows.delete(row);
     } else {
-      if (this.selectedRows.size >= 2) return;
       this.selectedRows.add(row);
     }
   }
@@ -127,11 +148,15 @@ export class ArgocdDashboardComponent implements OnInit {
   // ── Compare: open side-by-side dialog ─────────────────────────────────────
 
   openCompare() {
-    const [appA, appB] = Array.from(this.selectedRows);
+    const rows = Array.from(this.selectedRows);
+    if (rows.length !== 1) return;
+    const envApps = Object.values(rows[0].envs);
+    if (envApps.length < 2) return;
+
     this.dialog.open(ArgocdCompareDialogComponent, {
       width: '900px',
       maxHeight: '90vh',
-      data: { appA, appB },
+      data: { apps: envApps },
       panelClass: 'dark-dialog'
     });
   }
@@ -139,38 +164,58 @@ export class ArgocdDashboardComponent implements OnInit {
   // ── Navigate to Branch-Compare with pre-filled state ──────────────────────
 
   navigateToCompare() {
-    const apps = Array.from(this.selectedRows);
-    // Resolve via registry — works for 1 or 2 apps
-    const serviceNames = apps.map(a => a.name);
-    const resolved = resolveServices(serviceNames, this.authConfig.serviceRegistry());
+    const rows = Array.from(this.selectedRows);
+    if (rows.length === 0) return;
 
-    if (!resolved.ok) {
-      this.notify.error(resolved.error);
+    const preFills: import('../../core/services/branch-compare-state.service').BranchComparePreFill[] = [];
+    let hasTooManyEnvs = false;
+
+    for (const row of rows) {
+      const envApps = Object.values(row.envs);
+
+      if (!row.resolvedProject || row.repository === 'Unknown') {
+        this.notify.error(`Skipping "${row.appName}": Could not resolve service project.`);
+        continue;
+      }
+
+      if (envApps.length > 2) {
+        hasTooManyEnvs = true;
+        continue;
+      }
+
+      if (envApps.length === 2) {
+        preFills.push({
+          project: row.resolvedProject,
+          repository: row.repository,
+          fromRef: envApps[0].syncTag,
+          fromType: 'tag',
+          toRef: envApps[1].syncTag,
+          toType: 'tag',
+        });
+      } else if (envApps.length === 1) {
+        preFills.push({
+          project: row.resolvedProject,
+          repository: row.repository,
+          fromRef: envApps[0].syncTag,
+          fromType: 'tag',
+          toRef: 'main',
+          toType: 'branch',
+        });
+      }
+    }
+
+    if (hasTooManyEnvs) {
+      this.notify.error('Please select exactly two environments or one environment for compare gap.');
+    }
+
+    if (preFills.length === 0) {
+      if (!hasTooManyEnvs) {
+        this.notify.error('No environment data available for comparison.');
+      }
       return;
     }
 
-    if (apps.length === 2) {
-      // Two apps: compare their sync tags against each other
-      this.compareState.set({
-        project: resolved.result.project,
-        repository: resolved.result.repository,
-        fromRef: apps[0].syncTag,
-        fromType: 'tag',
-        toRef: apps[1].syncTag,
-        toType: 'tag',
-      });
-    } else {
-      // One app: compare its sync tag against main
-      this.compareState.set({
-        project: resolved.result.project,
-        repository: resolved.result.repository,
-        fromRef: apps[0].syncTag,
-        fromType: 'tag',
-        toRef: 'main',
-        toType: 'branch',
-      });
-    }
-
+    this.compareState.set(preFills);
     this.router.navigate(['/branch-compare']);
   }
 
@@ -197,22 +242,57 @@ export class ArgocdDashboardComponent implements OnInit {
     });
 
     forkJoin(requests).subscribe(results => {
-      const allApps = results.flatMap((apps, idx) => {
-        const envName = selectedEnvs[idx].config.name?.trim().toUpperCase();
+      const registry = this.authConfig.serviceRegistry();
+      const groupedMap = new Map<string, GroupedAppRow>();
 
-        // ── Hardcoded namespace rules ────────────────────────────────────────
+      results.forEach((apps, idx) => {
+        const envName = selectedEnvs[idx].config.name?.trim().toUpperCase() || 'UNKNOWN';
+
+        let filteredApps = apps;
         if (envName === 'HMG PROD') {
-          return apps.filter(a => a.namespace === 'vida-prod');
+          filteredApps = apps.filter(a => a.namespace === 'vida-prod');
+        } else if (envName === 'HMG PRE-PROD') {
+          filteredApps = apps.filter(a => a.namespace === 'vida-uat');
         }
-        if (envName === 'HMG PRE-PROD') {
-          return apps.filter(a => a.namespace === 'vida-uat');
-        }
-        // ─────────────────────────────────────────────────────────────────────
 
-        return apps;
+        filteredApps.forEach(app => {
+          app.envName = envName;
+          const resolved = resolveServices([app.name], registry);
+          
+          let id = app.name;
+          let appName = app.name;
+          let repository = 'Unknown';
+          let resolvedProject = '';
+
+          if (resolved.ok) {
+            id = resolved.result.repository;
+            appName = resolved.result.displayName || app.name;
+            repository = resolved.result.repository;
+            resolvedProject = resolved.result.project;
+          }
+
+          if (!groupedMap.has(id)) {
+            groupedMap.set(id, { appName, repository, resolvedProject, envs: {} });
+          }
+
+          groupedMap.get(id)!.envs[envName] = app;
+        });
       });
 
-      this.dataSource.data = allApps;
+      let groupedRows = Array.from(groupedMap.values());
+      groupedRows.sort((a, b) => a.appName.localeCompare(b.appName));
+
+      this.dataSource.data = groupedRows as any;
+      
+      this.envColumns = selectedEnvs.map(e => e.config.name?.trim().toUpperCase() || 'UNKNOWN');
+      this.displayedColumns = ['select', 'appName', ...this.envColumns];
+      
+      this.envColumns.forEach(col => {
+        if (!(col in this.filterValues)) {
+          this.filterValues[col] = '';
+        }
+      });
+
       this.applyFilter();
 
       this.envs.update(envs => {
@@ -229,12 +309,90 @@ export class ArgocdDashboardComponent implements OnInit {
   }
 
   clearFilters() {
-    Object.keys(this.filterValues).forEach(key => this.filterValues[key] = '');
+    this.filterValues = { appName: '' };
+    this.envColumns.forEach(col => this.filterValues[col] = '');
     this.applyFilter();
+  }
+
+  getHealthClass(app: ArgoAppModel): string {
+    if (app.healthStatus === 'Degraded') return 'status-degraded';
+    if (app.healthStatus === 'Missing') return 'status-missing';
+    if (app.healthStatus === 'Progressing') return 'status-progressing';
+    if (app.syncStatus === 'OutOfSync') return 'status-out-of-sync';
+    return 'status-healthy';
+  }
+
+  getTooltip(app: ArgoAppModel): string {
+    return `Health: ${app.healthStatus} | Sync: ${app.syncStatus}\nSynced At: ${this.formatDate(app.lastSyncedAt)}`;
   }
 
   formatDate(isoString: string): string {
     if (!isoString) return '—';
     return new Date(isoString).toLocaleString();
+  }
+
+  copyToClipboard(text: string) {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+      this.notify.success('Copied to clipboard: ' + text);
+    }).catch(err => {
+      this.notify.error('Failed to copy: ' + err);
+    });
+  }
+
+  copyAsConfluenceTable() {
+    const selected = Array.from(this.selectedRows);
+    if (selected.length === 0) {
+      this.notify.error('Please select at least one application.');
+      return;
+    }
+
+    const envs = this.envColumns;
+    const thStyle = 'border:1px solid #ccc;padding:6px 10px;background:#f4f5f7;font-weight:600;text-align:left;color:#333;';
+    const tdStyle = 'border:1px solid #ccc;padding:6px 10px;vertical-align:top;';
+
+    // Header: App Name + Env Names
+    const headerCells = ['Application Name', ...envs]
+      .map(h => `<th style="${thStyle}">${h}</th>`).join('');
+
+    const rowsHtml = selected.map(row => {
+      const envCells = envs.map(env => {
+        const tag = row.envs[env]?.syncTag || '—';
+        return `<td style="${tdStyle}">${tag}</td>`;
+      }).join('');
+
+      return `<tr>
+        <td style="${tdStyle}"><strong>${row.appName}</strong></td>
+        ${envCells}
+      </tr>`;
+    }).join('');
+
+    const html = `
+      <table style="border-collapse:collapse;width:100%;font-family:sans-serif;font-size:13px;">
+        <thead><tr>${headerCells}</tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>`;
+
+    const plain = [
+      ['Application Name', ...envs].join('\t'),
+      ...selected.map(row => [
+        row.appName,
+        ...envs.map(env => row.envs[env]?.syncTag || '—')
+      ].join('\t'))
+    ].join('\n');
+
+    try {
+      const item = new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([plain], { type: 'text/plain' }),
+      });
+      navigator.clipboard.write([item]).then(() => {
+        this.notify.success(`Copied ${selected.length} apps as a Confluence table!`);
+      }).catch(() => this.notify.error('Failed to copy to clipboard.'));
+    } catch {
+      navigator.clipboard.writeText(plain).then(() => {
+        this.notify.success(`Copied ${selected.length} apps (plain text fallback).`);
+      }).catch(() => this.notify.error('Failed to copy to clipboard.'));
+    }
   }
 }

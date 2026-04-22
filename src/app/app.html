@@ -7,20 +7,16 @@
         </div>
         <div class="logo-text">
           <span class="logo-name">Dev Helper</span>
-          <span class="logo-sub">{{ session.session().domain === 'work' ? 'Enterprise Shell' : 'Personal Container' }}</span>
+          <span class="logo-sub">{{ session.session().domain === 'work' ? 'Enterprise Shell' : 'Personal Container'
+            }}</span>
         </div>
       </div>
 
       <nav class="sidebar-nav" *ngIf="session.session().domain === 'work'">
         <ng-container *ngFor="let item of navItems">
           <!-- Normal Link -->
-          <a
-            *ngIf="!item.children"
-            [routerLink]="item.path"
-            routerLinkActive="active"
-            class="nav-item"
-            [title]="item.label"
-          >
+          <a *ngIf="!item.children" [routerLink]="item.path" routerLinkActive="active" class="nav-item"
+            [title]="item.label">
             <mat-icon>{{ item.icon }}</mat-icon>
             <span>{{ item.label }}</span>
             <span *ngIf="item.badge" class="nav-badge">{{ item.badge }}</span>
@@ -33,15 +29,10 @@
               <span>{{ item.label }}</span>
               <mat-icon class="chevron">{{ item.expanded ? 'expand_less' : 'expand_more' }}</mat-icon>
             </div>
-            
+
             <div class="nav-children" *ngIf="item.expanded">
-              <a
-                *ngFor="let child of item.children"
-                [routerLink]="child.path"
-                routerLinkActive="active"
-                class="nav-item child-item"
-                [title]="child.label"
-              >
+              <a *ngFor="let child of item.children" [routerLink]="child.path" routerLinkActive="active"
+                class="nav-item child-item" [title]="child.label">
                 <mat-icon>{{ child.icon }}</mat-icon>
                 <span>{{ child.label }}</span>
               </a>
@@ -60,11 +51,8 @@
       </nav>
 
       <div class="sidebar-footer">
-        <div class="config-status" (click)="switchDomain()" style="cursor: pointer; margin-bottom: 8px;">
-          <mat-icon>swap_horiz</mat-icon>
-          <span>Switch to {{ session.session().domain === 'work' ? 'Personal' : 'Work' }}</span>
-        </div>
-        <div class="config-status" [class.configured]="isConfigured()" style="cursor: pointer;" (click)="session.logout()">
+        <div class="config-status" [class.configured]="isConfigured()" style="cursor: pointer;"
+          (click)="session.logout()">
           <mat-icon>logout</mat-icon>
           <span>{{ session.session().username }} (Log Out)</span>
         </div>

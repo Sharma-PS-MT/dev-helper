@@ -18,7 +18,7 @@ import { AuthConfigService } from '../../core/services/auth-config.service';
 import { BitbucketProject, BitbucketRepo, BitbucketBranch, BitbucketTag, BranchComparison } from '../../core/models/bitbucket.models';
 import { TicketBadgeComponent } from '../../shared/components/ticket-badge/ticket-badge.component';
 import { catchError, finalize } from 'rxjs/operators';
-import { of } from 'rxjs';
+import { of, lastValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-branch-compare',
@@ -53,8 +53,8 @@ export class BranchCompareComponent implements OnInit {
     return this.repos().filter(r => (r.name || '').toLowerCase().includes(t) || (r.slug || '').toLowerCase().includes(t));
   });
 
-  fromType = signal<'branch'|'tag'>('branch');
-  toType = signal<'branch'|'tag'>('branch');
+  fromType = signal<'branch' | 'tag'>('branch');
+  toType = signal<'branch' | 'tag'>('branch');
 
   fromRef = signal<string>('');
   toRef = signal<string>('');
@@ -78,7 +78,14 @@ export class BranchCompareComponent implements OnInit {
   loadingRefs = signal(false);
   comparing = signal(false);
 
+  results = signal<(BranchComparison & { repoSlug?: string })[]>([]); // To be removed, replaced with multiQueue
   result = signal<BranchComparison | null>(null);
+
+  multiQueue = signal<import('../../core/services/branch-compare-state.service').BranchComparePreFill[]>([]);
+  multiIndex = signal(0);
+
+  get hasNext() { return this.multiIndex() < this.multiQueue().length - 1; }
+  get hasPrev() { return this.multiIndex() > 0; }
 
   /** When true, commits whose message starts with common branch-merge patterns are hidden */
   excludeMergeCommits = signal(true);
@@ -115,8 +122,10 @@ export class BranchCompareComponent implements OnInit {
   filteredCommits = computed(() => {
     const res = this.result();
     if (!res) return [];
+
     const excludeMerges = this.excludeMergeCommits();
     const excludePRs = this.excludePullRequests();
+
     return res.commits.filter(cwt => {
       const msg = cwt.commit.message.trim();
       if (excludeMerges && BranchCompareComponent.MERGE_PATTERNS.some(p => p.test(msg))) return false;
@@ -139,7 +148,7 @@ export class BranchCompareComponent implements OnInit {
     private notify: NotificationService,
     private compareState: BranchCompareStateService,
     private authConfig: AuthConfigService,
-  ) {}
+  ) { }
 
   ngOnInit(): void {
     this.loadProjects();
@@ -153,12 +162,25 @@ export class BranchCompareComponent implements OnInit {
 
   /**
    * Applies ArgoCD pre-fill state:
-   * 1. Sets project + triggers repo load
-   * 2. After repos load, sets repo + triggers ref load
-   * 3. After refs load, sets fromRef/toRef
+   * 1. Sets multiQueue and multiIndex
+   * 2. Loads the first queue item
    */
-  private _applyPreFill(state: import('../../core/services/branch-compare-state.service').BranchComparePreFill) {
+  private _applyPreFill(queue: import('../../core/services/branch-compare-state.service').BranchComparePreFill[]) {
+    if (queue.length === 0) return;
+    
+    this.multiQueue.set(queue);
+    this.multiIndex.set(0);
+    this._loadQueueItem(0);
+  }
+
+  private _loadQueueItem(index: number) {
+    const queue = this.multiQueue();
+    if (index < 0 || index >= queue.length) return;
+    
+    const state = queue[index];
     const { project, repository, fromRef, fromType, toRef, toType } = state;
+
+    this.result.set(null);
 
     // Wait for projects to load, then auto-select
     this.bitbucket.getProjects().subscribe(projects => {
@@ -206,10 +228,28 @@ export class BranchCompareComponent implements OnInit {
           this.fromRef.set(fromRef);
           this.toRef.set(toRef);
 
-          this.notify.success(`Pre-filled: ${project}/${repository} — ${fromRef} → ${toRef}`);
+          if (queue.length > 1) {
+            this.notify.success(`Loaded ${index + 1} of ${queue.length}: ${project}/${repository}`);
+          }
+          
+          this.compare();
         });
       });
     });
+  }
+
+  nextCompare() {
+    if (this.hasNext) {
+      this.multiIndex.update(i => i + 1);
+      this._loadQueueItem(this.multiIndex());
+    }
+  }
+
+  prevCompare() {
+    if (this.hasPrev) {
+      this.multiIndex.update(i => i - 1);
+      this._loadQueueItem(this.multiIndex());
+    }
   }
 
   loadProjects(): void {
@@ -247,7 +287,7 @@ export class BranchCompareComponent implements OnInit {
     this.loadingRefs.set(true);
     this.fromRef.set('');
     this.toRef.set('');
-    
+
     const proj = this.selectedProject() || undefined;
 
     const b$ = this.bitbucket.getBranches(slug, proj).pipe(catchError(() => of([])));
@@ -305,6 +345,8 @@ export class BranchCompareComponent implements OnInit {
     this.fromRef.set('');
     this.toRef.set('');
     this.result.set(null);
+    this.multiQueue.set([]);
+    this.multiIndex.set(0);
     this.pageIndex.set(0);
   }
 
@@ -433,7 +475,7 @@ export class BranchCompareComponent implements OnInit {
     // ── Write to clipboard ─────────────────────────────────────────────────
     try {
       const item = new ClipboardItem({
-        'text/html':  new Blob([html],  { type: 'text/html' }),
+        'text/html': new Blob([html], { type: 'text/html' }),
         'text/plain': new Blob([plain], { type: 'text/plain' }),
       });
       navigator.clipboard.write([item]).then(() => {

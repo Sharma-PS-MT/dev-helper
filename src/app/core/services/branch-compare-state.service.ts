@@ -31,18 +31,22 @@ export interface BranchComparePreFill {
 @Injectable({ providedIn: 'root' })
 export class BranchCompareStateService {
   /** Filled by ArgoCD dashboard, consumed (and cleared) by BranchCompareComponent */
-  private _preFill = signal<BranchComparePreFill | null>(null);
+  private _preFill = signal<BranchComparePreFill[] | null>(null);
 
   /** Read-only accessor */
   readonly preFill = this._preFill.asReadonly();
 
   /** ArgoCD dashboard calls this before navigating */
-  set(state: BranchComparePreFill) {
-    this._preFill.set(state);
+  set(state: BranchComparePreFill | BranchComparePreFill[]) {
+    if (Array.isArray(state)) {
+      this._preFill.set(state);
+    } else {
+      this._preFill.set([state]);
+    }
   }
 
   /** BranchCompareComponent calls this after reading the state */
-  consume(): BranchComparePreFill | null {
+  consume(): BranchComparePreFill[] | null {
     const val = this._preFill();
     this._preFill.set(null);
     return val;

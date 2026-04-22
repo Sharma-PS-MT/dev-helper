@@ -1,6 +1,6 @@
 <div class="login-page">
   <div class="login-wrapper fade-in-up">
-    
+
     <div class="brand-header">
       <div class="logo-icon"><mat-icon>developer_mode</mat-icon></div>
       <h1>Dev Helper</h1>
@@ -11,14 +11,15 @@
       <div class="input-section">
         <mat-form-field appearance="outline" class="w-full">
           <mat-label>Username</mat-label>
-          <input matInput [ngModel]="username()" (ngModelChange)="username.set($event)" placeholder="e.g. alice" (keyup.enter)="submit()" />
+          <input matInput [ngModel]="username()" (ngModelChange)="username.set($event)" placeholder="e.g. alice"
+            (keyup.enter)="submit()" />
           <mat-icon matPrefix>person</mat-icon>
         </mat-form-field>
       </div>
 
       <div class="domain-section">
         <p class="section-label">Select Workspace Domain</p>
-        
+
         <div class="domain-cards">
           <div class="domain-card" [class.selected]="selectedDomain() === 'work'" (click)="selectDomain('work')">
             <mat-icon class="domain-icon">business_center</mat-icon>
@@ -26,19 +27,12 @@
             <p>Enterprise integrations, PRs, Keycloak</p>
             <div class="check-ring" *ngIf="selectedDomain() === 'work'"><mat-icon>check</mat-icon></div>
           </div>
-          
-          <div class="domain-card" [class.selected]="selectedDomain() === 'personal'" (click)="selectDomain('personal')">
-            <mat-icon class="domain-icon">home</mat-icon>
-            <h3>Personal Space</h3>
-            <p>Private configurations & deployments</p>
-            <div class="check-ring" *ngIf="selectedDomain() === 'personal'"><mat-icon>check</mat-icon></div>
-          </div>
+
         </div>
       </div>
 
-      <button mat-flat-button color="primary" class="enter-btn w-full" 
-              [disabled]="!username().trim() || !selectedDomain()" 
-              (click)="submit()">
+      <button mat-flat-button color="primary" class="enter-btn w-full"
+        [disabled]="!username().trim() || !selectedDomain()" (click)="submit()">
         Enter Workspace <mat-icon iconPositionEnd>arrow_forward</mat-icon>
       </button>
     </mat-card>

@@ -6,14 +6,12 @@ import { MatIconModule } from '@angular/material/icon';
 import { ArgoAppModel } from '../../core/services/argocd.service';
 
 interface CompareData {
-  appA: ArgoAppModel;
-  appB: ArgoAppModel;
+  apps: ArgoAppModel[];
 }
 
 interface CompareRow {
   label: string;
-  valA: string;
-  valB: string;
+  vals: string[];
   different: boolean;
 }
 
@@ -30,24 +28,23 @@ interface CompareRow {
 
       <div class="compare-body">
         <!-- App name headers -->
-        <div class="compare-grid header-row">
+        <div class="compare-grid header-row" [style.grid-template-columns]="getGridColumns()">
           <div class="field-label"></div>
-          <div class="val-header">{{ data.appA.name }}</div>
-          <div class="val-header">{{ data.appB.name }}</div>
+          <div class="val-header" *ngFor="let app of data.apps">
+            {{ app.name }}<br>
+            <span style="font-size: 11px; font-weight: normal; opacity: 0.8">{{ app.envName }}</span>
+          </div>
         </div>
 
         <!-- Diff rows -->
         <div class="compare-grid data-row"
              *ngFor="let row of rows"
-             [class.diff]="row.different">
+             [class.diff]="row.different"
+             [style.grid-template-columns]="getGridColumns()">
           <div class="field-label">{{ row.label }}</div>
-          <div class="field-val" [class.changed]="row.different">
+          <div class="field-val" *ngFor="let val of row.vals" [class.changed]="row.different">
             <mat-icon *ngIf="row.different" class="diff-icon" inline>circle</mat-icon>
-            {{ row.valA || '—' }}
-          </div>
-          <div class="field-val" [class.changed]="row.different">
-            <mat-icon *ngIf="row.different" class="diff-icon" inline>circle</mat-icon>
-            {{ row.valB || '—' }}
+            {{ val || '—' }}
           </div>
         </div>
       </div>
@@ -81,7 +78,6 @@ interface CompareRow {
     }
     .compare-grid {
       display: grid;
-      grid-template-columns: 160px 1fr 1fr;
       gap: 8px;
       align-items: center;
       padding: 8px 0;
@@ -145,12 +141,16 @@ export class ArgocdCompareDialogComponent {
     ];
 
     this.rows = fields.map(f => {
-      const valA = String(data.appA[f.key] ?? '');
-      const valB = String(data.appB[f.key] ?? '');
-      return { label: f.label, valA, valB, different: valA !== valB };
+      const vals = data.apps.map(app => String(app[f.key] ?? ''));
+      const different = new Set(vals).size > 1;
+      return { label: f.label, vals, different };
     });
 
     this.diffCount = this.rows.filter(r => r.different).length;
+  }
+
+  getGridColumns() {
+    return `160px repeat(${this.data.apps.length}, 1fr)`;
   }
 
   close() { this.dialogRef.close(); }
