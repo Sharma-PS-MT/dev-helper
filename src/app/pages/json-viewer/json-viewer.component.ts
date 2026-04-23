@@ -12,6 +12,10 @@ import { NotificationService } from '../../core/services/notification.service';
 import { JSONPath } from 'jsonpath-plus';
 import { MatSelectModule } from '@angular/material/select';
 import { MatOptionModule } from '@angular/material/core';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatDialogModule, MatDialog } from '@angular/material/dialog';
+import { TemplateRef, ViewChild } from '@angular/core';
 
 @Component({
   selector: 'app-json-viewer',
@@ -20,7 +24,8 @@ import { MatOptionModule } from '@angular/material/core';
     CommonModule, FormsModule,
     MatCardModule, MatFormFieldModule, MatInputModule,
     MatButtonModule, MatIconModule, MatTooltipModule,
-    MatSelectModule, MatOptionModule
+    MatSelectModule, MatOptionModule, MatAutocompleteModule,
+    MatMenuModule, MatDialogModule
   ],
   templateUrl: './json-viewer.component.html',
   styleUrls: ['./json-viewer.component.scss']
@@ -37,11 +42,16 @@ export class JsonViewerComponent {
   // Query & Analysis
   queryInput = signal<string>('');
   queryType = signal<'jsonpath' | 'regex'>('jsonpath');
-  calculationType = signal<'none' | 'sum' | 'avg' | 'count' | 'min' | 'max'>('none');
+  calculationType = signal<'none' | 'sum' | 'avg' | 'count' | 'min' | 'max'>('sum');
   queryResult = signal<any>(null);
   calculationResult = signal<string | number | null>(null);
   queryError = signal<string>('');
-  isFooterExpanded = signal<boolean>(true);
+  isFooterExpanded = signal<boolean>(false);
+
+  // Suggestions
+  suggestions = signal<{display: string, value: string}[]>([]);
+  /** Maps a normalised path-segment string to the keys available at that level. */
+  pathIndex = signal<Map<string, Set<string>>>(new Map());
 
   // Statistics
   itemCount = computed(() => {
@@ -59,9 +69,12 @@ export class JsonViewerComponent {
     return typeof obj === 'object' ? 'Object' : typeof obj;
   });
 
+  @ViewChild('helpDialog') helpDialogTpl!: TemplateRef<any>;
+
   constructor(
     private sanitizer: DomSanitizer,
-    private notify: NotificationService
+    private notify: NotificationService,
+    private dialog: MatDialog
   ) {}
 
   onPaste(event: ClipboardEvent) {
@@ -79,6 +92,7 @@ export class JsonViewerComponent {
       this.isValid.set(true);
       this.errorMsg.set('');
       this.generateHighlightedHtml(val);
+      this.extractKeys(parsed); // Build keys for autocomplete
       this.applyQuery(); // Trigger query update
     } catch (e: any) {
       this.isValid.set(false);
@@ -98,18 +112,18 @@ export class JsonViewerComponent {
       this.queryResult.set(null);
       this.queryError.set('');
       this.applyCalculation();
+      this.updateSuggestions('');
       return;
     }
 
     try {
       this.queryError.set('');
       if (type === 'jsonpath') {
-        const result = JSONPath({ path: query, json: obj });
+        const normalizedQuery = this.normalizeJsonPath(query);
+        const result = JSONPath({ path: normalizedQuery, json: obj });
         this.queryResult.set(result);
       } else {
-        // Regex search on the stringified JSON or structured?
-        // Usually regex on JSON means searching values or keys.
-        // We'll treat it as a filter on string values if it's an array, or just string match.
+        // Regex search
         const regex = new RegExp(query, 'i');
         const results: any[] = [];
         
@@ -127,11 +141,127 @@ export class JsonViewerComponent {
         this.queryResult.set(results);
       }
       this.applyCalculation();
+      this.updateSuggestions(query);
     } catch (e: any) {
       this.queryError.set(e.message || 'Query Error');
       this.queryResult.set(null);
       this.calculationResult.set(null);
     }
+  }
+
+
+
+  updateSuggestions(query: string) {
+    if (this.queryType() !== 'jsonpath') {
+      this.suggestions.set([]);
+      return;
+    }
+
+    // When the input is completely empty, just suggest the root starter
+    if (!query.trim()) {
+      this.suggestions.set([{ display: '$.', value: '$.' }]);
+      return;
+    }
+
+    const index = this.pathIndex();
+    if (index.size === 0) { this.suggestions.set([]); return; }
+
+    // Determine whether the user just finished a segment (ends with . or [)
+    // or is mid-typing a key token.
+    const endsWithSep = /[.\[]$/.test(query);
+    const contextPath = endsWithSep ? query : query.replace(/[^.\[]*$/, '');
+    // Partial token being typed (empty when cursor is right after a separator)
+    const partial = endsWithSep ? '' : (query.match(/[^.\[\]"']*$/) ?? [''])[0];
+
+    // Normalise the context path to a lookup key used in pathIndex:
+    // Strip leading $ and any trailing . or [, collapse [*] / [0-9] into [*]
+    const normKey = this.normalisePathKey(contextPath);
+
+    const keysAtLevel = index.get(normKey);
+    if (!keysAtLevel || keysAtLevel.size === 0) {
+      this.suggestions.set([]);
+      return;
+    }
+
+    const filtered = Array.from(keysAtLevel)
+      .filter(k => !partial || k.toLowerCase().startsWith(partial.toLowerCase()))
+      .slice(0, 5)
+      .map(k => {
+        let fullPath = '';
+        if (contextPath.endsWith('.')) {
+          fullPath = contextPath + k;
+        } else if (contextPath.endsWith('[')) {
+          // If the user typed '[', then they are probably typing a property inside brackets.
+          // Wait, 'k' can be '[*]' which already has brackets.
+          if (k.startsWith('[')) {
+            // e.g. contextPath = '$.', but k is '[*]'
+            fullPath = contextPath + k;
+          } else {
+            fullPath = contextPath + k + (k.endsWith(']') ? '' : ']');
+          }
+        } else {
+          // It's the root (e.g., user typed nothing or just $ and we didn't match endsWithSep)
+          if (k.startsWith('[')) fullPath = contextPath + k;
+          else fullPath = contextPath + (contextPath ? '.' : '') + k;
+        }
+        
+        // Clean up any double dots or brackets
+        fullPath = fullPath.replace(/\.\./g, '.').replace(/\[\[/g, '[').replace(/\]\]/g, ']');
+        
+        // Auto-append dot if it has children (i.e. if it's an object/array)
+        const norm = this.normalisePathKey(fullPath);
+        if (index.has(norm)) {
+          fullPath += '.';
+        }
+        
+        return { display: k, value: fullPath };
+      });
+
+    this.suggestions.set(filtered);
+  }
+
+  /** Normalise a partial JSONPath into an index lookup key. */
+  private normalisePathKey(path: string): string {
+    let p = path
+      .replace(/\[\d+\]/g, '[*]')   // collapse numeric indices
+      .replace(/\.$/, '')           // trailing dot
+      .replace(/\[$/, '')           // trailing open bracket
+      .replace(/\.\./g, '.**.')     // recursive descent marker
+      .replace(/\.\[/g, '[');       // collapse optional dot before array bracket
+    
+    if (!p) return '$';
+    if (!p.startsWith('$')) p = '$' + (p.startsWith('.') ? p : '.' + p);
+    
+    // Clean up double dots or $. at start
+    p = p.replace(/^\$\./, '$');
+    if (p === '') return '$';
+    return p;
+  }
+
+  extractKeys(obj: any) {
+    const index = new Map<string, Set<string>>();
+
+    const addKey = (pathKey: string, key: string) => {
+      if (!index.has(pathKey)) index.set(pathKey, new Set());
+      index.get(pathKey)!.add(key);
+    };
+
+    const walk = (item: any, pathKey: string) => {
+      if (Array.isArray(item)) {
+        addKey(pathKey, '[*]');
+        if (item.length > 0) {
+          walk(item[0], pathKey + '[*]');
+        }
+      } else if (typeof item === 'object' && item !== null) {
+        Object.keys(item).forEach(k => {
+          addKey(pathKey, k);
+          walk(item[k], pathKey + (pathKey === '$' ? '' : '.') + k);
+        });
+      }
+    };
+
+    walk(obj, '$');
+    this.pathIndex.set(index);
   }
 
   applyCalculation() {
@@ -143,8 +273,8 @@ export class JsonViewerComponent {
       return;
     }
 
-    // Ensure we have an array for calculations
-    const items = Array.isArray(data) ? data : [data];
+    // Ensure we have a flat array of numbers for calculations
+    const items = Array.isArray(data) ? data.flat(Infinity) : [data];
     const numericItems = items
       .map(item => (typeof item === 'number' ? item : parseFloat(item)))
       .filter(item => !isNaN(item));
@@ -171,6 +301,46 @@ export class JsonViewerComponent {
   }
 
   onQueryChange() {
+    this.applyQuery();
+  }
+
+  /**
+   * Normalize a JSONPath query to work around the jsonpath-plus limitation
+   * where quoted union keys (e.g., ['key1','key2']) return empty results.
+   * Simple identifier keys are unquoted: ['a','b'] → [a,b]
+   * Quoted keys that are not simple identifiers (e.g., contain spaces) are left as-is.
+   */
+  private normalizeJsonPath(path: string): string {
+    // Match bracket expressions like ['key1','key2'] or ["key1","key2"] with 2+ items
+    return path.replace(/\[([^\]]+)\]/g, (match, inner) => {
+      // Split by comma, handling optional spaces around commas
+      const parts = inner.split(',').map((p: string) => p.trim());
+
+      // Check if all parts are quoted simple identifiers
+      const isQuotedUnion = parts.length > 1 && parts.every((p: string) =>
+        /^['"][a-zA-Z_$][a-zA-Z0-9_$]*['"]$/.test(p)
+      );
+
+      if (isQuotedUnion) {
+        // Strip the quotes from each key
+        const unquoted = parts.map((p: string) => p.slice(1, -1)).join(',');
+        return `[${unquoted}]`;
+      }
+
+      return match;
+    });
+  }
+
+  onSuggestionSelect(suggestion: string) {
+    const current = this.queryInput();
+    const parts = current.split(/[.\[\]]/);
+    
+    // Find where the last part starts
+    const lastPart = parts[parts.length - 1];
+    const prefix = current.substring(0, current.lastIndexOf(lastPart));
+    
+    const updated = prefix + suggestion;
+    this.queryInput.set(updated);
     this.applyQuery();
   }
 
@@ -318,6 +488,19 @@ export class JsonViewerComponent {
     this.queryResult.set(null);
     this.calculationResult.set(null);
     this.queryError.set('');
+    this.pathIndex.set(new Map());
+    this.suggestions.set([]);
+  }
+
+  async copyQueryResult() {
+    const result = this.queryResult();
+    if (result === null) return;
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(result, null, 2));
+      this.notify.success('Query results copied to clipboard.');
+    } catch {
+      this.notify.error('Failed to copy. Your browser might block this without HTTPS.');
+    }
   }
 
   async copyToClipboard() {
@@ -329,5 +512,12 @@ export class JsonViewerComponent {
     } catch (e) {
       this.notify.error('Failed to copy. Your browser might block this action without HTTPS.');
     }
+  }
+
+  openHelpDialog() {
+    this.dialog.open(this.helpDialogTpl, {
+      width: '600px',
+      panelClass: 'premium-dialog'
+    });
   }
 }

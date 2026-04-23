@@ -23,7 +23,7 @@
       </div>
 
       <mat-form-field appearance="outline" class="w-full textarea-field">
-        <textarea matInput rows="20" [(ngModel)]="rawJson" (ngModelChange)="onInputChange($event)"
+        <textarea matInput [(ngModel)]="rawJson" (ngModelChange)="onInputChange($event)"
           (paste)="onPaste($event)" placeholder="Paste your raw JSON array or object here..."></textarea>
       </mat-form-field>
 
@@ -66,21 +66,21 @@
   </div>
 
   <!-- Query & Analysis Footer Section -->
-  <div class="section-card query-analysis flex-col fade-in-up" [class.collapsed]="!isFooterExpanded()" *ngIf="parsedObj()">
+  <div class="section-card query-analysis flex-col fade-in-up" [class.collapsed]="!isFooterExpanded()">
     <div class="section-title justify-between cursor-pointer" (click)="toggleFooter()">
       <div class="flex items-center gap-2">
         <mat-icon>analytics</mat-icon> 
         <span>Query & Analysis</span>
       </div>
-      <button mat-icon-button>
-        <mat-icon>{{ isFooterExpanded() ? 'expand_more' : 'expand_less' }}</mat-icon>
+      <button mat-icon-button class="toggle-btn">
+        <mat-icon>expand_more</mat-icon>
       </button>
     </div>
 
-    <div class="footer-content flex-col gap-3" *ngIf="isFooterExpanded()">
+    <div class="footer-content flex-col gap-3">
       <!-- Row 1: Query (3:9 Ratio) -->
       <div class="query-row flex gap-4">
-        <mat-form-field appearance="outline" class="w-3-12">
+        <mat-form-field appearance="outline" class="w-2-12">
           <mat-label>Query Type</mat-label>
           <mat-select [ngModel]="queryType()" (ngModelChange)="queryType.set($event); applyQuery()">
             <mat-option value="jsonpath">JSONPath</mat-option>
@@ -88,17 +88,83 @@
           </mat-select>
         </mat-form-field>
 
-        <mat-form-field appearance="outline" class="w-9-12">
+        <mat-form-field appearance="outline" class="w-10-12">
           <mat-label>{{ queryType() === 'jsonpath' ? 'JSONPath Expression' : 'Regex Pattern' }}</mat-label>
           <input matInput [ngModel]="queryInput()" (ngModelChange)="queryInput.set($event); onQueryChange()" 
+            [matAutocomplete]="auto"
             [placeholder]="queryType() === 'jsonpath' ? '$.phoneNumbers[:1].type' : 'pattern...'">
-          <mat-icon matSuffix *ngIf="queryError()" color="warn" [matTooltip]="queryError()">error</mat-icon>
-        </mat-form-field>
-      </div>
+          
+          <mat-autocomplete #auto="matAutocomplete" (optionSelected)="applyQuery()">
+            <mat-option *ngFor="let suggestion of suggestions()" [value]="suggestion.value">
+              {{ suggestion.display }}
+            </mat-option>
+          </mat-autocomplete>
+
+        <button mat-icon-button matSuffix (click)="openHelpDialog(); $event.stopPropagation()" matTooltip="Help & Examples">
+          <mat-icon>info_outline</mat-icon>
+        </button>
+        
+        <mat-icon matSuffix *ngIf="queryError()" color="warn" [matTooltip]="queryError()" class="mr-2">error</mat-icon>
+      </mat-form-field>
+    </div>
+
+      <!-- Help Dialog Template -->
+      <ng-template #helpDialog>
+        <div class="premium-dialog-container">
+          <div class="dialog-header">
+            <mat-icon>lightbulb</mat-icon>
+            <span>JSONPath Help & Examples</span>
+            <button mat-icon-button mat-dialog-close><mat-icon>close</mat-icon></button>
+          </div>
+          
+          <div mat-dialog-content class="dialog-body">
+            <p class="intro">JSONPath allows you to filter and extract data from your JSON structure. Below are common patterns used in this application:</p>
+            
+            <div class="example-grid">
+              <div class="example-card" (click)="queryInput.set('$.[*].services[*].companyShareAmount'); applyQuery();" mat-dialog-close>
+                <div class="card-header">
+                  <span class="code">$.[*].services[*].companyShareAmount</span>
+                </div>
+                <div class="card-body">
+                  <span class="desc">Extracts the <strong>companyShareAmount</strong> from every service in the list.</span>
+                </div>
+              </div>
+
+              <div class="example-card" (click)="queryInput.set('$.[*].services[*].[\'companyShareAmount\', \'companyTax\']'); applyQuery();" mat-dialog-close>
+                <div class="card-header">
+                  <span class="code">$.[*].services[*].['companyShareAmount', 'companyTax']</span>
+                </div>
+                <div class="card-body">
+                  <span class="desc">Extracts <strong>both</strong> fields simultaneously. Useful for calculating total costs (Sum/Avg).</span>
+                </div>
+              </div>
+
+              <div class="example-card" (click)="queryInput.set('$.[*].services[?(@.lineItemNo==1)].packageDetails.[*].[\'companyShareAmount\',\'companyTax\']'); applyQuery();" mat-dialog-close>
+                <div class="card-header">
+                  <span class="code">$.[*].services[?(@.lineItemNo==1)]...</span>
+                </div>
+                <div class="card-body">
+                  <span class="desc">Filters services where <strong>lineItemNo is 1</strong>, then dives into <strong>packageDetails</strong> to get share and tax.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="syntax-tips">
+              <h5>Quick Tips:</h5>
+              <ul>
+                <li><code>$</code> represents the root object or array.</li>
+                <li><code>[*]</code> iterates over all items in an array.</li>
+                <li><code>?(@.field == val)</code> filters items based on a condition.</li>
+                <li><code>['a', 'b']</code> selects multiple properties (Union).</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </ng-template>
 
       <!-- Row 2: Analysis (3:9 Ratio) -->
       <div class="analysis-row flex gap-4 items-center">
-        <mat-form-field appearance="outline" class="w-3-12">
+        <mat-form-field appearance="outline" class="w-2-12">
           <mat-label>Calculation</mat-label>
           <mat-select [ngModel]="calculationType()" (ngModelChange)="calculationType.set($event); applyCalculation()">
             <mat-option value="none">None</mat-option>
@@ -110,7 +176,7 @@
           </mat-select>
         </mat-form-field>
 
-        <div class="w-9-12">
+        <div class="w-10-12">
           <div class="result-chip-compact" *ngIf="calculationType() !== 'none'">
             <span class="label">{{ calculationType().toUpperCase() }}:</span>
             <span class="value">{{ calculationResult() ?? 'N/A' }}</span>
@@ -118,9 +184,14 @@
         </div>
       </div>
 
-      <!-- Query Results (Optional visibility based on expansion?) -->
+      <!-- Query Results -->
       <div class="query-results-compact" *ngIf="queryResult() !== null">
-        <div class="result-header">Query Results</div>
+        <div class="result-header">
+          <span>Query Results</span>
+          <button class="copy-result-btn" matTooltip="Copy Results" (click)="copyQueryResult()">
+            <mat-icon>content_copy</mat-icon>
+          </button>
+        </div>
         <div class="result-content">
           <pre>{{ queryResult() | json }}</pre>
         </div>
