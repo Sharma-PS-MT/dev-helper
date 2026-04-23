@@ -48,7 +48,54 @@
 - Python (v3.10+)
 - Angular CLI (`npm install -g @angular/cli`)
 
-### 2. Frontend Setup
+---
+
+### ⚡ Quick Start — Run in Background
+
+Both services start as **independent background processes** — your terminal is freed immediately after running the script.
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd dev-helper
+
+# Make scripts executable (first time only)
+chmod +x start.sh stop.sh
+
+# Launch both services in the background
+./start.sh
+```
+
+| Service | URL | Log file |
+|---------|-----|----------|
+| 🌐 Frontend (Angular) | http://localhost:4201 | `logs/frontend.log` |
+| ⚙️ Backend (FastAPI)  | http://localhost:8000 | `logs/backend.log`  |
+
+**What the script does:**
+1. Verifies Node.js, npm, Python and uvicorn are available.
+2. Runs `npm install` automatically if `node_modules` is missing.
+3. Runs `pip install -r requirements.txt` automatically if packages are missing.
+4. Launches both services via `nohup` — each in its own independent process.
+5. Saves each service's PID to `logs/*.pid` for clean management.
+
+**Useful commands while services are running:**
+```bash
+# Follow live logs of both services
+tail -f logs/frontend.log logs/backend.log
+
+# Follow only one service
+tail -f logs/frontend.log
+tail -f logs/backend.log
+
+# Stop both services
+./stop.sh
+```
+
+> **Windows users:** Run the scripts inside **Git Bash**, **WSL**, or any bash-compatible shell.
+
+---
+
+### 2. Frontend Setup (manual)
 ```bash
 # Clone the repository
 git clone <repository-url>
@@ -62,7 +109,7 @@ npm run start
 ```
 The app will be available at `http://localhost:4201`.
 
-### 3. Backend Microservice Setup
+### 3. Backend Microservice Setup (manual)
 ```bash
 cd python-ai
 
