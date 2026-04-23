@@ -64,4 +64,67 @@
       </div>
     </div>
   </div>
+
+  <!-- Query & Analysis Footer Section -->
+  <div class="section-card query-analysis flex-col fade-in-up" [class.collapsed]="!isFooterExpanded()" *ngIf="parsedObj()">
+    <div class="section-title justify-between cursor-pointer" (click)="toggleFooter()">
+      <div class="flex items-center gap-2">
+        <mat-icon>analytics</mat-icon> 
+        <span>Query & Analysis</span>
+      </div>
+      <button mat-icon-button>
+        <mat-icon>{{ isFooterExpanded() ? 'expand_more' : 'expand_less' }}</mat-icon>
+      </button>
+    </div>
+
+    <div class="footer-content flex-col gap-3" *ngIf="isFooterExpanded()">
+      <!-- Row 1: Query (3:9 Ratio) -->
+      <div class="query-row flex gap-4">
+        <mat-form-field appearance="outline" class="w-3-12">
+          <mat-label>Query Type</mat-label>
+          <mat-select [ngModel]="queryType()" (ngModelChange)="queryType.set($event); applyQuery()">
+            <mat-option value="jsonpath">JSONPath</mat-option>
+            <mat-option value="regex">Regex</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="w-9-12">
+          <mat-label>{{ queryType() === 'jsonpath' ? 'JSONPath Expression' : 'Regex Pattern' }}</mat-label>
+          <input matInput [ngModel]="queryInput()" (ngModelChange)="queryInput.set($event); onQueryChange()" 
+            [placeholder]="queryType() === 'jsonpath' ? '$.phoneNumbers[:1].type' : 'pattern...'">
+          <mat-icon matSuffix *ngIf="queryError()" color="warn" [matTooltip]="queryError()">error</mat-icon>
+        </mat-form-field>
+      </div>
+
+      <!-- Row 2: Analysis (3:9 Ratio) -->
+      <div class="analysis-row flex gap-4 items-center">
+        <mat-form-field appearance="outline" class="w-3-12">
+          <mat-label>Calculation</mat-label>
+          <mat-select [ngModel]="calculationType()" (ngModelChange)="calculationType.set($event); applyCalculation()">
+            <mat-option value="none">None</mat-option>
+            <mat-option value="sum">Sum</mat-option>
+            <mat-option value="avg">Average</mat-option>
+            <mat-option value="count">Count</mat-option>
+            <mat-option value="min">Min</mat-option>
+            <mat-option value="max">Max</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <div class="w-9-12">
+          <div class="result-chip-compact" *ngIf="calculationType() !== 'none'">
+            <span class="label">{{ calculationType().toUpperCase() }}:</span>
+            <span class="value">{{ calculationResult() ?? 'N/A' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Query Results (Optional visibility based on expansion?) -->
+      <div class="query-results-compact" *ngIf="queryResult() !== null">
+        <div class="result-header">Query Results</div>
+        <div class="result-content">
+          <pre>{{ queryResult() | json }}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>

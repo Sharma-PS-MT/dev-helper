@@ -9,6 +9,9 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { NotificationService } from '../../core/services/notification.service';
+import { JSONPath } from 'jsonpath-plus';
+import { MatSelectModule } from '@angular/material/select';
+import { MatOptionModule } from '@angular/material/core';
 
 @Component({
   selector: 'app-json-viewer',
@@ -16,7 +19,8 @@ import { NotificationService } from '../../core/services/notification.service';
   imports: [
     CommonModule, FormsModule,
     MatCardModule, MatFormFieldModule, MatInputModule,
-    MatButtonModule, MatIconModule, MatTooltipModule
+    MatButtonModule, MatIconModule, MatTooltipModule,
+    MatSelectModule, MatOptionModule
   ],
   templateUrl: './json-viewer.component.html',
   styleUrls: ['./json-viewer.component.scss']
@@ -29,6 +33,15 @@ export class JsonViewerComponent {
   
   // Highlighted HTML output safely typed for strict parsing
   highlightedHtml = signal<SafeHtml>('');
+
+  // Query & Analysis
+  queryInput = signal<string>('');
+  queryType = signal<'jsonpath' | 'regex'>('jsonpath');
+  calculationType = signal<'none' | 'sum' | 'avg' | 'count' | 'min' | 'max'>('none');
+  queryResult = signal<any>(null);
+  calculationResult = signal<string | number | null>(null);
+  queryError = signal<string>('');
+  isFooterExpanded = signal<boolean>(true);
 
   // Statistics
   itemCount = computed(() => {
@@ -66,12 +79,103 @@ export class JsonViewerComponent {
       this.isValid.set(true);
       this.errorMsg.set('');
       this.generateHighlightedHtml(val);
+      this.applyQuery(); // Trigger query update
     } catch (e: any) {
       this.isValid.set(false);
       this.parsedObj.set(null);
       this.errorMsg.set(e.message || 'Invalid JSON format');
       this.generateHighlightedHtml(val);
+      this.queryResult.set(null); // Clear query result
     }
+  }
+
+  applyQuery() {
+    const obj = this.parsedObj();
+    const query = this.queryInput().trim();
+    const type = this.queryType();
+
+    if (!obj || !query) {
+      this.queryResult.set(null);
+      this.queryError.set('');
+      this.applyCalculation();
+      return;
+    }
+
+    try {
+      this.queryError.set('');
+      if (type === 'jsonpath') {
+        const result = JSONPath({ path: query, json: obj });
+        this.queryResult.set(result);
+      } else {
+        // Regex search on the stringified JSON or structured?
+        // Usually regex on JSON means searching values or keys.
+        // We'll treat it as a filter on string values if it's an array, or just string match.
+        const regex = new RegExp(query, 'i');
+        const results: any[] = [];
+        
+        const search = (item: any) => {
+          if (typeof item === 'string' && regex.test(item)) {
+            results.push(item);
+          } else if (Array.isArray(item)) {
+            item.forEach(search);
+          } else if (typeof item === 'object' && item !== null) {
+            Object.values(item).forEach(search);
+          }
+        };
+        
+        search(obj);
+        this.queryResult.set(results);
+      }
+      this.applyCalculation();
+    } catch (e: any) {
+      this.queryError.set(e.message || 'Query Error');
+      this.queryResult.set(null);
+      this.calculationResult.set(null);
+    }
+  }
+
+  applyCalculation() {
+    const data = this.queryResult();
+    const type = this.calculationType();
+
+    if (data === null || type === 'none') {
+      this.calculationResult.set(null);
+      return;
+    }
+
+    // Ensure we have an array for calculations
+    const items = Array.isArray(data) ? data : [data];
+    const numericItems = items
+      .map(item => (typeof item === 'number' ? item : parseFloat(item)))
+      .filter(item => !isNaN(item));
+
+    switch (type) {
+      case 'count':
+        this.calculationResult.set(items.length);
+        break;
+      case 'sum':
+        this.calculationResult.set(numericItems.reduce((a, b) => a + b, 0));
+        break;
+      case 'avg':
+        this.calculationResult.set(numericItems.length > 0 ? (numericItems.reduce((a, b) => a + b, 0) / numericItems.length).toFixed(2) : 0);
+        break;
+      case 'min':
+        this.calculationResult.set(numericItems.length > 0 ? Math.min(...numericItems) : null);
+        break;
+      case 'max':
+        this.calculationResult.set(numericItems.length > 0 ? Math.max(...numericItems) : null);
+        break;
+      default:
+        this.calculationResult.set(null);
+    }
+  }
+
+  onQueryChange() {
+    this.applyQuery();
+  }
+
+  toggleFooter() {
+    this.isFooterExpanded.set(!this.isFooterExpanded());
   }
 
   formatJson() {
@@ -90,12 +194,14 @@ export class JsonViewerComponent {
       const beautified = JSON.stringify(parsed, null, 2);
       this.rawJson.set(beautified);
       this.generateHighlightedHtml(beautified);
+      this.applyQuery();
       
     } catch (e: any) {
       this.isValid.set(false);
       this.parsedObj.set(null);
       this.errorMsg.set(e.message || 'Invalid JSON format');
       this.highlightedHtml.set('');
+      this.queryResult.set(null);
     }
   }
 
@@ -208,6 +314,10 @@ export class JsonViewerComponent {
     this.highlightedHtml.set('');
     this.isValid.set(true);
     this.errorMsg.set('');
+    this.queryInput.set('');
+    this.queryResult.set(null);
+    this.calculationResult.set(null);
+    this.queryError.set('');
   }
 
   async copyToClipboard() {
