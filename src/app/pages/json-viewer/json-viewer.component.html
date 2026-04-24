@@ -1,25 +1,30 @@
 <div class="page-container fade-in-up">
-  <div class="page-header">
-    <h1>JSON Beautifier</h1>
-    <p>Format, highlight, and analyze your raw JSON payloads</p>
+  <div class="page-header flex justify-between items-center">
+    <div>
+      <h1>JSON Beautifier</h1>
+      <p>Format, highlight, and analyze your raw JSON payloads</p>
+    </div>
+    <div class="global-actions flex items-center gap-3">
+      <button mat-flat-button color="primary" class="large-action-btn" (click)="formatJson()">
+        <mat-icon>auto_fix_high</mat-icon> Format
+      </button>
+      <button mat-flat-button class="large-action-btn bg-surface border-standard" (click)="minifyJson()">
+        <mat-icon>compress</mat-icon> Minify
+      </button>
+      <button mat-flat-button class="large-action-btn bg-surface border-standard" (click)="copyToClipboard()" [disabled]="!parsedObj()">
+        <mat-icon>content_copy</mat-icon> Copy
+      </button>
+      <button mat-icon-button color="warn" class="large-icon-btn bg-surface border-standard" matTooltip="Clear All" (click)="clear()">
+        <mat-icon>delete_outline</mat-icon>
+      </button>
+    </div>
   </div>
 
   <div class="viewer-grid">
     <!-- Left Pane: Input -->
     <div class="section-card flex-col gap-4">
-      <div class="section-title justify-between">
+      <div class="section-title">
         <span><mat-icon>terminal</mat-icon> Raw JSON Input</span>
-        <div class="actions flex gap-2">
-          <button mat-stroked-button (click)="formatJson()">
-            <mat-icon>auto_fix_high</mat-icon> Format
-          </button>
-          <button mat-stroked-button (click)="minifyJson()">
-            <mat-icon>compress</mat-icon> Minify
-          </button>
-          <button mat-icon-button matTooltip="Clear All" (click)="clear()">
-            <mat-icon>delete_outline</mat-icon>
-          </button>
-        </div>
       </div>
 
       <mat-form-field appearance="outline" class="w-full textarea-field">
@@ -47,10 +52,6 @@
             <div class="dot"></div>
             <span>{{ parsedObj() ? (dataType() + ' (' + itemCount() + ' items)') : 'Waiting for Input' }}</span>
           </div>
-
-          <button mat-icon-button matTooltip="Copy to Clipboard" (click)="copyToClipboard()" [disabled]="!parsedObj()">
-            <mat-icon>content_copy</mat-icon>
-          </button>
         </div>
       </div>
 
@@ -69,7 +70,7 @@
   <div class="section-card query-analysis flex-col fade-in-up" [class.collapsed]="!isFooterExpanded()">
     <div class="section-title justify-between cursor-pointer" (click)="toggleFooter()">
       <div class="flex items-center gap-2">
-        <mat-icon>analytics</mat-icon> 
+        <mat-icon>analytics</mat-icon>
         <span>Query & Analysis</span>
       </div>
       <button mat-icon-button class="toggle-btn">
@@ -90,10 +91,10 @@
 
         <mat-form-field appearance="outline" class="w-10-12">
           <mat-label>{{ queryType() === 'jsonpath' ? 'JSONPath Expression' : 'Regex Pattern' }}</mat-label>
-          <input matInput [ngModel]="queryInput()" (ngModelChange)="queryInput.set($event); onQueryChange()" 
+          <input matInput [ngModel]="queryInput()" (ngModelChange)="queryInput.set($event); onQueryChange()"
             [matAutocomplete]="auto"
             [placeholder]="queryType() === 'jsonpath' ? '$.phoneNumbers[:1].type' : 'pattern...'">
-          
+
           <mat-autocomplete #auto="matAutocomplete" (optionSelected)="applyQuery()">
             <mat-option *ngFor="let suggestion of suggestions()" [value]="suggestion.value">
               {{ suggestion.display }}
@@ -103,7 +104,7 @@
         <button mat-icon-button matSuffix (click)="openHelpDialog(); $event.stopPropagation()" matTooltip="Help & Examples">
           <mat-icon>info_outline</mat-icon>
         </button>
-        
+
         <mat-icon matSuffix *ngIf="queryError()" color="warn" [matTooltip]="queryError()" class="mr-2">error</mat-icon>
       </mat-form-field>
     </div>
@@ -116,10 +117,10 @@
             <span>JSONPath Help & Examples</span>
             <button mat-icon-button mat-dialog-close><mat-icon>close</mat-icon></button>
           </div>
-          
+
           <div mat-dialog-content class="dialog-body">
             <p class="intro">JSONPath allows you to filter and extract data from your JSON structure. Below are common patterns used in this application:</p>
-            
+
             <div class="example-grid">
               <div class="example-card" (click)="queryInput.set('$.[*].services[*].companyShareAmount'); applyQuery();" mat-dialog-close>
                 <div class="card-header">
@@ -180,7 +181,7 @@
           <div class="result-chip-compact flex items-center w-full" *ngIf="calculationType() !== 'none'">
             <span class="label">{{ calculationType().toUpperCase() }}:</span>
             <span class="value">{{ calculationResult() ?? 'N/A' }}</span>
-            
+
             <div class="calc-actions flex items-center gap-1" style="margin-left: auto;" *ngIf="calculationResult() !== null">
               <button mat-icon-button class="small-icon-btn text-secondary" matTooltip="Copy Value Only" (click)="copyCalculationValue()">
                 <mat-icon>content_copy</mat-icon>
