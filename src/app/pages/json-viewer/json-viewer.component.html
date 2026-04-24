@@ -177,9 +177,18 @@
         </mat-form-field>
 
         <div class="w-10-12">
-          <div class="result-chip-compact" *ngIf="calculationType() !== 'none'">
+          <div class="result-chip-compact flex items-center w-full" *ngIf="calculationType() !== 'none'">
             <span class="label">{{ calculationType().toUpperCase() }}:</span>
             <span class="value">{{ calculationResult() ?? 'N/A' }}</span>
+            
+            <div class="calc-actions flex items-center gap-1" style="margin-left: auto;" *ngIf="calculationResult() !== null">
+              <button mat-icon-button class="small-icon-btn text-secondary" matTooltip="Copy Value Only" (click)="copyCalculationValue()">
+                <mat-icon>content_copy</mat-icon>
+              </button>
+              <button mat-icon-button class="small-icon-btn text-secondary" matTooltip="Copy Expression + Value" (click)="copyCalculationFormula()">
+                <mat-icon>functions</mat-icon>
+              </button>
+            </div>
           </div>
         </div>
       </div>

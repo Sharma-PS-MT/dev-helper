@@ -223,7 +223,7 @@ export class JsonViewerComponent {
   /** Normalise a partial JSONPath into an index lookup key. */
   private normalisePathKey(path: string): string {
     let p = path
-      .replace(/\[\d+\]/g, '[*]')   // collapse numeric indices
+      .replace(/\[(?:\?|\d)[^\]]*\]/g, '[*]') // collapse numeric indices, slices, and filters [?(...)]
       .replace(/\.$/, '')           // trailing dot
       .replace(/\[$/, '')           // trailing open bracket
       .replace(/\.\./g, '.**.')     // recursive descent marker
@@ -511,6 +511,29 @@ export class JsonViewerComponent {
       this.notify.success('Copied! The JSON data is in your clipboard.');
     } catch (e) {
       this.notify.error('Failed to copy. Your browser might block this action without HTTPS.');
+    }
+  }
+
+  async copyCalculationValue() {
+    const result = this.calculationResult();
+    if (result === null) return;
+    try {
+      await navigator.clipboard.writeText(String(result));
+      this.notify.success('Calculation value copied.');
+    } catch {
+      this.notify.error('Failed to copy.');
+    }
+  }
+
+  async copyCalculationFormula() {
+    const result = this.calculationResult();
+    if (result === null) return;
+    try {
+      const formula = `${this.calculationType().toUpperCase()} (${this.queryInput()}) = ${result}`;
+      await navigator.clipboard.writeText(formula);
+      this.notify.success('Formula copied.');
+    } catch {
+      this.notify.error('Failed to copy.');
     }
   }
 
