@@ -57,31 +57,45 @@ export class BitbucketService {
   }
 
   // ── Branches ─────────────────────────────────────────────────────────────────
-  getBranches(repoSlug: string, projectKey?: string): Observable<BitbucketBranch[]> {
+  getBranches(repoSlug: string, projectKey?: string, filterText?: string, start?: number, limit: number = 20): Observable<PagedResponse<BitbucketBranch>> {
     const pk = projectKey || this.ws;
+    let params = new HttpParams().set('limit', limit);
+    if (filterText) params = params.set('filterText', filterText);
+    if (start) params = params.set('start', start);
+
     return this.http
       .get<PagedResponse<any>>(
         `${this.base}/rest/api/1.0/projects/${pk}/repos/${repoSlug}/branches`,
-        { params: new HttpParams().set('limit', 100) }
+        { params }
       )
-      .pipe(map(r => r.values.map(b => ({
-        name: b.displayId,
-        target: { hash: b.latestCommit, date: '' }
-      }))));
+      .pipe(map(r => ({
+        ...r,
+        values: r.values.map((b: any) => ({
+          name: b.displayId,
+          target: { hash: b.latestCommit, date: '' }
+        }))
+      })));
   }
 
   // ── Tags ─────────────────────────────────────────────────────────────────────
-  getTags(repoSlug: string, projectKey?: string): Observable<BitbucketTag[]> {
+  getTags(repoSlug: string, projectKey?: string, filterText?: string, start?: number, limit: number = 20): Observable<PagedResponse<BitbucketTag>> {
     const pk = projectKey || this.ws;
+    let params = new HttpParams().set('limit', limit);
+    if (filterText) params = params.set('filterText', filterText);
+    if (start) params = params.set('start', start);
+
     return this.http
       .get<PagedResponse<any>>(
         `${this.base}/rest/api/1.0/projects/${pk}/repos/${repoSlug}/tags`,
-        { params: new HttpParams().set('limit', 100) }
+        { params }
       )
-      .pipe(map(r => r.values.map(t => ({
-        name: t.displayId,
-        target: { hash: t.latestCommit, date: '' }
-      }))));
+      .pipe(map(r => ({
+        ...r,
+        values: r.values.map((t: any) => ({
+          name: t.displayId,
+          target: { hash: t.latestCommit, date: '' }
+        }))
+      })));
   }
 
   // ── Pull Request ──────────────────────────────────────────────────────────────

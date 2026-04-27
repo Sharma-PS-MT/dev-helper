@@ -17,8 +17,9 @@ import { BranchCompareStateService } from '../../core/services/branch-compare-st
 import { AuthConfigService } from '../../core/services/auth-config.service';
 import { BitbucketProject, BitbucketRepo, BitbucketBranch, BitbucketTag, BranchComparison } from '../../core/models/bitbucket.models';
 import { TicketBadgeComponent } from '../../shared/components/ticket-badge/ticket-badge.component';
-import { catchError, finalize } from 'rxjs/operators';
-import { of, lastValueFrom } from 'rxjs';
+import { catchError, finalize, debounceTime, distinctUntilChanged, tap, switchMap } from 'rxjs/operators';
+import { of, Subject, Subscription, forkJoin, Observable } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-branch-compare',
@@ -34,9 +35,7 @@ import { of, lastValueFrom } from 'rxjs';
 export class BranchCompareComponent implements OnInit {
   projects = signal<BitbucketProject[]>([]);
   repos = signal<BitbucketRepo[]>([]);
-  branches = signal<BitbucketBranch[]>([]);
-  tags = signal<BitbucketTag[]>([]);
-
+  
   selectedProject = signal<string | null>(null);
   selectedRepo = signal<string | null>(null);
 
@@ -61,24 +60,27 @@ export class BranchCompareComponent implements OnInit {
   fromSearch = signal('');
   toSearch = signal('');
 
-  filteredFromOptions = computed(() => {
-    const t = this.fromSearch().toLowerCase();
-    const opts = this.fromType() === 'branch' ? this.branches() : this.tags();
-    return opts.filter(o => o.name.toLowerCase().includes(t));
-  });
+  fromOptions = signal<any[]>([]);
+  toOptions = signal<any[]>([]);
 
-  filteredToOptions = computed(() => {
-    const t = this.toSearch().toLowerCase();
-    const opts = this.toType() === 'branch' ? this.branches() : this.tags();
-    return opts.filter(o => o.name.toLowerCase().includes(t));
-  });
+  fromStart = signal(0);
+  toStart = signal(0);
+
+  fromHasMore = signal(true);
+  toHasMore = signal(true);
+
+  fromLoadingOptions = signal(false);
+  toLoadingOptions = signal(false);
+
+  private fromSearchSubject = new Subject<string>();
+  private toSearchSubject = new Subject<string>();
 
   loadingProjects = signal(false);
   loadingRepos = signal(false);
   loadingRefs = signal(false);
   comparing = signal(false);
 
-  results = signal<(BranchComparison & { repoSlug?: string })[]>([]); // To be removed, replaced with multiQueue
+  results = signal<(BranchComparison & { repoSlug?: string })[]>([]); 
   result = signal<BranchComparison | null>(null);
 
   multiQueue = signal<import('../../core/services/branch-compare-state.service').BranchComparePreFill[]>([]);
@@ -148,7 +150,29 @@ export class BranchCompareComponent implements OnInit {
     private notify: NotificationService,
     private compareState: BranchCompareStateService,
     private authConfig: AuthConfigService,
-  ) { }
+  ) { 
+    this.fromSearchSubject.pipe(
+      takeUntilDestroyed(),
+      debounceTime(400),
+      distinctUntilChanged(),
+      tap(() => {
+        this.fromStart.set(0);
+        this.fromHasMore.set(true);
+      }),
+      switchMap(text => this.loadRefsForSide('from', false, text))
+    ).subscribe();
+
+    this.toSearchSubject.pipe(
+      takeUntilDestroyed(),
+      debounceTime(400),
+      distinctUntilChanged(),
+      tap(() => {
+        this.toStart.set(0);
+        this.toHasMore.set(true);
+      }),
+      switchMap(text => this.loadRefsForSide('to', false, text))
+    ).subscribe();
+  }
 
   ngOnInit(): void {
     this.loadProjects();
@@ -158,6 +182,79 @@ export class BranchCompareComponent implements OnInit {
     if (preFill) {
       this._applyPreFill(preFill);
     }
+  }
+
+  onFromSearch(text: string) {
+    this.fromSearch.set(text);
+    this.fromSearchSubject.next(text);
+  }
+
+  onToSearch(text: string) {
+    this.toSearch.set(text);
+    this.toSearchSubject.next(text);
+  }
+
+  loadRefsForSide(side: 'from' | 'to', append: boolean = false, filterText?: string) {
+    const slug = this.selectedRepo();
+    if (!slug) return of(null);
+
+    const type = side === 'from' ? this.fromType() : this.toType();
+    const start = append ? (side === 'from' ? this.fromStart() : this.toStart()) : 0;
+    const filter = filterText ?? (side === 'from' ? this.fromSearch() : this.toSearch());
+
+    if (side === 'from') this.fromLoadingOptions.set(true);
+    else this.toLoadingOptions.set(true);
+
+    const obs$: Observable<any> = type === 'branch' 
+      ? this.bitbucket.getBranches(slug, this.selectedProject() || undefined, filter, start)
+      : this.bitbucket.getTags(slug, this.selectedProject() || undefined, filter, start);
+
+    return obs$.pipe(
+      tap((res: any) => {
+        if (side === 'from') {
+          const current = append ? this.fromOptions() : [];
+          this.fromOptions.set([...current, ...res.values]);
+          this.fromStart.set(res.nextPageStart || 0);
+          this.fromHasMore.set(!res.isLastPage);
+          this.fromLoadingOptions.set(false);
+        } else {
+          const current = append ? this.toOptions() : [];
+          this.toOptions.set([...current, ...res.values]);
+          this.toStart.set(res.nextPageStart || 0);
+          this.toHasMore.set(!res.isLastPage);
+          this.toLoadingOptions.set(false);
+        }
+      }),
+      catchError(err => {
+        this.notify.error(`Failed to load ${type}es for ${side}`);
+        if (side === 'from') this.fromLoadingOptions.set(false);
+        else this.toLoadingOptions.set(false);
+        return of(null);
+      })
+    );
+  }
+
+  registerScrollListener(opened: boolean, side: 'from' | 'to') {
+    if (!opened) return;
+    
+    // Give time for the panel to render
+    setTimeout(() => {
+      const panel = document.querySelector('.mat-mdc-select-panel');
+      if (!panel) return;
+
+      panel.addEventListener('scroll', (event: any) => {
+        const threshold = 50; // pixels from bottom
+        const position = event.target.scrollTop + event.target.offsetHeight;
+        const height = event.target.scrollHeight;
+
+        const loading = side === 'from' ? this.fromLoadingOptions() : this.toLoadingOptions();
+        const hasMore = side === 'from' ? this.fromHasMore() : this.toHasMore();
+
+        if (height - position < threshold && !loading && hasMore) {
+          this.loadRefsForSide(side, true).subscribe();
+        }
+      });
+    }, 100);
   }
 
   /**
@@ -212,21 +309,32 @@ export class BranchCompareComponent implements OnInit {
 
         this.selectedRepo.set(repo.slug);
 
-        // Load branches + tags, then set refs
-        const slug = repo.slug;
-        const b$ = this.bitbucket.getBranches(slug, proj.key);
-        const t$ = this.bitbucket.getTags(slug, proj.key);
+        // Set the types and refs first
+        this.fromType.set(fromType);
+        this.toType.set(toType);
+        this.fromRef.set(fromRef);
+        this.toRef.set(toRef);
+        
+        this.fromStart.set(0);
+        this.toStart.set(0);
 
-        b$.subscribe(bx => this.branches.set(bx));
-        t$.subscribe(tx => {
-          this.tags.set(tx);
+        // Load the options for the specific types
+        forkJoin({
+          from: this.loadRefsForSide('from', false),
+          to: this.loadRefsForSide('to', false)
+        }).subscribe(() => {
+          // Ensure the selected refs are in the options list so mat-select displays them properly
+          const fOpts = this.fromOptions();
+          if (fromRef && !fOpts.some(o => o.name === fromRef)) {
+            this.fromOptions.set([{ name: fromRef, target: { hash: '' } }, ...fOpts]);
+          }
+
+          const tOpts = this.toOptions();
+          if (toRef && !tOpts.some(o => o.name === toRef)) {
+            this.toOptions.set([{ name: toRef, target: { hash: '' } }, ...tOpts]);
+          }
+
           this.loadingRefs.set(false);
-
-          // Set the refs after branches/tags are loaded
-          this.fromType.set(fromType);
-          this.toType.set(toType);
-          this.fromRef.set(fromRef);
-          this.toRef.set(toRef);
 
           if (queue.length > 1) {
             this.notify.success(`Loaded ${index + 1} of ${queue.length}: ${project}/${repository}`);
@@ -271,8 +379,8 @@ export class BranchCompareComponent implements OnInit {
     ).subscribe({
       next: rx => {
         this.repos.set(rx);
-        this.branches.set([]);
-        this.tags.set([]);
+        this.fromOptions.set([]);
+        this.toOptions.set([]);
       },
       error: () => this.notify.error('Failed to load repositories')
     });
@@ -280,29 +388,25 @@ export class BranchCompareComponent implements OnInit {
 
   onRepoChange(slug: string): void {
     this.selectedRepo.set(slug);
-    this.loadRefs(slug);
+    this.loadRefs();
   }
 
-  loadRefs(slug: string): void {
+  loadRefs(): void {
     this.loadingRefs.set(true);
     this.fromRef.set('');
     this.toRef.set('');
+    this.fromStart.set(0);
+    this.toStart.set(0);
 
-    const proj = this.selectedProject() || undefined;
-
-    const b$ = this.bitbucket.getBranches(slug, proj).pipe(catchError(() => of([])));
-    const t$ = this.bitbucket.getTags(slug, proj).pipe(catchError(() => of([])));
-
-    b$.subscribe(bx => {
-      this.branches.set(bx);
-      // Auto-select main branch as destination usually
-      const main = bx.find(b => b.name === 'main' || b.name === 'master');
+    forkJoin({
+      from: this.loadRefsForSide('from'),
+      to: this.loadRefsForSide('to')
+    }).pipe(
+      finalize(() => this.loadingRefs.set(false))
+    ).subscribe(() => {
+      // Auto-select main/master for destination if found
+      const main = this.toOptions().find(o => o.name === 'main' || o.name === 'master');
       if (main) this.toRef.set(main.name);
-    });
-
-    t$.subscribe(tx => {
-      this.tags.set(tx);
-      this.loadingRefs.set(false);
     });
   }
 
@@ -328,15 +432,40 @@ export class BranchCompareComponent implements OnInit {
   }
 
   swapRefs(): void {
-    const f = this.fromRef();
-    const t = this.toRef();
-    const ft = this.fromType();
-    const tt = this.toType();
+    const fRef = this.fromRef();
+    const tRef = this.toRef();
+    const fType = this.fromType();
+    const tType = this.toType();
+    
+    const fOpts = this.fromOptions();
+    const tOpts = this.toOptions();
+    
+    const fSearch = this.fromSearch();
+    const tSearch = this.toSearch();
+    
+    const fStart = this.fromStart();
+    const tStart = this.toStart();
+    
+    const fHasMore = this.fromHasMore();
+    const tHasMore = this.toHasMore();
 
-    this.fromType.set(tt);
-    this.toType.set(ft);
-    this.fromRef.set(t);
-    this.toRef.set(f);
+    this.fromType.set(tType);
+    this.toType.set(fType);
+    
+    this.fromRef.set(tRef);
+    this.toRef.set(fRef);
+    
+    this.fromOptions.set(tOpts);
+    this.toOptions.set(fOpts);
+    
+    this.fromSearch.set(tSearch);
+    this.toSearch.set(fSearch);
+    
+    this.fromStart.set(tStart);
+    this.toStart.set(fStart);
+    
+    this.fromHasMore.set(tHasMore);
+    this.toHasMore.set(fHasMore);
   }
 
   clear(): void {

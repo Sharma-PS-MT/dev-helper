@@ -64,17 +64,6 @@
             </mat-form-field>
           </div>
 
-          <div class="action-row">
-            <button mat-stroked-button color="primary" type="button" (click)="saveConfig()">
-              <mat-icon>cloud_upload</mat-icon> Sync
-            </button>
-            
-            <button mat-flat-button color="primary" class="generate-btn" type="button" (click)="generate()" [disabled]="generating()">
-              <mat-spinner *ngIf="generating()" diameter="20"></mat-spinner>
-              <mat-icon *ngIf="!generating()" inline>vpn_key</mat-icon>
-              <span *ngIf="!generating()">Generate Token</span>
-            </button>
-          </div>
         </form>
         
         <div *ngIf="!selectedEnv()" class="empty-state">
@@ -89,9 +78,23 @@
       <mat-card class="result-card fade-in-up" [class.active-result]="tokenResult()">
         <div class="card-header">
           <div class="title"><mat-icon inline>lock_open</mat-icon> Token Extractor</div>
-          <button mat-icon-button color="primary" (click)="copyToClipboard(tokenResult())" matTooltip="Force Re-Copy" [disabled]="!tokenResult()">
-            <mat-icon>content_copy</mat-icon>
-          </button>
+          <div class="header-actions">
+            <button mat-stroked-button color="primary" class="header-btn" type="button" (click)="saveConfig()" [disabled]="!selectedEnv()">
+              <mat-icon>cloud_upload</mat-icon> Sync
+            </button>
+            
+            <button mat-flat-button color="primary" class="header-btn generate-btn" type="button" (click)="generate()" [disabled]="!selectedEnv() || generating()">
+              <mat-spinner *ngIf="generating()" diameter="18"></mat-spinner>
+              <mat-icon *ngIf="!generating()" inline>vpn_key</mat-icon>
+              <span *ngIf="!generating()">Generate Token</span>
+            </button>
+
+            <div class="divider"></div>
+
+            <button mat-icon-button color="primary" (click)="copyToClipboard(tokenResult())" matTooltip="Force Re-Copy" [disabled]="!tokenResult()">
+              <mat-icon>content_copy</mat-icon>
+            </button>
+          </div>
         </div>
         
         <div class="token-container" *ngIf="tokenResult()">

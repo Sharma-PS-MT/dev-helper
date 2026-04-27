@@ -165,3 +165,10 @@
 .mt-20 { margin-top: 20px; }
 .mt-24 { margin-top: 24px; }
 .ml-auto { margin-left: auto; }
+
+.loading-option {
+  display: flex; justify-content: center; align-items: center; padding: 12px; height: auto !important;
+}
+.load-more-hint {
+  font-size: 11px; color: var(--text-muted); text-align: center; padding: 8px; font-style: italic; height: auto !important;
+}

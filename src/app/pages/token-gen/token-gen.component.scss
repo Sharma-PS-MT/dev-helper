@@ -8,7 +8,7 @@
 }
 
 .split-layout {
-  display: grid; grid-template-columns: 1fr 450px; gap: 24px; align-items: start;
+  display: grid; grid-template-columns: 1fr 500px; gap: 24px; align-items: start;
 }
 
 .token-card {
@@ -38,11 +38,6 @@
   mat-icon { font-size: 48px; width: 48px; height: 48px; color: var(--border-subtle); margin-bottom: 16px; }
 }
 
-.action-row {
-  display: flex; gap: 16px; justify-content: flex-end; margin-top: 16px; padding-top: 24px; border-top: 1px solid var(--border-subtle);
-  .generate-btn { height: 44px; font-weight: 600; padding: 0 24px; display: flex; align-items: center; gap: 8px; }
-}
-
 .mt-24 { margin-top: 24px; }
 .mt-16 { margin-top: 16px; }
 
@@ -50,8 +45,41 @@
   padding: 0; background: var(--bg-card); border: 1px solid var(--border-subtle); position: sticky; top: 32px;
   &.active-result { border-color: var(--status-done); box-shadow: 0 4px 20px rgba(63,185,80,0.1); }
   .card-header {
-    padding: 16px 20px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;
-    .title { font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px; font-size: 14px; }
+    padding: 12px 16px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    .title { font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px; font-size: 14px; white-space: nowrap; }
+    .header-actions {
+      display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+      
+      .header-btn {
+        height: 32px; line-height: 32px; font-size: 12px; font-weight: 600; padding: 0 12px;
+        border-radius: 4px; transition: all 0.2s var(--transition);
+        display: inline-flex; align-items: center; justify-content: center;
+        
+        mat-icon { font-size: 16px; width: 16px; height: 16px; margin-right: 6px; }
+        
+        &.generate-btn {
+          background: var(--accent-cyan) !important; color: white !important; border: none;
+          &:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(57,197,207,0.3); }
+          
+          mat-spinner { margin-right: 8px; ::ng-deep circle { stroke: white !important; } }
+        }
+
+        &[mat-stroked-button] {
+          border-color: rgba(57,197,207,0.3); color: var(--accent-cyan);
+          &:hover:not(:disabled) { background: rgba(57,197,207,0.05); color: var(--accent-cyan); border-color: var(--accent-cyan); }
+        }
+
+        &:disabled { opacity: 0.5; cursor: not-allowed; }
+      }
+      
+      .divider { width: 1px; height: 18px; background: var(--border-subtle); margin: 0 4px; }
+      
+      button[mat-icon-button] {
+        width: 32px; height: 32px; line-height: 32px; color: var(--text-secondary);
+        &:hover { color: var(--accent-cyan); background: var(--bg-secondary); }
+        mat-icon { font-size: 18px; width: 18px; height: 18px; }
+      }
+    }
   }
   .token-container {
     padding: 20px;
