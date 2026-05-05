@@ -101,3 +101,16 @@ export interface TicketSummary {
   blocked: number;
   other: number;
 }
+
+export interface BranchGapAnalysis {
+  fromRef: string;
+  toRef: string;
+  /** Commits in fromRef that are NOT in toRef — CRITICAL (forward only) */
+  criticalCommits: CommitWithTickets[];
+  /** Commits in toRef that are NOT in fromRef — INCOMING (reverse only) */
+  incomingCommits: CommitWithTickets[];
+  /** Raw total commits fetched from→to before dedup */
+  totalForward: number;
+  /** Raw total commits fetched to→from before dedup */
+  totalReverse: number;
+}

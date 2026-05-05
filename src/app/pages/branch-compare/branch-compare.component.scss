@@ -172,3 +172,154 @@
 .load-more-hint {
   font-size: 11px; color: var(--text-muted); text-align: center; padding: 8px; font-style: italic; height: auto !important;
 }
+
+// ── Action buttons ──────────────────────────────────────────────────────────
+.action-btns {
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+
+  .compare-btn, .gap-btn {
+    height: 56px; padding: 0 24px; font-weight: 600;
+    .btn-inner {
+      display: flex; align-items: center; gap: 8px;
+      mat-icon { font-size: 20px; width: 20px; height: 20px; line-height: 20px; }
+    }
+  }
+
+  .gap-btn {
+    border-color: var(--accent-cyan) !important;
+    color: var(--accent-cyan) !important;
+    background: rgba(57,197,207,.06);
+    transition: all 0.2s ease;
+    &:hover:not([disabled]) { background: rgba(57,197,207,.14); box-shadow: 0 0 0 1px var(--accent-cyan); }
+  }
+}
+
+// ── Gap Analysis Panel ───────────────────────────────────────────────────────
+.gap-analysis-panel {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+}
+
+.gap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, rgba(188,140,255,.07) 0%, rgba(57,197,207,.07) 100%);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+  gap: 16px;
+
+  .gap-header-left {
+    display: flex; align-items: center; gap: 14px;
+    .gap-icon { font-size: 36px; width: 36px; height: 36px; color: var(--accent-cyan); }
+    .gap-title { font-size: 18px; font-weight: 700; color: var(--text-primary); }
+    .gap-subtitle {
+      font-size: 13px; color: var(--text-secondary); margin-top: 3px;
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    }
+  }
+
+  .gap-header-right {
+    display: flex; align-items: center; gap: 12px;
+  }
+
+  .gap-stats-row {
+    display: flex; align-items: center; gap: 0; background: var(--bg-secondary);
+    border-radius: 10px; border: 1px solid var(--border-subtle); overflow: hidden;
+    .gap-stat {
+      padding: 12px 20px; text-align: center;
+      .stat-number { font-size: 22px; font-weight: 700; font-family: monospace; }
+      .stat-label { font-size: 11px; font-weight: 500; text-transform: uppercase; color: var(--text-secondary); margin-top: 2px; letter-spacing: 0.5px; }
+      &.critical .stat-number { color: #f97316; }
+      &.incoming .stat-number { color: var(--accent-cyan); }
+      &.neutral .stat-number { color: var(--text-secondary); }
+    }
+    .gap-stat-divider { width: 1px; background: var(--border-subtle); align-self: stretch; }
+  }
+
+  .gap-close-btn {
+    color: var(--text-secondary);
+    &:hover { color: var(--text-primary); background: var(--bg-secondary); }
+  }
+}
+
+.ref-chip {
+  display: inline-block; padding: 2px 8px; border-radius: 5px; font-family: monospace; font-size: 12px; font-weight: 600;
+  &.from-chip { background: rgba(249,115,22,.12); color: #f97316; border: 1px solid rgba(249,115,22,.3); }
+  &.to-chip { background: rgba(57,197,207,.12); color: var(--accent-cyan); border: 1px solid rgba(57,197,207,.3); }
+}
+
+// ── Gap Columns ─────────────────────────────────────────────────────────────
+.gap-columns {
+  display: grid; grid-template-columns: 1fr 1fr; min-height: 200px;
+}
+
+.gap-col { display: flex; flex-direction: column; }
+.critical-col { border-right: 1px solid var(--border-subtle); }
+
+.gap-col-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex; flex-direction: column; gap: 6px;
+
+  .gap-col-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 14px; font-weight: 700;
+    mat-icon { font-size: 18px; width: 18px; height: 18px; }
+  }
+  .gap-col-desc { font-size: 12px; color: var(--text-secondary); }
+  .gap-badge {
+    display: inline-block; padding: 2px 10px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; align-self: flex-start;
+  }
+
+  &.critical-header {
+    background: rgba(249,115,22,.04);
+    .gap-col-title { color: #f97316; mat-icon { color: #f97316; } }
+    .critical-badge { background: rgba(249,115,22,.15); color: #f97316; border: 1px solid rgba(249,115,22,.35); }
+  }
+  &.incoming-header {
+    background: rgba(57,197,207,.04);
+    .gap-col-title { color: var(--accent-cyan); mat-icon { color: var(--accent-cyan); } }
+    .incoming-badge { background: rgba(57,197,207,.15); color: var(--accent-cyan); border: 1px solid rgba(57,197,207,.35); }
+  }
+}
+
+.gap-empty {
+  display: flex; align-items: center; gap: 10px; padding: 28px 20px;
+  color: var(--status-done); font-size: 13px;
+  mat-icon { font-size: 22px; width: 22px; height: 22px; }
+}
+
+.gap-commits-list { padding: 0 4px; overflow-y: auto; max-height: 520px; }
+
+.gap-commit-item {
+  display: flex; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border-subtle);
+  transition: background 0.15s;
+  &:last-child { border-bottom: none; }
+  &:hover { background: var(--bg-secondary); }
+
+  .gap-commit-hash {
+    font-family: 'Consolas', monospace; font-size: 11px;
+    padding: 3px 7px; border-radius: 4px; height: fit-content; white-space: nowrap; flex-shrink: 0;
+  }
+  .gap-commit-body { flex: 1; min-width: 0; }
+  .gap-commit-msg { font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gap-commit-meta { font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
+  .ticket-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  &.critical-item {
+    border-left: 3px solid rgba(249,115,22,.6);
+    .gap-commit-hash { background: rgba(249,115,22,.12); color: #f97316; }
+    &:hover { background: rgba(249,115,22,.04); }
+  }
+  &.incoming-item {
+    border-left: 3px solid rgba(57,197,207,.5);
+    .gap-commit-hash { background: rgba(57,197,207,.12); color: var(--accent-cyan); }
+    &:hover { background: rgba(57,197,207,.04); }
+  }
+}
+

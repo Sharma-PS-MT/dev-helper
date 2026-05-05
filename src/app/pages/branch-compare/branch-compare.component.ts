@@ -15,7 +15,7 @@ import { BitbucketService } from '../../core/services/bitbucket.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { BranchCompareStateService } from '../../core/services/branch-compare-state.service';
 import { AuthConfigService } from '../../core/services/auth-config.service';
-import { BitbucketProject, BitbucketRepo, BitbucketBranch, BitbucketTag, BranchComparison } from '../../core/models/bitbucket.models';
+import { BitbucketProject, BitbucketRepo, BitbucketBranch, BitbucketTag, BranchComparison, BranchGapAnalysis } from '../../core/models/bitbucket.models';
 import { TicketBadgeComponent } from '../../shared/components/ticket-badge/ticket-badge.component';
 import { catchError, finalize, debounceTime, distinctUntilChanged, tap, switchMap } from 'rxjs/operators';
 import { of, Subject, Subscription, forkJoin, Observable } from 'rxjs';
@@ -79,6 +79,9 @@ export class BranchCompareComponent implements OnInit {
   loadingRepos = signal(false);
   loadingRefs = signal(false);
   comparing = signal(false);
+  analyzingGap = signal(false);
+
+  gapResult = signal<BranchGapAnalysis | null>(null);
 
   results = signal<(BranchComparison & { repoSlug?: string })[]>([]); 
   result = signal<BranchComparison | null>(null);
@@ -426,6 +429,27 @@ export class BranchCompareComponent implements OnInit {
       next: res => this.result.set(res),
       error: err => {
         this.notify.error('Comparison failed. Check ref names or API limits.');
+        console.error(err);
+      }
+    });
+  }
+
+  analyzeGap(): void {
+    const p = this.selectedProject() || undefined;
+    const r = this.selectedRepo();
+    const f = this.fromRef();
+    const t = this.toRef();
+    if (!r || !f || !t) return;
+
+    this.analyzingGap.set(true);
+    this.gapResult.set(null);
+
+    this.bitbucket.analyzeGap(r, f, t, p).pipe(
+      finalize(() => this.analyzingGap.set(false))
+    ).subscribe({
+      next: res => this.gapResult.set(res),
+      error: err => {
+        this.notify.error('Gap analysis failed. Check ref names or API limits.');
         console.error(err);
       }
     });

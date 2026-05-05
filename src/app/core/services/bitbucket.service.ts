@@ -5,7 +5,7 @@ import { map, switchMap, catchError } from 'rxjs/operators';
 import { AuthConfigService } from './auth-config.service';
 import {
   BitbucketProject, BitbucketRepo, BitbucketBranch, BitbucketTag,
-  BitbucketCommit, BitbucketPR, PRAnalysis, PRGap, CommitWithTickets, BranchComparison, TicketSummary
+  BitbucketCommit, BitbucketPR, PRAnalysis, PRGap, CommitWithTickets, BranchComparison, TicketSummary, BranchGapAnalysis
 } from '../models/bitbucket.models';
 import { JiraService } from './jira.service';
 import { JiraTicket, resolveStatusCategory } from '../models/jira.models';
@@ -261,6 +261,82 @@ export class BitbucketService {
         { params: new HttpParams().set('since', from).set('until', to).set('limit', 1000) }
       )
       .pipe(map(r => r.values.map(c => this.mapCommit(c))));
+  }
+
+  // ── Gap Analysis ─────────────────────────────────────────────────────────────
+  analyzeGap(repoSlug: string, fromRef: string, toRef: string, projectKey?: string): Observable<BranchGapAnalysis> {
+    return forkJoin({
+      forward: this.getCommitsBetween(repoSlug, fromRef, toRef, projectKey),
+      reverse: this.getCommitsBetween(repoSlug, toRef, fromRef, projectKey),
+    }).pipe(
+      switchMap(({ forward, reverse }) => {
+        // Build message frequency maps
+        const countMap = (commits: BitbucketCommit[]) => {
+          const map = new Map<string, number>();
+          for (const c of commits) {
+            const key = c.message.trim().split('\n')[0]; // first line only
+            map.set(key, (map.get(key) || 0) + 1);
+          }
+          return map;
+        };
+
+        const forwardCounts = countMap(forward);
+        const reverseCounts = countMap(reverse);
+
+        // Deduplicate: subtract reverse counts from forward counts (net per message key)
+        const deduplicate = (commits: BitbucketCommit[], otherCounts: Map<string, number>): BitbucketCommit[] => {
+          const remaining = new Map<string, number>(otherCounts);
+          return commits.filter(c => {
+            const key = c.message.trim().split('\n')[0];
+            const available = remaining.get(key) || 0;
+            if (available > 0) {
+              remaining.set(key, available - 1);
+              return false; // absorbed by other side
+            }
+            return true;
+          });
+        };
+
+        const criticalCommits = deduplicate(forward, new Map(reverseCounts));
+        const incomingCommits = deduplicate(reverse, new Map(forwardCounts));
+
+        // Collect all unique ticket IDs from both sets
+        const allCommits = [...criticalCommits, ...incomingCommits];
+        const allText = allCommits.map(c => c.message).join('\n');
+        const regexIds = this.authConfig.extractTicketIds(allText);
+        const propIds = allCommits.flatMap(c => c.ticketIds || []);
+        const ticketIds = [...new Set([...regexIds, ...propIds])];
+
+        const enrichCommits = (commits: BitbucketCommit[], tickets: Map<string, JiraTicket>): CommitWithTickets[] =>
+          commits.map(c => {
+            const ids = [...new Set([...this.authConfig.extractTicketIds(c.message), ...(c.ticketIds || [])])];
+            return { commit: c, ticketIds: ids, tickets: ids.map(id => tickets.get(id)).filter(Boolean) as JiraTicket[] };
+          });
+
+        if (ticketIds.length === 0) {
+          return of<BranchGapAnalysis>({
+            fromRef, toRef,
+            criticalCommits: criticalCommits.map(c => ({ commit: c, ticketIds: [], tickets: [] })),
+            incomingCommits: incomingCommits.map(c => ({ commit: c, ticketIds: [], tickets: [] })),
+            totalForward: forward.length,
+            totalReverse: reverse.length,
+          });
+        }
+
+        return this.jira.getIssues(ticketIds).pipe(
+          map(tickets => {
+            const ticketMap = new Map(tickets.map(t => [t.key, t]));
+            return {
+              fromRef, toRef,
+              criticalCommits: enrichCommits(criticalCommits, ticketMap),
+              incomingCommits: enrichCommits(incomingCommits, ticketMap),
+              totalForward: forward.length,
+              totalReverse: reverse.length,
+            } as BranchGapAnalysis;
+          })
+        );
+      })
+    );
   }
 
   compareBranchesOrTags(repoSlug: string, from: string, to: string, projectKey?: string): Observable<BranchComparison> {

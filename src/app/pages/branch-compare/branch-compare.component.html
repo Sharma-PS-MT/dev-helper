@@ -42,7 +42,8 @@
         <div class="ref-header">Destination Ref (Into)</div>
         <div class="ref-controls">
           <mat-form-field appearance="outline" class="type-sel">
-            <mat-select [(ngModel)]="fromType" (ngModelChange)="fromRef.set(''); loadRefsForSide('from', false).subscribe()">
+            <mat-select [(ngModel)]="fromType"
+              (ngModelChange)="fromRef.set(''); loadRefsForSide('from', false).subscribe()">
               <mat-option value="branch">Branch</mat-option>
               <mat-option value="tag">Tag</mat-option>
             </mat-select>
@@ -100,16 +101,171 @@
       </div>
 
       <!-- Action -->
-      <button mat-flat-button color="primary" class="compare-btn" (click)="compare()"
-        [disabled]="!fromRef() || !toRef() || fromRef() === toRef() || comparing()">
-        <mat-spinner *ngIf="comparing()" diameter="20"></mat-spinner>
-        <span *ngIf="!comparing()">Compare</span>
-      </button>
-      <button mat-icon-button (click)="clear()" matTooltip="Clear All">
-        <mat-icon>clear</mat-icon>
-      </button>
+      <div class="action-btns">
+        <button mat-flat-button color="primary" class="compare-btn" (click)="compare()"
+          [disabled]="!fromRef() || !toRef() || fromRef() === toRef() || comparing() || analyzingGap()">
+          <mat-spinner *ngIf="comparing()" diameter="20"></mat-spinner>
+          <div class="btn-inner" *ngIf="!comparing()">
+            <mat-icon>compare_arrows</mat-icon>
+            <span>Compare</span>
+          </div>
+        </button>
+        <button mat-stroked-button class="gap-btn" (click)="analyzeGap()"
+          [disabled]="!fromRef() || !toRef() || fromRef() === toRef() || comparing() || analyzingGap()"
+          matTooltip="Bidirectional gap analysis — finds unique commits on each side">
+          <mat-spinner *ngIf="analyzingGap()" diameter="20"></mat-spinner>
+          <div class="btn-inner" *ngIf="!analyzingGap()">
+            <mat-icon>analytics</mat-icon>
+            <span>Analyze Gap β</span>
+          </div>
+        </button>
+        <button mat-icon-button (click)="clear()" matTooltip="Clear All">
+          <mat-icon>clear</mat-icon>
+        </button>
+      </div>
     </div>
   </mat-card>
+
+  <!-- ── Gap Analysis Loading ── -->
+  <div *ngIf="analyzingGap()" class="loading-state fade-in-up">
+    <mat-spinner diameter="40"></mat-spinner>
+    <p>Analyzing bidirectional gap between <strong>{{ fromRef() }}</strong> and <strong>{{ toRef() }}</strong>...</p>
+    <div class="skeleton-list mt-20">
+      <div class="skeleton" style="height:40px; width:100%; margin-bottom:10px;"></div>
+      <div class="skeleton" style="height:40px; width:100%; margin-bottom:10px;"></div>
+    </div>
+  </div>
+
+  <!-- ── Gap Analysis Results ── -->
+  <ng-container *ngIf="gapResult() as gap">
+    <div class="gap-analysis-panel fade-in-up mt-24">
+
+      <!-- Header banner -->
+      <div class="gap-header">
+        <div class="gap-header-left">
+          <mat-icon class="gap-icon">analytics</mat-icon>
+          <div>
+            <div class="gap-title">Gap Analysis</div>
+            <div class="gap-subtitle">
+              Bidirectional comparison between
+              <span class="ref-chip from-chip">{{ gap.fromRef }}</span>
+              and
+              <span class="ref-chip to-chip">{{ gap.toRef }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="gap-header-right">
+          <div class="gap-stats-row">
+            <div class="gap-stat critical">
+              <div class="stat-number">{{ gap.criticalCommits.length }}</div>
+              <div class="stat-label">Critical Unique</div>
+            </div>
+            <div class="gap-stat-divider"></div>
+            <div class="gap-stat incoming">
+              <div class="stat-number">{{ gap.incomingCommits.length }}</div>
+              <div class="stat-label">Incoming Unique</div>
+            </div>
+            <div class="gap-stat-divider"></div>
+            <div class="gap-stat neutral">
+              <div class="stat-number">{{ gap.totalForward + gap.totalReverse - gap.criticalCommits.length -
+                gap.incomingCommits.length }}</div>
+              <div class="stat-label">Shared / Absorbed</div>
+            </div>
+          </div>
+          <button mat-icon-button class="gap-close-btn" (click)="gapResult.set(null)" matTooltip="Close Gap Analysis">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+      </div>
+
+      <!-- Two column layout -->
+      <div class="gap-columns">
+
+        <!-- CRITICAL column (fromRef → toRef) -->
+        <div class="gap-col critical-col">
+          <div class="gap-col-header critical-header">
+            <div class="gap-col-title">
+              <mat-icon>priority_high</mat-icon>
+              Critical Commits
+            </div>
+            <span class="gap-col-desc">
+              In <strong>{{ gap.fromRef }}</strong> but NOT in <strong>{{ gap.toRef }}</strong>
+            </span>
+            <span class="gap-badge critical-badge">{{ gap.criticalCommits.length }} commits</span>
+          </div>
+
+          <div *ngIf="gap.criticalCommits.length === 0" class="gap-empty">
+            <mat-icon>check_circle</mat-icon>
+            <span>No unique commits — branches are in sync on this side</span>
+          </div>
+
+          <div class="gap-commits-list">
+            <div *ngFor="let cwt of gap.criticalCommits" class="gap-commit-item critical-item">
+              <div class="gap-commit-hash critical-hash">{{ cwt.commit.hash | slice:0:7 }}</div>
+              <div class="gap-commit-body">
+                <div class="gap-commit-msg">{{ cwt.commit.message.split('\n')[0] }}</div>
+                <div class="gap-commit-meta">
+                  {{ cwt.commit.author.user?.display_name || cwt.commit.author.raw.split('<')[0] }} &bull; {{
+                    cwt.commit.date | date:'MMM d, HH:mm' }} </div>
+                    <div class="ticket-chips" *ngIf="cwt.ticketIds.length > 0">
+                      <app-ticket-badge *ngFor="let t of cwt.tickets" [ticket]="t"></app-ticket-badge>
+                      <ng-container *ngFor="let id of cwt.ticketIds">
+                        <app-ticket-badge *ngIf="!cwt.tickets.some(x => x.key === id)"
+                          [ticketId]="id"></app-ticket-badge>
+                      </ng-container>
+                    </div>
+                    <span class="status-chip warn" *ngIf="cwt.ticketIds.length === 0">
+                      <span class="dot"></span> No Ticket
+                    </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- INCOMING column (toRef → fromRef) -->
+          <div class="gap-col incoming-col">
+            <div class="gap-col-header incoming-header">
+              <div class="gap-col-title">
+                <mat-icon>call_received</mat-icon>
+                Incoming Commits
+              </div>
+              <span class="gap-col-desc">
+                In <strong>{{ gap.toRef }}</strong> but NOT in <strong>{{ gap.fromRef }}</strong>
+              </span>
+              <span class="gap-badge incoming-badge">{{ gap.incomingCommits.length }} commits</span>
+            </div>
+
+            <div *ngIf="gap.incomingCommits.length === 0" class="gap-empty">
+              <mat-icon>check_circle</mat-icon>
+              <span>No unique commits — branches are in sync on this side</span>
+            </div>
+
+            <div class="gap-commits-list">
+              <div *ngFor="let cwt of gap.incomingCommits" class="gap-commit-item incoming-item">
+                <div class="gap-commit-hash incoming-hash">{{ cwt.commit.hash | slice:0:7 }}</div>
+                <div class="gap-commit-body">
+                  <div class="gap-commit-msg">{{ cwt.commit.message.split('\n')[0] }}</div>
+                  <div class="gap-commit-meta">
+                    {{ cwt.commit.author.user?.display_name || cwt.commit.author.raw.split('<')[0] }} &bull; {{
+                      cwt.commit.date | date:'MMM d, HH:mm' }} </div>
+                      <div class="ticket-chips" *ngIf="cwt.ticketIds.length > 0">
+                        <app-ticket-badge *ngFor="let t of cwt.tickets" [ticket]="t"></app-ticket-badge>
+                        <ng-container *ngFor="let id of cwt.ticketIds">
+                          <app-ticket-badge *ngIf="!cwt.tickets.some(x => x.key === id)"
+                            [ticketId]="id"></app-ticket-badge>
+                        </ng-container>
+                      </div>
+                      <span class="status-chip warn" *ngIf="cwt.ticketIds.length === 0">
+                        <span class="dot"></span> No Ticket
+                      </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+  </ng-container>
 
   <div *ngIf="comparing()" class="loading-state fade-in-up">
     <mat-spinner diameter="40"></mat-spinner>
@@ -122,9 +278,10 @@
 
   <ng-container *ngIf="result() as res">
     <div class="results-layout fade-in-up mt-24">
-      
+
       <!-- Multi-Queue Navigation -->
-      <div *ngIf="multiQueue().length > 1" class="multi-nav-bar" style="grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface-elevated); padding: 12px 20px; border-radius: 8px; margin-bottom: 16px;">
+      <div *ngIf="multiQueue().length > 1" class="multi-nav-bar"
+        style="grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface-elevated); padding: 12px 20px; border-radius: 8px; margin-bottom: 16px;">
         <button mat-stroked-button (click)="prevCompare()" [disabled]="!hasPrev">
           <mat-icon>chevron_left</mat-icon> Previous App
         </button>
@@ -229,8 +386,10 @@
 
           <div *ngIf="filteredCommits().length === 0" class="empty-state">
             <mat-icon>done_all</mat-icon>
-            <p *ngIf="res.commits.length === 0">No new commits to show. Refs are identical or {{ res.toRef }} is behind.</p>
-            <p *ngIf="res.commits.length > 0">All commits are merge commits — toggle <strong>Exclude merges</strong> off to
+            <p *ngIf="res.commits.length === 0">No new commits to show. Refs are identical or {{ res.toRef }} is behind.
+            </p>
+            <p *ngIf="res.commits.length > 0">All commits are merge commits — toggle <strong>Exclude merges</strong> off
+              to
               see them.</p>
           </div>
 
