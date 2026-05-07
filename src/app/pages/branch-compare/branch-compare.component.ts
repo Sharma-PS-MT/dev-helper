@@ -83,6 +83,44 @@ export class BranchCompareComponent implements OnInit {
 
   gapResult = signal<BranchGapAnalysis | null>(null);
 
+  // ── Critical column filters (independent) ───────────────────────────────
+  /** Critical: exclude branch merge commits */
+  gapExcludeMergeCommits = signal(true);
+  /** Critical: exclude PR merge commits */
+  gapExcludePullRequests = signal(true);
+
+  // ── Incoming column filters (independent) ───────────────────────────────
+  /** Incoming: exclude branch merge commits */
+  gapIncomingExcludeMergeCommits = signal(true);
+  /** Incoming: exclude PR merge commits */
+  gapIncomingExcludePullRequests = signal(true);
+
+  filteredCriticalCommits = computed(() => {
+    const gap = this.gapResult();
+    if (!gap) return [];
+    const exM = this.gapExcludeMergeCommits();
+    const exP = this.gapExcludePullRequests();
+    return gap.criticalCommits.filter(cwt => {
+      const msg = cwt.commit.message.trim();
+      if (exM && BranchCompareComponent.MERGE_PATTERNS.some(p => p.test(msg))) return false;
+      if (exP && BranchCompareComponent.PR_PATTERNS.some(p => p.test(msg))) return false;
+      return true;
+    });
+  });
+
+  filteredIncomingCommits = computed(() => {
+    const gap = this.gapResult();
+    if (!gap) return [];
+    const exM = this.gapIncomingExcludeMergeCommits();
+    const exP = this.gapIncomingExcludePullRequests();
+    return gap.incomingCommits.filter(cwt => {
+      const msg = cwt.commit.message.trim();
+      if (exM && BranchCompareComponent.MERGE_PATTERNS.some(p => p.test(msg))) return false;
+      if (exP && BranchCompareComponent.PR_PATTERNS.some(p => p.test(msg))) return false;
+      return true;
+    });
+  });
+
   results = signal<(BranchComparison & { repoSlug?: string })[]>([]); 
   result = signal<BranchComparison | null>(null);
 

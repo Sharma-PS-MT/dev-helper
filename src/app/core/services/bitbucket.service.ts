@@ -297,8 +297,12 @@ export class BitbucketService {
           });
         };
 
-        const criticalCommits = deduplicate(forward, new Map(reverseCounts));
-        const incomingCommits = deduplicate(reverse, new Map(forwardCounts));
+        // forward = commits in toRef NOT in fromRef  (since=fromRef, until=toRef)
+        // reverse = commits in fromRef NOT in toRef  (since=toRef, until=fromRef)
+        // Critical = fromRef unique (what fromRef has that toRef doesn't) → reverse
+        // Incoming = toRef unique (what toRef has that fromRef doesn't) → forward
+        const criticalCommits = deduplicate(reverse, new Map(forwardCounts));
+        const incomingCommits = deduplicate(forward, new Map(reverseCounts));
 
         // Collect all unique ticket IDs from both sets
         const allCommits = [...criticalCommits, ...incomingCommits];
