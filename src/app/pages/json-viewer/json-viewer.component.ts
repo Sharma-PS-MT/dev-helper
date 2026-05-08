@@ -38,11 +38,13 @@ export class JsonViewerComponent {
   
   // Highlighted HTML output safely typed for strict parsing
   highlightedHtml = signal<SafeHtml>('');
+  // Highlighted HTML for the active query result (null = show full JSON)
+  queryHighlightedHtml = signal<SafeHtml | null>(null);
 
   // Query & Analysis
   queryInput = signal<string>('');
   queryType = signal<'jsonpath' | 'regex'>('jsonpath');
-  calculationType = signal<'none' | 'sum' | 'avg' | 'count' | 'min' | 'max'>('sum');
+  calculationType = signal<'value' | 'sum' | 'avg' | 'count' | 'min' | 'max'>('value');
   queryResult = signal<any>(null);
   calculationResult = signal<string | number | null>(null);
   queryError = signal<string>('');
@@ -111,6 +113,7 @@ export class JsonViewerComponent {
     if (!obj || !query) {
       this.queryResult.set(null);
       this.queryError.set('');
+      this.queryHighlightedHtml.set(null); // restore full JSON view
       this.applyCalculation();
       this.updateSuggestions('');
       return;
@@ -119,9 +122,81 @@ export class JsonViewerComponent {
     try {
       this.queryError.set('');
       if (type === 'jsonpath') {
-        const normalizedQuery = this.normalizeJsonPath(query);
-        const result = JSONPath({ path: normalizedQuery, json: obj });
-        this.queryResult.set(result);
+        // Normalize multiplication symbol and shorthand filter syntax
+        // [@.field op value] → [?(@.field op value)]  (user-friendly shorthand)
+        let queryStr = query.replace(/×/g, '*');
+        queryStr = queryStr.replace(
+          /\[@\.([a-zA-Z0-9_]+)\s*(>|<|>=|<=|==|!=)\s*([^\]]+)\]/g,
+          (_: string, field: string, op: string, val: string) => `[?(@.${field}${op}${val.trim()})]`
+        );
+
+        // ── Mode 1: @.field formula syntax ──────────────────────────────────────────
+        // e.g. $.[*].services[*].((@.companyTax * 100) / @.companyShareAmount)
+        // Pattern: <basePath>.(<formula with @.field tokens>)
+        const atFormulaMatch = queryStr.match(/^(.*?)\.(\(.*\))$/);
+        const hasAtRef = atFormulaMatch && /@\.[a-zA-Z0-9_]+/.test(atFormulaMatch[2]);
+
+        if (hasAtRef && atFormulaMatch) {
+          const basePath = atFormulaMatch[1];        // e.g. $.[*].services[*]
+          const formulaTemplate = atFormulaMatch[2]; // e.g. ((@.companyTax * 100) / @.companyShareAmount)
+
+          const items: any[] = JSONPath({ path: this.normalizeJsonPath(basePath), json: obj }) || [];
+          const results = items.map((item: any) => {
+            if (typeof item !== 'object' || item === null) return null;
+
+            // Substitute every @.fieldName with its numeric value
+            const expr = formulaTemplate.replace(/@\.([a-zA-Z0-9_]+)/g, (_: string, field: string) => {
+              const val = item[field];
+              return (val !== undefined && val !== null) ? String(val) : 'NaN';
+            });
+
+            // Safety-guard: allow only numbers and arithmetic symbols
+            if (/^[0-9\+\-\*\/\(\)\.\s]+$/.test(expr)) {
+              try { return +(new Function('return (' + expr + ')')()).toFixed(4); } catch { return null; }
+            }
+            return null;
+          });
+          this.queryResult.set(results);
+
+        // ── Mode 2: dual $-path arithmetic  ─────────────────────────────────────────
+        // e.g. ($.[*].services[*].companyTax * 100) / $.[*].services[*].companyShareAmount
+        } else {
+          const pathRegex = /\$(?:(?:\.[a-zA-Z0-9_]+)|(?:\[[^\]]+\])|(?:\.\*))*/g;
+          let pIndex = 0;
+          const tokenizedQuery = queryStr.replace(pathRegex, () => `__VAR_${pIndex++}__`);
+          const hasMathOperator = /[\+\-\*\/]/.test(tokenizedQuery.replace(/__VAR_\d+__/g, ''));
+          const paths = queryStr.match(pathRegex);
+
+          if (hasMathOperator && paths && paths.length > 1) {
+            const evaluatedPaths = paths.map(p => JSONPath({ path: this.normalizeJsonPath(p), json: obj }) || []);
+            const maxLength = Math.max(...evaluatedPaths.map(arr => Array.isArray(arr) ? arr.length : 1));
+
+            if (maxLength === 0) {
+              this.queryResult.set([]);
+            } else {
+              const results: any[] = [];
+              for (let i = 0; i < maxLength; i++) {
+                let expr = tokenizedQuery;
+                let valid = true;
+                for (let j = 0; j < paths.length; j++) {
+                  const valArr = evaluatedPaths[j];
+                  const val = Array.isArray(valArr) ? valArr[i] : valArr;
+                  if (val === undefined || val === null) { valid = false; break; }
+                  expr = expr.replace(`__VAR_${j}__`, String(val));
+                }
+                if (valid && /^[0-9\+\-\*\/\(\)\.\s]+$/.test(expr)) {
+                  try { results.push(+(new Function('return (' + expr + ')')()).toFixed(4)); } catch { results.push(null); }
+                } else { results.push(null); }
+              }
+              this.queryResult.set(results);
+            }
+          } else {
+            // ── Mode 3: plain JSONPath ───────────────────────────────────────────────
+            const normalizedQuery = this.normalizeJsonPath(queryStr);
+            const result = JSONPath({ path: normalizedQuery, json: obj });
+            this.queryResult.set(result);
+          }
+        }
       } else {
         // Regex search
         const regex = new RegExp(query, 'i');
@@ -142,10 +217,12 @@ export class JsonViewerComponent {
       }
       this.applyCalculation();
       this.updateSuggestions(query);
+      this.updateViewerHtml();
     } catch (e: any) {
       this.queryError.set(e.message || 'Query Error');
       this.queryResult.set(null);
       this.calculationResult.set(null);
+      this.queryHighlightedHtml.set(null); // revert to full JSON view on error
     }
   }
 
@@ -166,6 +243,46 @@ export class JsonViewerComponent {
     const index = this.pathIndex();
     if (index.size === 0) { this.suggestions.set([]); return; }
 
+    // ── @.field suggestions (inside filter [?(@.xx)] or formula .(... @.xx)) ──
+    // Triggered whenever the cursor is sitting after an `@.` token.
+    const atRefMatch = query.match(/@\.([a-zA-Z0-9_]*)$/);
+    if (atRefMatch) {
+      const partial = atRefMatch[1]; // '' or 'gr' or 'compa' etc.
+
+      // Find where the filter/formula context block starts so we can determine
+      // which collection's keys to suggest.
+      const filterIdx = query.lastIndexOf('[?(');  // filter:  [?(@.field
+      const formulaIdx = query.lastIndexOf('.(');  // formula: .((@.field
+      const cutIdx = Math.max(filterIdx, formulaIdx);
+
+      // basePath is everything before the filter/formula block
+      const basePath = cutIdx >= 0
+        ? query.substring(0, cutIdx)
+        : query.replace(/@\.[a-zA-Z0-9_]*$/, '');
+
+      // Normalise basePath then append [*] to step into array items
+      const normBase = this.normalisePathKey(basePath);
+      const normItem = normBase.endsWith('[*]') ? normBase : normBase + '[*]';
+
+      const keysAtLevel = index.get(normItem) ?? index.get(normBase);
+
+      if (keysAtLevel && keysAtLevel.size > 0) {
+        // Prefix is everything in the query before the @.partial token
+        const prefix = query.substring(0, query.length - atRefMatch[0].length);
+
+        const filtered = Array.from(keysAtLevel)
+          .filter(k => k !== '[*]' && (!partial || k.toLowerCase().startsWith(partial.toLowerCase())))
+          .slice(0, 6)
+          .map(k => ({ display: k, value: prefix + '@.' + k }));
+
+        this.suggestions.set(filtered);
+        return;
+      }
+      this.suggestions.set([]);
+      return;
+    }
+
+    // ── Standard path suggestions ─────────────────────────────────────────────
     // Determine whether the user just finished a segment (ends with . or [)
     // or is mid-typing a key token.
     const endsWithSep = /[.\[]$/.test(query);
@@ -268,8 +385,26 @@ export class JsonViewerComponent {
     const data = this.queryResult();
     const type = this.calculationType();
 
-    if (data === null || type === 'none') {
+    if (data === null) {
       this.calculationResult.set(null);
+      return;
+    }
+
+    // ── Value mode: describe the result without math ──
+    if (type === 'value') {
+      // JSONPath always wraps results in an array. Unwrap when there is exactly
+      // one match so a single primitive or object is reported correctly.
+      const effective = Array.isArray(data) && data.length === 1 ? data[0] : data;
+
+      if (Array.isArray(effective)) {
+        this.calculationResult.set(`Array (${effective.length} item${effective.length === 1 ? '' : 's'})`);
+      } else if (effective !== null && typeof effective === 'object') {
+        const keyCount = Object.keys(effective).length;
+        this.calculationResult.set(`Object (${keyCount} key${keyCount === 1 ? '' : 's'})`);
+      } else {
+        // Primitive: string, number, boolean, null
+        this.calculationResult.set(String(effective));
+      }
       return;
     }
 
@@ -302,6 +437,17 @@ export class JsonViewerComponent {
 
   onQueryChange() {
     this.applyQuery();
+  }
+
+  /** Re-render the Beautiful Viewer based on the active query result. */
+  updateViewerHtml() {
+    const result = this.queryResult();
+    if (result === null || result === undefined) {
+      this.queryHighlightedHtml.set(null); // fall back to full JSON
+      return;
+    }
+    const html = this.buildSyntaxHighlightedHtml(result);
+    this.queryHighlightedHtml.set(this.sanitizer.bypassSecurityTrustHtml(html));
   }
 
   /**
@@ -482,6 +628,7 @@ export class JsonViewerComponent {
     this.rawJson.set('');
     this.parsedObj.set(null);
     this.highlightedHtml.set('');
+    this.queryHighlightedHtml.set(null);
     this.isValid.set(true);
     this.errorMsg.set('');
     this.queryInput.set('');

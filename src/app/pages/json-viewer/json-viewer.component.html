@@ -47,6 +47,11 @@
         <span><mat-icon>data_object</mat-icon> Beautiful Viewer</span>
 
         <div class="flex items-center gap-4">
+          <!-- Query active badge -->
+          <div class="status-chip query-active-badge" *ngIf="queryInput().trim() && !queryError()" style="background: rgba(99,102,241,0.15); color: #818cf8; border-color: rgba(99,102,241,0.3);">
+            <mat-icon style="font-size:14px; width:14px; height:14px;">filter_alt</mat-icon>
+            <span>Filtered View</span>
+          </div>
           <!-- Stats Indicator -->
           <div class="status-chip" [ngClass]="isValid() && parsedObj() ? 'done' : 'todo'">
             <div class="dot"></div>
@@ -55,10 +60,23 @@
         </div>
       </div>
 
+      <!-- Query error banner -->
+      <div *ngIf="queryError()" class="gap-item error fade-in-up" style="margin: 0 0 8px 0;">
+        <mat-icon>warning_amber</mat-icon>
+        <div class="flex-col">
+          <span class="gap-text">Query Error</span>
+          <span class="gap-sub">{{ queryError() }}</span>
+        </div>
+      </div>
+
       <div class="code-container">
-        <pre *ngIf="highlightedHtml()"
+        <!-- Query result view -->
+        <pre *ngIf="queryHighlightedHtml() && !queryError()"
+          class="json-pre"><code [innerHTML]="queryHighlightedHtml()" (click)="onCodeClick($event)"></code></pre>
+        <!-- Full JSON view (no active query, or query error, or no result) -->
+        <pre *ngIf="!queryHighlightedHtml() && highlightedHtml()"
           class="json-pre"><code [innerHTML]="highlightedHtml()" (click)="onCodeClick($event)"></code></pre>
-        <div *ngIf="!highlightedHtml()" class="empty-state">
+        <div *ngIf="!queryHighlightedHtml() && !highlightedHtml()" class="empty-state">
           <mat-icon>code</mat-icon>
           <p>JSON structure will render here</p>
         </div>
@@ -148,6 +166,17 @@
                   <span class="desc">Filters services where <strong>lineItemNo is 1</strong>, then dives into <strong>packageDetails</strong> to get share and tax.</span>
                 </div>
               </div>
+
+              <div class="example-card" (click)="queryInput.set('$.[*].services[*].((@.companyTax * 100) / @.companyShareAmount)'); applyQuery();" mat-dialog-close>
+                <div class="card-header">
+                  <span class="code">$.[*].services[*].((@.companyTax * 100) / @.companyShareAmount)</span>
+                </div>
+                <div class="card-body">
+                  <span class="desc">Calculates the <strong>effective tax rate %</strong> for each service. Uses <code>@.field</code> to reference the current item's fields in a formula.</span>
+                  <span class="desc" style="margin-top:4px; display:block;">Example: <code>50.36 &times; 100 / 335.75 = <strong>15.0%</strong></code></span>
+                </div>
+              </div>
+
             </div>
 
             <div class="syntax-tips">
@@ -155,8 +184,9 @@
               <ul>
                 <li><code>$</code> represents the root object or array.</li>
                 <li><code>[*]</code> iterates over all items in an array.</li>
-                <li><code>?(@.field == val)</code> filters items based on a condition.</li>
+                <li><code>[?(@.field &gt; val)]</code> filters items based on a condition. Shorthand: <code>[@.field&gt;val]</code>.</li>
                 <li><code>['a', 'b']</code> selects multiple properties (Union).</li>
+                <li><code>.(@.field * 100)</code> evaluates a formula per item using <code>@.field</code> references.</li>
               </ul>
             </div>
           </div>
@@ -168,7 +198,7 @@
         <mat-form-field appearance="outline" class="w-2-12">
           <mat-label>Calculation</mat-label>
           <mat-select [ngModel]="calculationType()" (ngModelChange)="calculationType.set($event); applyCalculation()">
-            <mat-option value="none">None</mat-option>
+            <mat-option value="value">Value</mat-option>
             <mat-option value="sum">Sum</mat-option>
             <mat-option value="avg">Average</mat-option>
             <mat-option value="count">Count</mat-option>
@@ -178,7 +208,7 @@
         </mat-form-field>
 
         <div class="w-10-12">
-          <div class="result-chip-compact flex items-center w-full" *ngIf="calculationType() !== 'none'">
+          <div class="result-chip-compact flex items-center w-full">
             <span class="label">{{ calculationType().toUpperCase() }}:</span>
             <span class="value">{{ calculationResult() ?? 'N/A' }}</span>
 
@@ -194,18 +224,6 @@
         </div>
       </div>
 
-      <!-- Query Results -->
-      <div class="query-results-compact" *ngIf="queryResult() !== null">
-        <div class="result-header">
-          <span>Query Results</span>
-          <button class="copy-result-btn" matTooltip="Copy Results" (click)="copyQueryResult()">
-            <mat-icon>content_copy</mat-icon>
-          </button>
-        </div>
-        <div class="result-content">
-          <pre>{{ queryResult() | json }}</pre>
-        </div>
-      </div>
     </div>
   </div>
 </div>
