@@ -445,9 +445,11 @@ export class BranchCompareComponent implements OnInit {
     }).pipe(
       finalize(() => this.loadingRefs.set(false))
     ).subscribe(() => {
-      // Auto-select main/master for destination if found
-      const main = this.toOptions().find(o => o.name === 'main' || o.name === 'master');
-      if (main) this.toRef.set(main.name);
+      // Auto-select the configured default branch (or fall back to main/master)
+      const defaultBranch = this.authConfig.config().bitbucketDefaultBranch || 'main';
+      const preferred = this.toOptions().find(o => o.name === defaultBranch)
+        ?? this.toOptions().find(o => o.name === 'main' || o.name === 'master');
+      if (preferred) this.toRef.set(preferred.name);
     });
   }
 

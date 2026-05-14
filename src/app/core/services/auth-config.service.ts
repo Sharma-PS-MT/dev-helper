@@ -7,6 +7,8 @@ export interface AppConfig {
   bitbucketWorkspace: string;
   bitbucketToken: string;           // App password or access token
   bitbucketBaseUrl: string;         // https://api.bitbucket.org/2.0
+  /** Default branch used as the comparison base (e.g. 'main', 'develop') */
+  bitbucketDefaultBranch: string;
 
   // JIRA
   jiraBaseUrl: string;              // e.g. https://company.atlassian.net
@@ -60,6 +62,7 @@ const DEFAULTS: AppConfig = {
   bitbucketWorkspace: '',
   bitbucketToken: '',
   bitbucketBaseUrl: '/bitbucket-api',
+  bitbucketDefaultBranch: 'main',
   jiraBaseUrl: '/jira-api',
   jiraEmail: '',
   jiraToken: '',

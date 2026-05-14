@@ -85,6 +85,10 @@ export class ArgocdDashboardComponent implements OnInit {
     return this.hasMultipleEnvs();
   }
 
+  get defaultBranch(): string {
+    return this.authConfig.config().bitbucketDefaultBranch || 'main';
+  }
+
   constructor(
     private authConfig: AuthConfigService,
     private argocd: ArgocdService,
@@ -193,12 +197,13 @@ export class ArgocdDashboardComponent implements OnInit {
           toType: 'tag',
         });
       } else if (envApps.length === 1) {
+        const defaultBranch = this.authConfig.config().bitbucketDefaultBranch || 'main';
         preFills.push({
           project: row.resolvedProject,
           repository: row.repository,
           fromRef: envApps[0].syncTag,
           fromType: 'tag',
-          toRef: 'main',
+          toRef: defaultBranch,
           toType: 'branch',
         });
       }

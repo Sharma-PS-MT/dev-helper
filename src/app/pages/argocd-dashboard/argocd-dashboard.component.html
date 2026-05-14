@@ -8,7 +8,7 @@
     <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
       <!-- Branch Compare navigation: 1+ rows -->
       <button *ngIf="selectedRows.size >= 1" mat-flat-button class="branch-btn" (click)="navigateToCompare()"
-              [matTooltip]="hasMultipleEnvs() ? (hasExactlyTwoEnvs() ? 'Compare tags between environments' : 'Select exactly two environments to compare gap') : 'Compare tag vs main branch'">
+              [matTooltip]="hasMultipleEnvs() ? (hasExactlyTwoEnvs() ? 'Compare tag-to-tag gap between the two selected environments' : 'Too many environments — select exactly 1 or 2') : 'Compare selected tag against the \'' + defaultBranch + '\' branch'">
         <mat-icon>compare_arrows</mat-icon>
         Compare Gap
       </button>
