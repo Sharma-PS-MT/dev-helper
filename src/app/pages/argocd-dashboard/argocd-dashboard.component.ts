@@ -56,14 +56,20 @@ export class ArgocdDashboardComponent implements OnInit {
   dataSource = new MatTableDataSource<GroupedAppRow>([]);
   displayedColumns = ['select', 'appName'];
 
-  // Row selection — max 1
+  // Row selection
   selectedRows: Set<GroupedAppRow> = new Set();
 
   // Filters
   filterValues: { [key: string]: string } = { appName: '' };
 
-  // Plain number — updated manually after filter so it is always accurate
   totalRows = 0;
+
+  /**
+   * Per-environment result cache: envId → filtered ArgoAppModel[].
+   * Selecting an env fetches once and caches. Deselecting removes from
+   * cache instantly — no API call needed.
+   */
+  private envCache = new Map<string, ArgoAppModel[]>();
 
   get hasActiveFilters(): boolean {
     return Object.values(this.filterValues).some(val => val !== '');
@@ -131,8 +137,19 @@ export class ArgocdDashboardComponent implements OnInit {
   // ── Environment chips ──────────────────────────────────────────────────────
 
   toggleEnv(env: EnvSelection) {
+    const wasSelected = env.selected;
     env.selected = !env.selected;
-    this.refresh();
+
+    if (!env.selected) {
+      // DESELECT: remove from cache and rebuild table — no API call
+      this.envCache.delete(env.config.id);
+      this.selectedRows.clear();
+      this.buildTable();
+    } else {
+      // SELECT: fetch only this env (unless already cached)
+      this.selectedRows.clear();
+      this.loadEnv(env);
+    }
   }
 
   // ── Row selection (max 1 row for comparison) ───────────────────────────────
@@ -226,84 +243,138 @@ export class ArgocdDashboardComponent implements OnInit {
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
-  refresh() {
-    this.selectedRows.clear();
+  /**
+   * Fetch a single environment, update cache, then rebuild the table.
+   * If the env is already in cache (shouldn't normally happen) it skips the call.
+   */
+  private loadEnv(env: EnvSelection): void {
+    if (this.envCache.has(env.config.id)) {
+      this.buildTable();
+      return;
+    }
+    env.loading = true;
+    env.error = null;
+    this.envs.update(list => [...list]); // trigger CD for loading spinner
+
+    this.argocd.fetchApplicationsForEnv(env.config).pipe(
+      catchError(err => {
+        env.error = err.message || 'Connection failed';
+        env.loading = false;
+        this.envs.update(list => [...list]);
+        return of([] as ArgoAppModel[]);
+      })
+    ).subscribe(apps => {
+      env.loading = false;
+      this.envs.update(list => [...list]);
+      this.envCache.set(env.config.id, this.applyEnvFilter(env.config.name, apps));
+      this.buildTable();
+    });
+  }
+
+  /** Apply environment-specific namespace filters (e.g. HMG PROD). */
+  private applyEnvFilter(envName: string, apps: ArgoAppModel[]): ArgoAppModel[] {
+    const name = envName?.trim().toUpperCase() || '';
+    if (name === 'HMG PROD')     return apps.filter(a => a.namespace === 'vida-prod');
+    if (name === 'HMG PRE-PROD') return apps.filter(a => a.namespace === 'vida-uat');
+    return apps;
+  }
+
+  /**
+   * Rebuild the grouped table purely from the in-memory cache.
+   * Zero API calls — called after every cache mutation.
+   */
+  private buildTable(): void {
     const selectedEnvs = this.envs().filter(e => e.selected);
+
     if (selectedEnvs.length === 0) {
       this.dataSource.data = [];
+      this.envColumns = [];
+      this.displayedColumns = ['select', 'appName'];
       this.totalRows = 0;
       return;
     }
 
-    const requests = selectedEnvs.map(env => {
-      env.loading = true;
-      env.error = null;
-      return this.argocd.fetchApplicationsForEnv(env.config).pipe(
+    const registry = this.authConfig.serviceRegistry();
+    const groupedMap = new Map<string, GroupedAppRow>();
+
+    for (const env of selectedEnvs) {
+      const envName = env.config.name?.trim().toUpperCase() || 'UNKNOWN';
+      const apps = this.envCache.get(env.config.id) ?? [];
+
+      for (const app of apps) {
+        app.envName = envName;
+        const resolved = resolveServices([app.name], registry);
+
+        let id = app.name;
+        let appName = app.name;
+        let repository = 'Unknown';
+        let resolvedProject = '';
+
+        if (resolved.ok) {
+          id = resolved.result.repository;
+          appName = resolved.result.displayName || app.name;
+          repository = resolved.result.repository;
+          resolvedProject = resolved.result.project;
+        }
+
+        if (!groupedMap.has(id)) {
+          groupedMap.set(id, { appName, repository, resolvedProject, envs: {} });
+        }
+        groupedMap.get(id)!.envs[envName] = app;
+      }
+    }
+
+    const rows = Array.from(groupedMap.values()).sort((a, b) => a.appName.localeCompare(b.appName));
+    this.dataSource.data = rows as any;
+
+    this.envColumns = selectedEnvs.map(e => e.config.name?.trim().toUpperCase() || 'UNKNOWN');
+    this.displayedColumns = ['select', 'appName', ...this.envColumns];
+
+    // Add missing filter keys (never remove existing ones mid-session)
+    this.envColumns.forEach(col => {
+      if (!(col in this.filterValues)) this.filterValues[col] = '';
+    });
+
+    this.applyFilter();
+  }
+
+  /**
+   * Force refresh: clears the cache and re-fetches all currently selected envs
+   * in parallel via forkJoin.
+   */
+  refresh(): void {
+    this.selectedRows.clear();
+    this.envCache.clear();
+
+    const selectedEnvs = this.envs().filter(e => e.selected);
+    if (selectedEnvs.length === 0) {
+      this.dataSource.data = [];
+      this.envColumns = [];
+      this.displayedColumns = ['select', 'appName'];
+      this.totalRows = 0;
+      return;
+    }
+
+    selectedEnvs.forEach(e => { e.loading = true; e.error = null; });
+    this.envs.update(list => [...list]);
+
+    const requests = selectedEnvs.map(env =>
+      this.argocd.fetchApplicationsForEnv(env.config).pipe(
         catchError(err => {
           env.error = err.message || 'Connection failed';
           return of([] as ArgoAppModel[]);
         })
-      );
-    });
+      )
+    );
 
     forkJoin(requests).subscribe(results => {
-      const registry = this.authConfig.serviceRegistry();
-      const groupedMap = new Map<string, GroupedAppRow>();
-
       results.forEach((apps, idx) => {
-        const envName = selectedEnvs[idx].config.name?.trim().toUpperCase() || 'UNKNOWN';
-
-        let filteredApps = apps;
-        if (envName === 'HMG PROD') {
-          filteredApps = apps.filter(a => a.namespace === 'vida-prod');
-        } else if (envName === 'HMG PRE-PROD') {
-          filteredApps = apps.filter(a => a.namespace === 'vida-uat');
-        }
-
-        filteredApps.forEach(app => {
-          app.envName = envName;
-          const resolved = resolveServices([app.name], registry);
-          
-          let id = app.name;
-          let appName = app.name;
-          let repository = 'Unknown';
-          let resolvedProject = '';
-
-          if (resolved.ok) {
-            id = resolved.result.repository;
-            appName = resolved.result.displayName || app.name;
-            repository = resolved.result.repository;
-            resolvedProject = resolved.result.project;
-          }
-
-          if (!groupedMap.has(id)) {
-            groupedMap.set(id, { appName, repository, resolvedProject, envs: {} });
-          }
-
-          groupedMap.get(id)!.envs[envName] = app;
-        });
+        const env = selectedEnvs[idx];
+        env.loading = false;
+        this.envCache.set(env.config.id, this.applyEnvFilter(env.config.name, apps));
       });
-
-      let groupedRows = Array.from(groupedMap.values());
-      groupedRows.sort((a, b) => a.appName.localeCompare(b.appName));
-
-      this.dataSource.data = groupedRows as any;
-      
-      this.envColumns = selectedEnvs.map(e => e.config.name?.trim().toUpperCase() || 'UNKNOWN');
-      this.displayedColumns = ['select', 'appName', ...this.envColumns];
-      
-      this.envColumns.forEach(col => {
-        if (!(col in this.filterValues)) {
-          this.filterValues[col] = '';
-        }
-      });
-
-      this.applyFilter();
-
-      this.envs.update(envs => {
-        envs.forEach(e => { if (e.selected) e.loading = false; });
-        return [...envs];
-      });
+      this.envs.update(list => [...list]);
+      this.buildTable();
     });
   }
 
