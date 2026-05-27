@@ -68,7 +68,7 @@ export class SettingsComponent implements OnInit {
   showArgoPwd: { [key: string]: boolean } = {};
 
   // Service Registry global table logic
-  svcColumns = ['displayName', 'project', 'repository', 'aliases', 'actions'];
+  svcColumns = ['displayName', 'stream', 'project', 'repository', 'aliases', 'actions'];
   serviceRegistry = computed(() => this.authConfig.serviceRegistry());
   newSvcEntry: ServiceRegistryEntry = this.emptySvcEntry();
   newAliasInput: { [key: string]: string } = {};
@@ -218,7 +218,7 @@ export class SettingsComponent implements OnInit {
   // ===========================================================================
 
   private emptySvcEntry(): ServiceRegistryEntry {
-    return { key: '', displayName: '', project: '', repository: '', aliases: [] };
+    return { key: '', displayName: '', project: '', repository: '', aliases: [], stream: '' };
   }
 
   /** Derive registry key from displayName: uppercase, spaces→underscores */

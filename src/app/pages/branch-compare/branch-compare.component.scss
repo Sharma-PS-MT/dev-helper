@@ -13,8 +13,7 @@
       flex: 1;
       .ref-header { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 8px; }
       .ref-controls { display: flex; gap: 8px; }
-      .type-sel { width: 110px; }
-      .ref-val { flex: 1; }
+      .ref-sel { flex: 1; }
       ::ng-deep .mdc-text-field--outlined { margin-bottom: 0 !important; }
       ::ng-deep .mat-mdc-form-field-subscript-wrapper { display: none; }
     }

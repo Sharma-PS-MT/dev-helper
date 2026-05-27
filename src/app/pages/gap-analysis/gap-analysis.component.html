@@ -1,0 +1,163 @@
+<div class="page-container fade-in-up">
+  <!-- Header & Back Navigation -->
+  <div class="page-header" style="display: flex; gap: 16px; align-items: start;">
+    <button mat-icon-button routerLink="/argocd-dashboard" matTooltip="Back to Dashboard">
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+    <div>
+      <h1>Release Validate Gaps</h1>
+      <p>Analyze deployment gaps between selected environments.</p>
+    </div>
+  </div>
+
+  <!-- Pre-Processing Configuration Card -->
+  <mat-card class="glass-card config-card">
+    <div class="direction-container">
+      <div class="env-box source-env">
+        <span class="label">Source</span>
+        <span class="env-name">{{ sourceEnv }}</span>
+      </div>
+
+      <div class="swap-action">
+        <button mat-icon-button color="accent" class="swap-btn" (click)="swapDirection()" matTooltip="Swap Direction">
+          <mat-icon>swap_horiz</mat-icon>
+        </button>
+        <span class="direction-arrow">➔</span>
+      </div>
+
+      <div class="env-box target-env">
+        <span class="label">Target</span>
+        <span class="env-name">{{ targetEnv }}</span>
+      </div>
+    </div>
+
+    <div class="action-container">
+      <button mat-flat-button class="process-btn" [disabled]="isProcessing" (click)="processGaps()">
+        <mat-icon>sync</mat-icon>
+        {{ isProcessing ? 'Processing...' : 'Process GAP Analysis' }}
+      </button>
+    </div>
+  </mat-card>
+
+  <!-- Processing State -->
+  <div *ngIf="isProcessing" class="processing-state fade-in">
+    <mat-progress-bar mode="indeterminate" color="accent"></mat-progress-bar>
+    <p class="processing-text">Analyzing registries and cross-referencing multi-service commit logs...</p>
+  </div>
+
+  <!-- Results Area -->
+  <div *ngIf="hasProcessed && !isProcessing" class="results-container fade-in-up">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <h2 style="margin: 0;">GAP Results</h2>
+      <div style="display: flex; gap: 16px; align-items: center;">
+        <mat-slide-toggle [(ngModel)]="excludeMergeAndPR" color="primary">Exclude Merge & PR Commits</mat-slide-toggle>
+        <mat-slide-toggle [(ngModel)]="isGroupedByTicket" color="accent">Group by Ticket</mat-slide-toggle>
+        <button mat-stroked-button (click)="copyToConfluence()" style="margin-left: 8px;">
+          <mat-icon>content_copy</mat-icon>
+          Copy to Confluence
+        </button>
+      </div>
+    </div>
+    
+    <!-- Version List for selected services -->
+    <mat-card class="glass-card result-card" style="margin-bottom: 24px;">
+      <div class="service-header">
+        <h3><strong>Version List</strong></h3>
+      </div>
+      <table mat-table [dataSource]="selectedProjects" class="mat-elevation-z0 transparent-table">
+        <ng-container matColumnDef="appName">
+          <th mat-header-cell *matHeaderCellDef> Service </th>
+          <td mat-cell *matCellDef="let p" class="bold-text"> {{ p.appName }} </td>
+        </ng-container>
+        <ng-container matColumnDef="sourceVersion">
+          <th mat-header-cell *matHeaderCellDef> {{ sourceEnv }} Version </th>
+          <td mat-cell *matCellDef="let p"> 
+            <button class="version-badge version-button" (click)="openVersionDialog(p, 'sourceVersion')">
+              {{ p.sourceVersion }}
+              <mat-icon style="font-size: 14px; height: 14px; width: 14px; margin-left: 4px;">edit</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="targetVersion">
+          <th mat-header-cell *matHeaderCellDef> {{ targetEnv }} Version </th>
+          <td mat-cell *matCellDef="let p"> 
+            <button class="version-badge version-button" (click)="openVersionDialog(p, 'targetVersion')">
+              {{ p.targetVersion }}
+              <mat-icon style="font-size: 14px; height: 14px; width: 14px; margin-left: 4px;">edit</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="versionColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: versionColumns;"></tr>
+      </table>
+    </mat-card>
+
+    <div *ngFor="let result of results" class="service-result">
+      <mat-card class="glass-card result-card">
+        <div class="service-header">
+          <h3>Service: <strong>{{ result.serviceName }}</strong></h3>
+        </div>
+
+        <table mat-table [dataSource]="getDisplayGaps(result.gaps)" class="mat-elevation-z0 transparent-table">
+          <!-- Ticket ID -->
+          <ng-container matColumnDef="ticketId">
+            <th mat-header-cell *matHeaderCellDef> Ticket ID </th>
+            <td mat-cell *matCellDef="let gap" class="bold-text"> {{ gap.ticketId }} </td>
+          </ng-container>
+
+          <!-- Commit / Summary -->
+          <ng-container matColumnDef="commitMessage">
+            <th mat-header-cell *matHeaderCellDef> Commit / Summary Message </th>
+            <td mat-cell *matCellDef="let gap"> 
+              <ng-container *ngIf="gap.isGrouped">
+                <div *ngFor="let c of gap.commits" style="margin-bottom: 8px;">
+                  <div class="commit-text">{{ c.message }}</div>
+                  <div class="sha-text" style="font-size: 11px;">{{ c.sha }}</div>
+                </div>
+              </ng-container>
+              <ng-container *ngIf="!gap.isGrouped">
+                <div class="commit-text">{{ gap.commitMessage }}</div>
+                <div class="sha-text">{{ gap.commitSha }}</div>
+              </ng-container>
+            </td>
+          </ng-container>
+
+          <!-- Direction -->
+          <ng-container matColumnDef="direction">
+            <th mat-header-cell *matHeaderCellDef> Direction </th>
+            <td mat-cell *matCellDef="let gap">
+              <mat-chip-set>
+                <mat-chip [ngClass]="{'dir-forward': gap.direction === 'Forward', 'dir-reverse': gap.direction === 'Reverse', 'dir-both': gap.direction === 'Both'}">
+                  {{ gap.direction }}
+                </mat-chip>
+              </mat-chip-set>
+            </td>
+          </ng-container>
+
+          <!-- Status -->
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef> Gap Status </th>
+            <td mat-cell *matCellDef="let gap"> 
+              <span class="status-badge" [ngClass]="getStatusClass(gap.status)">{{ gap.status }}</span>
+            </td>
+          </ng-container>
+
+          <!-- Action / Impact -->
+          <ng-container matColumnDef="actionImpact">
+            <th mat-header-cell *matHeaderCellDef> Action / Impact </th>
+            <td mat-cell *matCellDef="let gap" class="impact-text"> {{ gap.actionImpact }} </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+          
+          <tr class="mat-row" *matNoDataRow>
+            <td class="mat-cell" [attr.colspan]="displayedColumns.length" style="text-align: center; padding: 24px;">
+              No actionable anomalies found after filtering.
+            </td>
+          </tr>
+        </table>
+      </mat-card>
+    </div>
+  </div>
+</div>

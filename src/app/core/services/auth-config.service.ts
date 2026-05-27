@@ -54,6 +54,8 @@ export interface ServiceRegistryEntry {
   repository: string;
   /** Comma-separated alias names for matching */ 
   aliases: string[];
+  /** Optional stream name for filtering */
+  stream?: string;
 }
 
 const STORAGE_KEY = 'dev_helper_config';

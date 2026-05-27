@@ -20,6 +20,7 @@ import { AuthConfigService, ArgocdEnvConfig } from '../../core/services/auth-con
 import { ArgocdService, ArgoAppModel } from '../../core/services/argocd.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { BranchCompareStateService } from '../../core/services/branch-compare-state.service';
+import { GapAnalysisStateService } from '../../core/services/gap-analysis-state.service';
 import { resolveServices } from '../../core/config/service-registry';
 import { ArgocdCompareDialogComponent } from './argocd-compare-dialog.component';
 
@@ -34,6 +35,7 @@ export interface GroupedAppRow {
   appName: string;
   repository: string;
   resolvedProject: string;
+  stream?: string;
   envs: { [envName: string]: ArgoAppModel };
 }
 
@@ -60,7 +62,7 @@ export class ArgocdDashboardComponent implements OnInit {
   selectedRows: Set<GroupedAppRow> = new Set();
 
   // Filters
-  filterValues: { [key: string]: string } = { appName: '' };
+  filterValues: { [key: string]: string } = { appName: '', stream: '' };
 
   totalRows = 0;
 
@@ -73,6 +75,10 @@ export class ArgocdDashboardComponent implements OnInit {
 
   get hasActiveFilters(): boolean {
     return Object.values(this.filterValues).some(val => val !== '');
+  }
+
+  get selectedEnvCount(): number {
+    return this.envs().filter(e => e.selected).length;
   }
 
   hasExactlyTwoEnvs(): boolean {
@@ -101,7 +107,8 @@ export class ArgocdDashboardComponent implements OnInit {
     private dialog: MatDialog,
     private router: Router,
     private notify: NotificationService,
-    private compareState: BranchCompareStateService
+    private compareState: BranchCompareStateService,
+    private gapState: GapAnalysisStateService
   ) {
     // Sync env list from Firebase signal — use untracked to avoid loop
     effect(() => {
@@ -123,6 +130,10 @@ export class ArgocdDashboardComponent implements OnInit {
         
         if (col === 'appName') {
           return data.appName.toLowerCase().includes(term) || data.repository.toLowerCase().includes(term);
+        }
+
+        if (col === 'stream') {
+          return data.stream?.toLowerCase().includes(term) || false;
         }
         
         const envApp = data.envs[col];
@@ -163,6 +174,24 @@ export class ArgocdDashboardComponent implements OnInit {
       this.selectedRows.delete(row);
     } else {
       this.selectedRows.add(row);
+    }
+  }
+
+  isAllSelected(): boolean {
+    if (this.dataSource.filteredData.length === 0) return false;
+    return this.dataSource.filteredData.every(row => this.selectedRows.has(row));
+  }
+
+  isSomeSelected(): boolean {
+    const some = this.dataSource.filteredData.some(row => this.selectedRows.has(row));
+    return some && !this.isAllSelected();
+  }
+
+  toggleSelectAll(checked: boolean) {
+    if (checked) {
+      this.dataSource.filteredData.forEach(row => this.selectedRows.add(row));
+    } else {
+      this.dataSource.filteredData.forEach(row => this.selectedRows.delete(row));
     }
   }
 
@@ -239,6 +268,40 @@ export class ArgocdDashboardComponent implements OnInit {
 
     this.compareState.set(preFills);
     this.router.navigate(['/branch-compare']);
+  }
+
+  // ── Navigate to Gap Analysis ──────────────────────────────────────────────
+
+  navigateToGap() {
+    const selected = this.envs().filter(e => e.selected);
+    if (selected.length !== 2) {
+      this.notify.error('Please select exactly two environments for GAP analysis.');
+      return;
+    }
+    
+    const rows = Array.from(this.selectedRows);
+    if (rows.length === 0) {
+      this.notify.error('Please select at least one application.');
+      return;
+    }
+
+    // Set the state
+    const env1 = selected[0].config.name;
+    const env2 = selected[1].config.name;
+    
+    this.gapState.set({
+      sourceEnv: env1,
+      targetEnv: env2,
+      services: rows.map(r => ({
+        appName: r.appName,
+        repository: r.repository,
+        project: r.resolvedProject,
+        sourceVersion: r.envs[env1]?.syncTag || '—',
+        targetVersion: r.envs[env2]?.syncTag || '—'
+      }))
+    });
+
+    this.router.navigate(['/gap-analysis']);
   }
 
   // ── Data fetching ──────────────────────────────────────────────────────────
@@ -385,7 +448,7 @@ export class ArgocdDashboardComponent implements OnInit {
   }
 
   clearFilters() {
-    this.filterValues = { appName: '' };
+    this.filterValues = { appName: '', stream: '' };
     this.envColumns.forEach(col => this.filterValues[col] = '');
     this.applyFilter();
   }

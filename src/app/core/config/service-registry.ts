@@ -25,6 +25,8 @@ export interface ServiceConfig {
    * Matching is case-insensitive substring — so partial names work.
    */
   aliases: string[];
+  /** Optional stream name */
+  stream?: string;
 }
 
 export const SERVICE_REGISTRY: Record<string, ServiceConfig> = {
@@ -39,6 +41,7 @@ export interface ResolvedService {
   project: string;
   repository: string;
   displayName: string;
+  stream?: string;
 }
 
 /**
@@ -105,6 +108,7 @@ function findMatch(
         project: entry.project,
         repository: entry.repository,
         displayName: entry.displayName || entry.key,
+        stream: entry.stream,
       };
     }
   }
@@ -118,6 +122,7 @@ function findMatch(
         project: cfg.project,
         repository: cfg.repository,
         displayName: cfg.displayName ?? key,
+        stream: cfg.stream,
       };
     }
   }

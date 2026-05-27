@@ -43,5 +43,9 @@ export const routes: Routes = [
     path: 'argocd-dashboard',
     loadComponent: () => import('./pages/argocd-dashboard/argocd-dashboard.component').then(m => m.ArgocdDashboardComponent),
   },
+  {
+    path: 'gap-analysis',
+    loadComponent: () => import('./pages/gap-analysis/gap-analysis.component').then(m => m.GapAnalysisComponent),
+  },
   { path: '**', redirectTo: 'dashboard' },
 ];

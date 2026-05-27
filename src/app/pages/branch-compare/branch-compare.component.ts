@@ -17,9 +17,9 @@ import { BranchCompareStateService } from '../../core/services/branch-compare-st
 import { AuthConfigService } from '../../core/services/auth-config.service';
 import { BitbucketProject, BitbucketRepo, BitbucketBranch, BitbucketTag, BranchComparison, BranchGapAnalysis } from '../../core/models/bitbucket.models';
 import { TicketBadgeComponent } from '../../shared/components/ticket-badge/ticket-badge.component';
-import { catchError, finalize, debounceTime, distinctUntilChanged, tap, switchMap } from 'rxjs/operators';
-import { of, Subject, Subscription, forkJoin, Observable } from 'rxjs';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { RefGroupPipe } from '../../shared/pipes/ref-group.pipe';
+import { catchError, finalize } from 'rxjs/operators';
+import { of, forkJoin, Observable } from 'rxjs';
 
 @Component({
   selector: 'app-branch-compare',
@@ -27,7 +27,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
   imports: [
     CommonModule, FormsModule, MatCardModule, MatFormFieldModule,
     MatSelectModule, MatInputModule, MatButtonModule, MatIconModule,
-    MatProgressSpinnerModule, MatPaginatorModule, MatTooltipModule, MatSlideToggleModule, TicketBadgeComponent,
+    MatProgressSpinnerModule, MatPaginatorModule, MatTooltipModule, MatSlideToggleModule,
+    TicketBadgeComponent, RefGroupPipe,
   ],
   templateUrl: './branch-compare.component.html',
   styleUrls: ['./branch-compare.component.scss'],
@@ -52,28 +53,25 @@ export class BranchCompareComponent implements OnInit {
     return this.repos().filter(r => (r.name || '').toLowerCase().includes(t) || (r.slug || '').toLowerCase().includes(t));
   });
 
-  fromType = signal<'branch' | 'tag'>('branch');
-  toType = signal<'branch' | 'tag'>('branch');
-
   fromRef = signal<string>('');
-  toRef = signal<string>('');
+  toRef   = signal<string>('');
   fromSearch = signal('');
-  toSearch = signal('');
+  toSearch   = signal('');
 
-  fromOptions = signal<any[]>([]);
-  toOptions = signal<any[]>([]);
-
-  fromStart = signal(0);
-  toStart = signal(0);
-
-  fromHasMore = signal(true);
-  toHasMore = signal(true);
-
+  // ── Branch side (Destination / Into) ────────────────────────────────────
+  branches     = signal<any[]>([]);   // full list from API
+  fromOptions  = signal<any[]>([]);   // filtered for display
   fromLoadingOptions = signal(false);
-  toLoadingOptions = signal(false);
 
-  private fromSearchSubject = new Subject<string>();
-  private toSearchSubject = new Subject<string>();
+  // ── Tag side (Source / From) ─────────────────────────────────────────────
+  allTags      = signal<any[]>([]);   // full list from API
+  toOptions    = signal<any[]>([]);   // filtered for display
+  toLoadingOptions   = signal(false);
+
+  /** Legacy type stubs so pre-fill/swap code still compiles */
+  fromType = signal<'branch' | 'tag'>('branch');
+  toType   = signal<'branch' | 'tag'>('tag');
+
 
   loadingProjects = signal(false);
   loadingRepos = signal(false);
@@ -191,29 +189,7 @@ export class BranchCompareComponent implements OnInit {
     private notify: NotificationService,
     private compareState: BranchCompareStateService,
     private authConfig: AuthConfigService,
-  ) { 
-    this.fromSearchSubject.pipe(
-      takeUntilDestroyed(),
-      debounceTime(400),
-      distinctUntilChanged(),
-      tap(() => {
-        this.fromStart.set(0);
-        this.fromHasMore.set(true);
-      }),
-      switchMap(text => this.loadRefsForSide('from', false, text))
-    ).subscribe();
-
-    this.toSearchSubject.pipe(
-      takeUntilDestroyed(),
-      debounceTime(400),
-      distinctUntilChanged(),
-      tap(() => {
-        this.toStart.set(0);
-        this.toHasMore.set(true);
-      }),
-      switchMap(text => this.loadRefsForSide('to', false, text))
-    ).subscribe();
-  }
+  ) { }
 
   ngOnInit(): void {
     this.loadProjects();
@@ -225,77 +201,77 @@ export class BranchCompareComponent implements OnInit {
     }
   }
 
+  /** Filter branches list as user types */
   onFromSearch(text: string) {
     this.fromSearch.set(text);
-    this.fromSearchSubject.next(text);
+    const lower = text.toLowerCase().trim();
+    const filtered = lower
+      ? this.branches().filter(o => o.name.toLowerCase().includes(lower))
+      : this.branches();
+    this.fromOptions.set(filtered);
   }
 
+  /** Filter tags list as user types */
   onToSearch(text: string) {
     this.toSearch.set(text);
-    this.toSearchSubject.next(text);
+    const lower = text.toLowerCase().trim();
+    const filtered = lower
+      ? this.allTags().filter(o => o.name.toLowerCase().includes(lower))
+      : this.allTags();
+    this.toOptions.set(filtered);
   }
 
-  loadRefsForSide(side: 'from' | 'to', append: boolean = false, filterText?: string) {
-    const slug = this.selectedRepo();
-    if (!slug) return of(null);
+  /** When a branch is selected, auto-select the latest (first) tag */
+  onBranchSelected(branchName: string) {
+    this.fromRef.set(branchName);
+    const latestTag = this.allTags()[0];
+    if (latestTag && !this.toRef()) {
+      this.toRef.set(latestTag.name);
+    }
+  }
 
-    const type = side === 'from' ? this.fromType() : this.toType();
-    const start = append ? (side === 'from' ? this.fromStart() : this.toStart()) : 0;
-    const filter = filterText ?? (side === 'from' ? this.fromSearch() : this.toSearch());
+  /**
+   * Loads branches (for left/from side) OR tags (for right/to side) separately.
+   * Called by loadRefs() and by pre-fill logic.
+   */
+  loadRefsForSide(side: 'from' | 'to', _append = false, _filterText?: string): Observable<any> {
+    const repo = this.selectedRepo();
+    if (!repo) return of(null);
+    const proj = this.selectedProject() || undefined;
 
-    if (side === 'from') this.fromLoadingOptions.set(true);
-    else this.toLoadingOptions.set(true);
-
-    const obs$: Observable<any> = type === 'branch' 
-      ? this.bitbucket.getBranches(slug, this.selectedProject() || undefined, filter, start)
-      : this.bitbucket.getTags(slug, this.selectedProject() || undefined, filter, start);
-
-    return obs$.pipe(
-      tap((res: any) => {
-        if (side === 'from') {
-          const current = append ? this.fromOptions() : [];
-          this.fromOptions.set([...current, ...res.values]);
-          this.fromStart.set(res.nextPageStart || 0);
-          this.fromHasMore.set(!res.isLastPage);
+    if (side === 'from') {
+      // Load branches
+      this.fromLoadingOptions.set(true);
+      return this.bitbucket.getBranches(repo, proj, '', 0).pipe(
+        tap((res: any) => {
+          const items = (res.values || []);
+          this.branches.set(items);
+          this.fromOptions.set(items);
           this.fromLoadingOptions.set(false);
-        } else {
-          const current = append ? this.toOptions() : [];
-          this.toOptions.set([...current, ...res.values]);
-          this.toStart.set(res.nextPageStart || 0);
-          this.toHasMore.set(!res.isLastPage);
+        }),
+        catchError(() => { this.fromLoadingOptions.set(false); return of(null); })
+      );
+    } else {
+      // Load tags
+      this.toLoadingOptions.set(true);
+      return this.bitbucket.getTags(repo, proj, '', 0).pipe(
+        tap((res: any) => {
+          const items = (res.values || []);
+          this.allTags.set(items);
+          this.toOptions.set(items);
           this.toLoadingOptions.set(false);
-        }
-      }),
-      catchError(err => {
-        this.notify.error(`Failed to load ${type}es for ${side}`);
-        if (side === 'from') this.fromLoadingOptions.set(false);
-        else this.toLoadingOptions.set(false);
-        return of(null);
-      })
-    );
+          // Auto-select latest tag if none chosen yet
+          if (items.length > 0 && !this.toRef()) {
+            this.toRef.set(items[0].name);
+          }
+        }),
+        catchError(() => { this.toLoadingOptions.set(false); return of(null); })
+      );
+    }
   }
 
-  registerScrollListener(opened: boolean, side: 'from' | 'to') {
-    if (!opened) return;
-    
-    // Give time for the panel to render
-    setTimeout(() => {
-      const panel = document.querySelector('.mat-mdc-select-panel');
-      if (!panel) return;
-
-      panel.addEventListener('scroll', (event: any) => {
-        const threshold = 50; // pixels from bottom
-        const position = event.target.scrollTop + event.target.offsetHeight;
-        const height = event.target.scrollHeight;
-
-        const loading = side === 'from' ? this.fromLoadingOptions() : this.toLoadingOptions();
-        const hasMore = side === 'from' ? this.fromHasMore() : this.toHasMore();
-
-        if (height - position < threshold && !loading && hasMore) {
-          this.loadRefsForSide(side, true).subscribe();
-        }
-      });
-    }, 100);
+  registerScrollListener(_opened: boolean, _side: 'from' | 'to') {
+    // Not needed — full list loaded upfront
   }
 
   /**

@@ -6,6 +6,14 @@
       <p>Select environments to aggregate and monitor your deployments.</p>
     </div>
     <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+      <!-- Release GAP button -->
+      <button *ngIf="selectedRows.size >= 1" mat-flat-button class="gap-btn" style="background-color: var(--accent-cyan); color: #fff;"
+              (click)="navigateToGap()" 
+              [disabled]="selectedEnvCount !== 2"
+              matTooltip="Select exactly two environments to run Gap Analysis">
+        <mat-icon>analytics</mat-icon> Release GAP
+      </button>
+
       <!-- Branch Compare navigation: 1+ rows -->
       <button *ngIf="selectedRows.size >= 1" mat-flat-button class="branch-btn" (click)="navigateToCompare()"
               [matTooltip]="hasMultipleEnvs() ? (hasExactlyTwoEnvs() ? 'Compare tag-to-tag gap between the two selected environments' : 'Too many environments — select exactly 1 or 2') : 'Compare selected tag against the \'' + defaultBranch + '\' branch'">
@@ -69,7 +77,12 @@
             <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap;">
               {{ selectedRows.size }} selected
             </div>
-            <div style="height: 24px;"></div>
+            <mat-checkbox
+              [checked]="isAllSelected()"
+              [indeterminate]="isSomeSelected()"
+              (change)="toggleSelectAll($event.checked)"
+              color="accent">
+            </mat-checkbox>
           </th>
           <td mat-cell *matCellDef="let row" style="width: 52px;">
             <mat-checkbox
@@ -91,6 +104,17 @@
             <div *ngIf="row.repository !== 'Unknown'" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
               {{ row.repository }}
             </div>
+          </td>
+        </ng-container>
+
+        <!-- Stream Column -->
+        <ng-container matColumnDef="stream">
+          <th mat-header-cell *matHeaderCellDef>
+            <div>Stream</div>
+            <input class="filter-input" placeholder="Filter stream..." [(ngModel)]="filterValues['stream']" (keyup)="applyFilter()">
+          </th>
+          <td mat-cell *matCellDef="let row" class="primary-text" style="min-width: 100px;">
+            <div>{{ row.stream || '—' }}</div>
           </td>
         </ng-container>
 

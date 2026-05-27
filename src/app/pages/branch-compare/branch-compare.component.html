@@ -37,29 +37,24 @@
 
     <!-- Disabled until a repo is loaded -->
     <div class="compare-row" [class.disabled]="!selectedRepo() || loadingRefs()">
-      <!-- Source -->
+      <!-- Branch selector (Destination / Into) -->
       <div class="ref-selector">
         <div class="ref-header">Destination Ref (Into)</div>
         <div class="ref-controls">
-          <mat-form-field appearance="outline" class="type-sel">
-            <mat-select [(ngModel)]="fromType"
-              (ngModelChange)="fromRef.set(''); loadRefsForSide('from', false).subscribe()">
-              <mat-option value="branch">Branch</mat-option>
-              <mat-option value="tag">Tag</mat-option>
-            </mat-select>
-          </mat-form-field>
           <mat-form-field appearance="outline" class="ref-sel">
-            <mat-select [(ngModel)]="fromRef" (openedChange)="registerScrollListener($event, 'from')">
+            <mat-label>🌿 Select Branch</mat-label>
+            <mat-select [ngModel]="fromRef()" (ngModelChange)="onBranchSelected($event)">
               <div class="select-search-container" (keydown)="$event.stopPropagation()">
-                <input placeholder="Search ref..." class="select-search-input" [ngModel]="fromSearch()"
-                  (ngModelChange)="onFromSearch($event)" (click)="$event.stopPropagation()">
+                <input placeholder="Search branch..." class="select-search-input"
+                  [ngModel]="fromSearch()" (ngModelChange)="onFromSearch($event)"
+                  (click)="$event.stopPropagation()">
               </div>
-              <mat-option *ngFor="let o of fromOptions()" [value]="o.name">{{ o.name }}</mat-option>
               <mat-option *ngIf="fromLoadingOptions()" disabled class="loading-option">
                 <mat-spinner diameter="20"></mat-spinner>
               </mat-option>
-              <mat-option *ngIf="!fromLoadingOptions() && fromHasMore()" disabled class="load-more-hint">
-                Scroll for more...
+              <mat-option *ngFor="let o of fromOptions()" [value]="o.name">{{ o.name }}</mat-option>
+              <mat-option *ngIf="!fromLoadingOptions() && fromOptions().length === 0" disabled>
+                No branches found
               </mat-option>
             </mat-select>
           </mat-form-field>
@@ -72,28 +67,24 @@
         <mat-icon>swap_horiz</mat-icon>
       </button>
 
-      <!-- Destination -->
+      <!-- Tag selector (Source / From) — latest tag auto-selected when branch chosen -->
       <div class="ref-selector">
         <div class="ref-header">Source Ref (From)</div>
         <div class="ref-controls">
-          <mat-form-field appearance="outline" class="type-sel">
-            <mat-select [(ngModel)]="toType" (ngModelChange)="toRef.set(''); loadRefsForSide('to', false).subscribe()">
-              <mat-option value="branch">Branch</mat-option>
-              <mat-option value="tag">Tag</mat-option>
-            </mat-select>
-          </mat-form-field>
           <mat-form-field appearance="outline" class="ref-sel">
-            <mat-select [(ngModel)]="toRef" (openedChange)="registerScrollListener($event, 'to')">
+            <mat-label>🏷️ Select Tag</mat-label>
+            <mat-select [ngModel]="toRef()" (ngModelChange)="toRef.set($event)">
               <div class="select-search-container" (keydown)="$event.stopPropagation()">
-                <input placeholder="Search ref..." class="select-search-input" [ngModel]="toSearch()"
-                  (ngModelChange)="onToSearch($event)" (click)="$event.stopPropagation()">
+                <input placeholder="Search tag..." class="select-search-input"
+                  [ngModel]="toSearch()" (ngModelChange)="onToSearch($event)"
+                  (click)="$event.stopPropagation()">
               </div>
-              <mat-option *ngFor="let o of toOptions()" [value]="o.name">{{ o.name }}</mat-option>
               <mat-option *ngIf="toLoadingOptions()" disabled class="loading-option">
                 <mat-spinner diameter="20"></mat-spinner>
               </mat-option>
-              <mat-option *ngIf="!toLoadingOptions() && toHasMore()" disabled class="load-more-hint">
-                Scroll for more...
+              <mat-option *ngFor="let o of toOptions()" [value]="o.name">{{ o.name }}</mat-option>
+              <mat-option *ngIf="!toLoadingOptions() && toOptions().length === 0" disabled>
+                No tags found
               </mat-option>
             </mat-select>
           </mat-form-field>
