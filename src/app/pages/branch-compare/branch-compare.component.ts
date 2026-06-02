@@ -17,10 +17,10 @@ import { BranchCompareStateService } from '../../core/services/branch-compare-st
 import { AuthConfigService } from '../../core/services/auth-config.service';
 import { BitbucketProject, BitbucketRepo, BitbucketBranch, BitbucketTag, BranchComparison, BranchGapAnalysis } from '../../core/models/bitbucket.models';
 import { TicketBadgeComponent } from '../../shared/components/ticket-badge/ticket-badge.component';
-import { RefGroupPipe } from '../../shared/pipes/ref-group.pipe';
-import { catchError, finalize } from 'rxjs/operators';
+import { catchError, finalize, tap } from 'rxjs/operators';
 import { of, forkJoin, Observable } from 'rxjs';
 
+// Branch & Tag Compare Component - supports toggling between branches and tags on both sides
 @Component({
   selector: 'app-branch-compare',
   standalone: true,
@@ -28,7 +28,7 @@ import { of, forkJoin, Observable } from 'rxjs';
     CommonModule, FormsModule, MatCardModule, MatFormFieldModule,
     MatSelectModule, MatInputModule, MatButtonModule, MatIconModule,
     MatProgressSpinnerModule, MatPaginatorModule, MatTooltipModule, MatSlideToggleModule,
-    TicketBadgeComponent, RefGroupPipe,
+    TicketBadgeComponent,
   ],
   templateUrl: './branch-compare.component.html',
   styleUrls: ['./branch-compare.component.scss'],
@@ -62,15 +62,19 @@ export class BranchCompareComponent implements OnInit {
   branches     = signal<any[]>([]);   // full list from API
   fromOptions  = signal<any[]>([]);   // filtered for display
   fromLoadingOptions = signal(false);
+  fromStart    = signal(0);           // pagination start
+  fromHasMore  = signal(false);       // has more items to load
 
   // ── Tag side (Source / From) ─────────────────────────────────────────────
   allTags      = signal<any[]>([]);   // full list from API
   toOptions    = signal<any[]>([]);   // filtered for display
   toLoadingOptions   = signal(false);
+  toStart      = signal(0);           // pagination start
+  toHasMore    = signal(false);       // has more items to load
 
-  /** Legacy type stubs so pre-fill/swap code still compiles */
+  /** Type selection for each side - branch or tag */
   fromType = signal<'branch' | 'tag'>('branch');
-  toType   = signal<'branch' | 'tag'>('tag');
+  toType   = signal<'branch' | 'tag'>('branch');
 
 
   loadingProjects = signal(false);
@@ -201,73 +205,44 @@ export class BranchCompareComponent implements OnInit {
     }
   }
 
-  /** Filter branches list as user types */
+  /** Filter ref list as user types (respects current type) */
   onFromSearch(text: string) {
     this.fromSearch.set(text);
     const lower = text.toLowerCase().trim();
+    const source = this.fromType() === 'branch' ? this.branches() : this.allTags();
     const filtered = lower
-      ? this.branches().filter(o => o.name.toLowerCase().includes(lower))
-      : this.branches();
+      ? source.filter(o => o.name.toLowerCase().includes(lower))
+      : source;
     this.fromOptions.set(filtered);
   }
 
-  /** Filter tags list as user types */
+  /** Filter ref list as user types (respects current type) */
   onToSearch(text: string) {
     this.toSearch.set(text);
     const lower = text.toLowerCase().trim();
+    const source = this.toType() === 'branch' ? this.branches() : this.allTags();
     const filtered = lower
-      ? this.allTags().filter(o => o.name.toLowerCase().includes(lower))
-      : this.allTags();
+      ? source.filter(o => o.name.toLowerCase().includes(lower))
+      : source;
     this.toOptions.set(filtered);
   }
 
-  /** When a branch is selected, auto-select the latest (first) tag */
-  onBranchSelected(branchName: string) {
-    this.fromRef.set(branchName);
-    const latestTag = this.allTags()[0];
-    if (latestTag && !this.toRef()) {
-      this.toRef.set(latestTag.name);
-    }
+  /** Toggle between branch/tag for the 'from' (destination) side */
+  onFromTypeChange(type: 'branch' | 'tag') {
+    this.fromType.set(type);
+    this.fromRef.set('');
+    this.fromSearch.set('');
+    // Switch the options to the correct list (already loaded)
+    this.fromOptions.set(type === 'branch' ? this.branches() : this.allTags());
   }
 
-  /**
-   * Loads branches (for left/from side) OR tags (for right/to side) separately.
-   * Called by loadRefs() and by pre-fill logic.
-   */
-  loadRefsForSide(side: 'from' | 'to', _append = false, _filterText?: string): Observable<any> {
-    const repo = this.selectedRepo();
-    if (!repo) return of(null);
-    const proj = this.selectedProject() || undefined;
-
-    if (side === 'from') {
-      // Load branches
-      this.fromLoadingOptions.set(true);
-      return this.bitbucket.getBranches(repo, proj, '', 0).pipe(
-        tap((res: any) => {
-          const items = (res.values || []);
-          this.branches.set(items);
-          this.fromOptions.set(items);
-          this.fromLoadingOptions.set(false);
-        }),
-        catchError(() => { this.fromLoadingOptions.set(false); return of(null); })
-      );
-    } else {
-      // Load tags
-      this.toLoadingOptions.set(true);
-      return this.bitbucket.getTags(repo, proj, '', 0).pipe(
-        tap((res: any) => {
-          const items = (res.values || []);
-          this.allTags.set(items);
-          this.toOptions.set(items);
-          this.toLoadingOptions.set(false);
-          // Auto-select latest tag if none chosen yet
-          if (items.length > 0 && !this.toRef()) {
-            this.toRef.set(items[0].name);
-          }
-        }),
-        catchError(() => { this.toLoadingOptions.set(false); return of(null); })
-      );
-    }
+  /** Toggle between branch/tag for the 'to' (source) side */
+  onToTypeChange(type: 'branch' | 'tag') {
+    this.toType.set(type);
+    this.toRef.set('');
+    this.toSearch.set('');
+    // Switch the options to the correct list (already loaded)
+    this.toOptions.set(type === 'branch' ? this.branches() : this.allTags());
   }
 
   registerScrollListener(_opened: boolean, _side: 'from' | 'to') {
@@ -335,11 +310,19 @@ export class BranchCompareComponent implements OnInit {
         this.fromStart.set(0);
         this.toStart.set(0);
 
-        // Load the options for the specific types
+        // Load BOTH branches AND tags so toggling works on both sides
         forkJoin({
-          from: this.loadRefsForSide('from', false),
-          to: this.loadRefsForSide('to', false)
-        }).subscribe(() => {
+          branches: this.bitbucket.getBranches(repo.slug, proj.key, '', 0),
+          tags: this.bitbucket.getTags(repo.slug, proj.key, '', 0)
+        }).subscribe(res => {
+          // Store both lists
+          this.branches.set(res.branches?.values || []);
+          this.allTags.set(res.tags?.values || []);
+          
+          // Set options based on current types
+          this.fromOptions.set(fromType === 'branch' ? this.branches() : this.allTags());
+          this.toOptions.set(toType === 'branch' ? this.branches() : this.allTags());
+          
           // Ensure the selected refs are in the options list so mat-select displays them properly
           const fOpts = this.fromOptions();
           if (fromRef && !fOpts.some(o => o.name === fromRef)) {
@@ -415,17 +398,35 @@ export class BranchCompareComponent implements OnInit {
     this.fromStart.set(0);
     this.toStart.set(0);
 
+    const repo = this.selectedRepo();
+    if (!repo) return;
+    const proj = this.selectedProject() || undefined;
+
+    // Load BOTH branches AND tags so both are available for toggling on either side
     forkJoin({
-      from: this.loadRefsForSide('from'),
-      to: this.loadRefsForSide('to')
+      branches: this.bitbucket.getBranches(repo, proj, '', 0),
+      tags: this.bitbucket.getTags(repo, proj, '', 0)
     }).pipe(
       finalize(() => this.loadingRefs.set(false))
-    ).subscribe(() => {
-      // Auto-select the configured default branch (or fall back to main/master)
-      const defaultBranch = this.authConfig.config().bitbucketDefaultBranch || 'main';
-      const preferred = this.toOptions().find(o => o.name === defaultBranch)
-        ?? this.toOptions().find(o => o.name === 'main' || o.name === 'master');
-      if (preferred) this.toRef.set(preferred.name);
+    ).subscribe(res => {
+      // Store both lists
+      this.branches.set(res.branches?.values || []);
+      this.allTags.set(res.tags?.values || []);
+      
+      // Set initial options based on current types
+      this.fromOptions.set(this.fromType() === 'branch' ? this.branches() : this.allTags());
+      this.toOptions.set(this.toType() === 'branch' ? this.branches() : this.allTags());
+      
+      // Auto-select the configured default branch on the 'to' side if it's set to branch type
+      if (this.toType() === 'branch') {
+        const defaultBranch = this.authConfig.config().bitbucketDefaultBranch || 'main';
+        const preferred = this.branches().find(o => o.name === defaultBranch)
+          ?? this.branches().find(o => o.name === 'main' || o.name === 'master');
+        if (preferred) this.toRef.set(preferred.name);
+      } else if (this.allTags().length > 0) {
+        // Auto-select first tag if on tag type
+        this.toRef.set(this.allTags()[0].name);
+      }
     });
   }
 

@@ -10,7 +10,7 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatListModule } from '@angular/material/list';
 import { BitbucketService } from '../../core/services/bitbucket.service';
-import { Subject, Observable } from 'rxjs';
+import { Subject, Observable, forkJoin } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
@@ -37,8 +37,22 @@ export interface VersionSelectDialogData {
       </div>
 
       <div class="dialog-body">
+        <!-- Branch/Tag Toggle -->
+        <div class="ref-type-toggle">
+          <button mat-button 
+                  [class.active]="refType() === 'branch'"
+                  (click)="onTypeChange('branch')">
+            <mat-icon>account_tree</mat-icon> Branch
+          </button>
+          <button mat-button 
+                  [class.active]="refType() === 'tag'"
+                  (click)="onTypeChange('tag')">
+            <mat-icon>sell</mat-icon> Tag
+          </button>
+        </div>
+
         <mat-form-field appearance="outline" class="search-field">
-          <mat-label>Search Tags</mat-label>
+          <mat-label>Search {{ refType() === 'branch' ? 'Branches' : 'Tags' }}</mat-label>
           <input matInput [ngModel]="searchText()" (ngModelChange)="onSearchChange($event)" placeholder="Type to search..." autofocus>
           <mat-icon matPrefix>search</mat-icon>
           <button *ngIf="searchText()" matSuffix mat-icon-button aria-label="Clear" (click)="onSearchChange('')">
@@ -51,12 +65,12 @@ export interface VersionSelectDialogData {
           
           <mat-action-list *ngIf="options().length > 0">
             <button mat-list-item *ngFor="let opt of options()" 
-                    (click)="selectRef(opt.displayId)"
-                    [class.selected]="opt.displayId === data.currentVersion"
-                    class="tag-item">
-              <mat-icon matListItemIcon>local_offer</mat-icon>
-              <span matListItemTitle class="tag-title">{{ opt.displayId }}</span>
-              <span matListItemLine class="commit-hash">{{ opt.latestCommit?.substring(0,8) }}</span>
+                    (click)="selectRef(opt.displayId || opt.name)"
+                    [class.selected]="(opt.displayId || opt.name) === data.currentVersion"
+                    class="ref-item">
+              <mat-icon matListItemIcon>{{ refType() === 'branch' ? 'account_tree' : 'sell' }}</mat-icon>
+              <span matListItemTitle class="ref-title">{{ opt.displayId || opt.name }}</span>
+              <span matListItemLine class="commit-hash">{{ (opt.latestCommit || opt.latestChangeset)?.substring(0,8) }}</span>
             </button>
           </mat-action-list>
 
@@ -66,7 +80,7 @@ export interface VersionSelectDialogData {
           </div>
 
           <div *ngIf="!loading() && options().length === 0" class="no-results">
-            No tags found matching "{{ searchText() }}"
+            No {{ refType() }}es found matching "{{ searchText() }}"
           </div>
         </div>
       </div>
@@ -95,6 +109,45 @@ export interface VersionSelectDialogData {
       flex-direction: column;
       gap: 16px;
     }
+    .ref-type-toggle {
+      display: flex;
+      gap: 4px;
+      
+      button {
+        flex: 1;
+        padding: 8px 12px;
+        font-size: 13px;
+        font-weight: 500;
+        border: 1px solid var(--border-subtle);
+        background: var(--bg-card);
+        color: var(--text-secondary);
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        
+        mat-icon {
+          font-size: 18px;
+          width: 18px;
+          height: 18px;
+        }
+        
+        &:hover:not(.active) {
+          background: var(--bg-secondary);
+          border-color: var(--accent-cyan);
+        }
+        
+        &.active {
+          background: var(--accent-cyan);
+          color: white;
+          border-color: var(--accent-cyan);
+          font-weight: 600;
+        }
+      }
+    }
     .search-field { width: 100%; }
     .results-container {
       height: 300px;
@@ -117,10 +170,10 @@ export interface VersionSelectDialogData {
     .commit-hash {
       font-family: monospace; font-size: 12px; color: var(--text-muted);
     }
-    .tag-item {
+    .ref-item {
       border-bottom: 1px solid rgba(255,255,255,0.05);
     }
-    .tag-title {
+    .ref-title {
       font-size: 15px;
       font-weight: 500;
       color: #00d2ff;
@@ -144,9 +197,14 @@ export interface VersionSelectDialogData {
   `]
 })
 export class VersionSelectDialogComponent implements OnInit {
+  refType = signal<'branch' | 'tag'>('branch');
   searchText = signal('');
   options = signal<any[]>([]);
   loading = signal(false);
+  
+  // Store both branches and tags
+  branches = signal<any[]>([]);
+  tags = signal<any[]>([]);
   
   start = signal(0);
   hasMore = signal(true);
@@ -171,38 +229,47 @@ export class VersionSelectDialogComponent implements OnInit {
   }
 
   ngOnInit() {
-    // Initial load
-    this.loadRefs(false, '').subscribe();
+    // Load both branches and tags on init
+    this.loading.set(true);
+    forkJoin({
+      branches: this.bitbucket.getBranches(this.data.repository, this.data.project, '', 0),
+      tags: this.bitbucket.getTags(this.data.repository, this.data.project, '', 0)
+    }).subscribe(res => {
+      this.branches.set(res.branches?.values || []);
+      this.tags.set(res.tags?.values || []);
+      
+      // Set initial options based on type (default is branch)
+      this.options.set(this.branches());
+      this.loading.set(false);
+    });
+  }
+
+  onTypeChange(type: 'branch' | 'tag') {
+    this.refType.set(type);
+    this.searchText.set('');
+    // Switch to the correct pre-loaded list
+    const source = type === 'branch' ? this.branches() : this.tags();
+    this.options.set(source);
   }
 
   onSearchChange(text: string) {
     this.searchText.set(text);
-    this.searchSubject.next(text);
-  }
-
-  onScroll(event: any) {
-    const target = event.target;
-    if (target.scrollHeight - target.scrollTop <= target.clientHeight + 20) {
-      if (this.hasMore() && !this.loading()) {
-        this.loadRefs(true, this.searchText()).subscribe();
-      }
+    const lower = text.toLowerCase().trim();
+    const source = this.refType() === 'branch' ? this.branches() : this.tags();
+    const filtered = lower
+      ? source.filter(o => (o.displayId || o.name || '').toLowerCase().includes(lower))
+      : source;
+    this.options.set(filtered);
+  }// Scroll loading disabled for now - full list loaded upfront
     }
   }
 
   loadRefs(append: boolean = false, filterText: string = ''): Observable<any> {
-    this.loading.set(true);
-    
-    const obs$: Observable<any> = this.bitbucket.getTags(
-      this.data.repository, 
-      this.data.project, 
-      filterText, 
-      append ? this.start() : 0
-    );
-
-    return obs$.pipe(
-      tap((res: any) => {
-        const current = append ? this.options() : [];
-        this.options.set([...current, ...res.values]);
+    // Not used anymore - full lists loaded in ngOnInit
+    return new Observable(observer => {
+      observer.next([]);
+      observer.complete();
+    }    this.options.set([...current, ...res.values]);
         this.start.set(res.nextPageStart || 0);
         this.hasMore.set(!res.isLastPage);
         this.loading.set(false);
@@ -211,6 +278,17 @@ export class VersionSelectDialogComponent implements OnInit {
   }
 
   selectRef(refId: string) {
+    // If selecting a branch, also show the latest tag info
+    if (this.refType() === 'branch' && this.tags().length > 0) {
+      const latestTag = this.tags()[0];
+      const tagName = latestTag?.displayId || latestTag?.name;
+      
+      // Ask user if they want to use the branch or the latest tag
+      if (confirm(`You selected branch "${refId}".\n\nWould you like to use the latest tag "${tagName}" instead?\n\nClick OK for Tag, Cancel for Branch.`)) {
+        this.dialogRef.close(tagName);
+        return;
+      }
+    }
     this.dialogRef.close(refId);
   }
 

@@ -12,6 +12,51 @@
     .ref-selector {
       flex: 1;
       .ref-header { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 8px; }
+      .ref-type-toggle {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 8px;
+        
+        button {
+          flex: 1;
+          padding: 6px 12px;
+          font-size: 12px;
+          font-weight: 500;
+          border: 1px solid var(--border-subtle);
+          background: var(--bg-card);
+          color: var(--text-secondary);
+          border-radius: 4px;
+          transition: all 0.2s ease;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+          
+          mat-icon {
+            font-size: 16px;
+            width: 16px;
+            height: 16px;
+          }
+          
+          &:hover:not(:disabled) {
+            background: var(--bg-secondary);
+            border-color: var(--accent-cyan);
+          }
+          
+          &.active {
+            background: var(--accent-cyan);
+            color: white;
+            border-color: var(--accent-cyan);
+            font-weight: 600;
+          }
+          
+          &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+        }
+      }
       .ref-controls { display: flex; gap: 8px; }
       .ref-sel { flex: 1; }
       ::ng-deep .mdc-text-field--outlined { margin-bottom: 0 !important; }

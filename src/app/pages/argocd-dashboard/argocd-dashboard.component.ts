@@ -56,7 +56,7 @@ export class ArgocdDashboardComponent implements OnInit {
   envColumns: string[] = [];
 
   dataSource = new MatTableDataSource<GroupedAppRow>([]);
-  displayedColumns = ['select', 'appName'];
+  displayedColumns = ['select', 'appName', 'stream'];
 
   // Row selection
   selectedRows: Set<GroupedAppRow> = new Set();
@@ -372,16 +372,18 @@ export class ArgocdDashboardComponent implements OnInit {
         let appName = app.name;
         let repository = 'Unknown';
         let resolvedProject = '';
+        let stream: string | undefined = undefined;
 
         if (resolved.ok) {
           id = resolved.result.repository;
           appName = resolved.result.displayName || app.name;
           repository = resolved.result.repository;
           resolvedProject = resolved.result.project;
+          stream = resolved.result.stream;
         }
 
         if (!groupedMap.has(id)) {
-          groupedMap.set(id, { appName, repository, resolvedProject, envs: {} });
+          groupedMap.set(id, { appName, repository, resolvedProject, stream, envs: {} });
         }
         groupedMap.get(id)!.envs[envName] = app;
       }
@@ -391,7 +393,7 @@ export class ArgocdDashboardComponent implements OnInit {
     this.dataSource.data = rows as any;
 
     this.envColumns = selectedEnvs.map(e => e.config.name?.trim().toUpperCase() || 'UNKNOWN');
-    this.displayedColumns = ['select', 'appName', ...this.envColumns];
+    this.displayedColumns = ['select', 'appName', 'stream', ...this.envColumns];
 
     // Add missing filter keys (never remove existing ones mid-session)
     this.envColumns.forEach(col => {
@@ -413,7 +415,7 @@ export class ArgocdDashboardComponent implements OnInit {
     if (selectedEnvs.length === 0) {
       this.dataSource.data = [];
       this.envColumns = [];
-      this.displayedColumns = ['select', 'appName'];
+      this.displayedColumns = ['select', 'appName', 'stream'];
       this.totalRows = 0;
       return;
     }

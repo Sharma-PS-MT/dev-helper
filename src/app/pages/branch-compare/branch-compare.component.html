@@ -37,15 +37,29 @@
 
     <!-- Disabled until a repo is loaded -->
     <div class="compare-row" [class.disabled]="!selectedRepo() || loadingRefs()">
-      <!-- Branch selector (Destination / Into) -->
+      <!-- Left selector (Destination / Into) - can be branch OR tag -->
       <div class="ref-selector">
         <div class="ref-header">Destination Ref (Into)</div>
+        <div class="ref-type-toggle">
+          <button mat-button 
+                  [class.active]="fromType() === 'branch'"
+                  (click)="onFromTypeChange('branch')"
+                  [disabled]="!selectedRepo() || loadingRefs()">
+            <mat-icon>account_tree</mat-icon> Branch
+          </button>
+          <button mat-button 
+                  [class.active]="fromType() === 'tag'"
+                  (click)="onFromTypeChange('tag')"
+                  [disabled]="!selectedRepo() || loadingRefs()">
+            <mat-icon>sell</mat-icon> Tag
+          </button>
+        </div>
         <div class="ref-controls">
           <mat-form-field appearance="outline" class="ref-sel">
-            <mat-label>🌿 Select Branch</mat-label>
-            <mat-select [ngModel]="fromRef()" (ngModelChange)="onBranchSelected($event)">
+            <mat-label>{{ fromType() === 'branch' ? 'Select Branch' : 'Select Tag' }}</mat-label>
+            <mat-select [ngModel]="fromRef()" (ngModelChange)="fromRef.set($event)">
               <div class="select-search-container" (keydown)="$event.stopPropagation()">
-                <input placeholder="Search branch..." class="select-search-input"
+                <input [placeholder]="'Search ' + fromType() + '...'" class="select-search-input"
                   [ngModel]="fromSearch()" (ngModelChange)="onFromSearch($event)"
                   (click)="$event.stopPropagation()">
               </div>
@@ -54,7 +68,7 @@
               </mat-option>
               <mat-option *ngFor="let o of fromOptions()" [value]="o.name">{{ o.name }}</mat-option>
               <mat-option *ngIf="!fromLoadingOptions() && fromOptions().length === 0" disabled>
-                No branches found
+                No {{ fromType() }}es found
               </mat-option>
             </mat-select>
           </mat-form-field>
@@ -67,15 +81,29 @@
         <mat-icon>swap_horiz</mat-icon>
       </button>
 
-      <!-- Tag selector (Source / From) — latest tag auto-selected when branch chosen -->
+      <!-- Right selector (Source / From) - can be branch OR tag -->
       <div class="ref-selector">
         <div class="ref-header">Source Ref (From)</div>
+        <div class="ref-type-toggle">
+          <button mat-button 
+                  [class.active]="toType() === 'branch'"
+                  (click)="onToTypeChange('branch')"
+                  [disabled]="!selectedRepo() || loadingRefs()">
+            <mat-icon>account_tree</mat-icon> Branch
+          </button>
+          <button mat-button 
+                  [class.active]="toType() === 'tag'"
+                  (click)="onToTypeChange('tag')"
+                  [disabled]="!selectedRepo() || loadingRefs()">
+            <mat-icon>sell</mat-icon> Tag
+          </button>
+        </div>
         <div class="ref-controls">
           <mat-form-field appearance="outline" class="ref-sel">
-            <mat-label>🏷️ Select Tag</mat-label>
+            <mat-label>{{ toType() === 'branch' ? 'Select Branch' : 'Select Tag' }}</mat-label>
             <mat-select [ngModel]="toRef()" (ngModelChange)="toRef.set($event)">
               <div class="select-search-container" (keydown)="$event.stopPropagation()">
-                <input placeholder="Search tag..." class="select-search-input"
+                <input [placeholder]="'Search ' + toType() + '...'" class="select-search-input"
                   [ngModel]="toSearch()" (ngModelChange)="onToSearch($event)"
                   (click)="$event.stopPropagation()">
               </div>
@@ -84,7 +112,7 @@
               </mat-option>
               <mat-option *ngFor="let o of toOptions()" [value]="o.name">{{ o.name }}</mat-option>
               <mat-option *ngIf="!toLoadingOptions() && toOptions().length === 0" disabled>
-                No tags found
+                No {{ toType() }}es found
               </mat-option>
             </mat-select>
           </mat-form-field>
