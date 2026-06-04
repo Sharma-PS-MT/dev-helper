@@ -260,8 +260,10 @@ export class VersionSelectDialogComponent implements OnInit {
       ? source.filter(o => (o.displayId || o.name || '').toLowerCase().includes(lower))
       : source;
     this.options.set(filtered);
-  }// Scroll loading disabled for now - full list loaded upfront
-    }
+  }
+
+  onScroll(_event: Event) {
+    // Scroll loading disabled - full list loaded upfront
   }
 
   loadRefs(append: boolean = false, filterText: string = ''): Observable<any> {
@@ -269,12 +271,7 @@ export class VersionSelectDialogComponent implements OnInit {
     return new Observable(observer => {
       observer.next([]);
       observer.complete();
-    }    this.options.set([...current, ...res.values]);
-        this.start.set(res.nextPageStart || 0);
-        this.hasMore.set(!res.isLastPage);
-        this.loading.set(false);
-      })
-    );
+    });
   }
 
   selectRef(refId: string) {
