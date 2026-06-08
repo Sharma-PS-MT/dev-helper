@@ -202,9 +202,8 @@ export class VersionSelectDialogComponent implements OnInit {
   options = signal<any[]>([]);
   loading = signal(false);
   
-  // Store both branches and tags
-  branches = signal<any[]>([]);
-  tags = signal<any[]>([]);
+  // Store the latest tag for the branch selection prompt
+  latestTag = signal<any>(null);
   
   start = signal(0);
   hasMore = signal(true);
@@ -219,66 +218,77 @@ export class VersionSelectDialogComponent implements OnInit {
     this.searchSubject.pipe(
       takeUntilDestroyed(),
       debounceTime(400),
-      distinctUntilChanged(),
-      tap(() => {
-        this.start.set(0);
-        this.hasMore.set(true);
-      }),
-      switchMap(text => this.loadRefs(false, text))
-    ).subscribe();
+      distinctUntilChanged()
+    ).subscribe(() => {
+      this.start.set(0);
+      this.hasMore.set(true);
+      this.loadData(false);
+    });
   }
 
   ngOnInit() {
-    // Load both branches and tags on init
-    this.loading.set(true);
-    forkJoin({
-      branches: this.bitbucket.getBranches(this.data.repository, this.data.project, '', 0),
-      tags: this.bitbucket.getTags(this.data.repository, this.data.project, '', 0)
-    }).subscribe(res => {
-      this.branches.set(res.branches?.values || []);
-      this.tags.set(res.tags?.values || []);
-      
-      // Set initial options based on type (default is branch)
-      this.options.set(this.branches());
-      this.loading.set(false);
+    // Fetch latest tag just for the prompt feature
+    this.bitbucket.getTags(this.data.repository, this.data.project, '', 0, 1).subscribe(res => {
+      if (res.values && res.values.length > 0) {
+        this.latestTag.set(res.values[0]);
+      }
     });
+
+    // Initial load
+    this.loadData(false);
   }
 
   onTypeChange(type: 'branch' | 'tag') {
     this.refType.set(type);
     this.searchText.set('');
-    // Switch to the correct pre-loaded list
-    const source = type === 'branch' ? this.branches() : this.tags();
-    this.options.set(source);
+    this.start.set(0);
+    this.hasMore.set(true);
+    this.options.set([]);
+    this.loadData(false);
   }
 
   onSearchChange(text: string) {
     this.searchText.set(text);
-    const lower = text.toLowerCase().trim();
-    const source = this.refType() === 'branch' ? this.branches() : this.tags();
-    const filtered = lower
-      ? source.filter(o => (o.displayId || o.name || '').toLowerCase().includes(lower))
-      : source;
-    this.options.set(filtered);
+    this.searchSubject.next(text);
   }
 
-  onScroll(_event: Event) {
-    // Scroll loading disabled - full list loaded upfront
+  onScroll(event: Event) {
+    const target = event.target as HTMLElement;
+    if (target.scrollHeight - target.scrollTop - target.clientHeight < 50) {
+      if (this.hasMore() && !this.loading()) {
+        this.loadData(true);
+      }
+    }
   }
 
-  loadRefs(append: boolean = false, filterText: string = ''): Observable<any> {
-    // Not used anymore - full lists loaded in ngOnInit
-    return new Observable(observer => {
-      observer.next([]);
-      observer.complete();
+  private loadData(append: boolean = false) {
+    this.loading.set(true);
+    const type = this.refType();
+    const obs: Observable<any> = type === 'branch'
+      ? this.bitbucket.getBranches(this.data.repository, this.data.project, this.searchText(), this.start(), 20)
+      : this.bitbucket.getTags(this.data.repository, this.data.project, this.searchText(), this.start(), 20);
+
+    obs.subscribe({
+      next: (res: any) => {
+        const newItems = res.values || [];
+        if (append) {
+          this.options.set([...this.options(), ...newItems]);
+        } else {
+          this.options.set(newItems);
+        }
+        this.hasMore.set(!res.isLastPage);
+        this.start.set(res.nextPageStart || 0);
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false)
     });
   }
 
   selectRef(refId: string) {
     // If selecting a branch, also show the latest tag info
-    if (this.refType() === 'branch' && this.tags().length > 0) {
-      const latestTag = this.tags()[0];
-      const tagName = latestTag?.displayId || latestTag?.name;
+    const tag = this.latestTag();
+    if (this.refType() === 'branch' && tag) {
+      const tagName = tag.displayId || tag.name;
       
       // Ask user if they want to use the branch or the latest tag
       if (confirm(`You selected branch "${refId}".\n\nWould you like to use the latest tag "${tagName}" instead?\n\nClick OK for Tag, Cancel for Branch.`)) {
