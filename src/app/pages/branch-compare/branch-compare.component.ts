@@ -17,8 +17,8 @@ import { BranchCompareStateService } from '../../core/services/branch-compare-st
 import { AuthConfigService } from '../../core/services/auth-config.service';
 import { BitbucketProject, BitbucketRepo, BitbucketBranch, BitbucketTag, BranchComparison, BranchGapAnalysis } from '../../core/models/bitbucket.models';
 import { TicketBadgeComponent } from '../../shared/components/ticket-badge/ticket-badge.component';
-import { catchError, finalize, tap } from 'rxjs/operators';
-import { of, forkJoin, Observable } from 'rxjs';
+import { catchError, finalize, tap, debounceTime, distinctUntilChanged } from 'rxjs/operators';
+import { of, forkJoin, Observable, Subject } from 'rxjs';
 
 // Branch & Tag Compare Component - supports toggling between branches and tags on both sides
 @Component({
@@ -195,8 +195,26 @@ export class BranchCompareComponent implements OnInit {
     private authConfig: AuthConfigService,
   ) { }
 
+  fromSearch$ = new Subject<string>();
+  toSearch$ = new Subject<string>();
+
   ngOnInit(): void {
     this.loadProjects();
+
+    // Setup debounced search for from/to references
+    this.fromSearch$.pipe(
+      debounceTime(300),
+      distinctUntilChanged()
+    ).subscribe(() => {
+      this.loadRefsForSide('from', false);
+    });
+
+    this.toSearch$.pipe(
+      debounceTime(300),
+      distinctUntilChanged()
+    ).subscribe(() => {
+      this.loadRefsForSide('to', false);
+    });
 
     // Consume pre-fill from ArgoCD dashboard (if any)
     const preFill = this.compareState.consume();
@@ -208,23 +226,13 @@ export class BranchCompareComponent implements OnInit {
   /** Filter ref list as user types (respects current type) */
   onFromSearch(text: string) {
     this.fromSearch.set(text);
-    const lower = text.toLowerCase().trim();
-    const source = this.fromType() === 'branch' ? this.branches() : this.allTags();
-    const filtered = lower
-      ? source.filter(o => o.name.toLowerCase().includes(lower))
-      : source;
-    this.fromOptions.set(filtered);
+    this.fromSearch$.next(text);
   }
 
   /** Filter ref list as user types (respects current type) */
   onToSearch(text: string) {
     this.toSearch.set(text);
-    const lower = text.toLowerCase().trim();
-    const source = this.toType() === 'branch' ? this.branches() : this.allTags();
-    const filtered = lower
-      ? source.filter(o => o.name.toLowerCase().includes(lower))
-      : source;
-    this.toOptions.set(filtered);
+    this.toSearch$.next(text);
   }
 
   /** Toggle between branch/tag for the 'from' (destination) side */
@@ -232,8 +240,7 @@ export class BranchCompareComponent implements OnInit {
     this.fromType.set(type);
     this.fromRef.set('');
     this.fromSearch.set('');
-    // Switch the options to the correct list (already loaded)
-    this.fromOptions.set(type === 'branch' ? this.branches() : this.allTags());
+    this.loadRefsForSide('from', false);
   }
 
   /** Toggle between branch/tag for the 'to' (source) side */
@@ -241,12 +248,24 @@ export class BranchCompareComponent implements OnInit {
     this.toType.set(type);
     this.toRef.set('');
     this.toSearch.set('');
-    // Switch the options to the correct list (already loaded)
-    this.toOptions.set(type === 'branch' ? this.branches() : this.allTags());
+    this.loadRefsForSide('to', false);
   }
 
-  registerScrollListener(_opened: boolean, _side: 'from' | 'to') {
-    // Not needed — full list loaded upfront
+  registerScrollListener(opened: boolean, side: 'from' | 'to') {
+    if (!opened) return;
+    // Slight delay to ensure the panel is rendered in the DOM
+    setTimeout(() => {
+      const panel = document.querySelector('.mat-mdc-select-panel');
+      if (panel) {
+        panel.addEventListener('scroll', (event) => {
+          const target = event.target as HTMLElement;
+          // Check if scrolled near the bottom (within 50px)
+          if (target.scrollHeight - target.scrollTop - target.clientHeight < 50) {
+            this.loadRefsForSide(side, true);
+          }
+        });
+      }
+    }, 100);
   }
 
   /**
@@ -392,41 +411,85 @@ export class BranchCompareComponent implements OnInit {
   }
 
   loadRefs(): void {
-    this.loadingRefs.set(true);
     this.fromRef.set('');
     this.toRef.set('');
-    this.fromStart.set(0);
-    this.toStart.set(0);
+    
+    this.loadRefsForSide('from', false);
+    this.loadRefsForSide('to', false);
+  }
 
+  loadRefsForSide(side: 'from' | 'to', isLoadMore: boolean = false): void {
     const repo = this.selectedRepo();
     if (!repo) return;
     const proj = this.selectedProject() || undefined;
 
-    // Load BOTH branches AND tags so both are available for toggling on either side
-    forkJoin({
-      branches: this.bitbucket.getBranches(repo, proj, '', 0),
-      tags: this.bitbucket.getTags(repo, proj, '', 0)
-    }).pipe(
-      finalize(() => this.loadingRefs.set(false))
-    ).subscribe(res => {
-      // Store both lists
-      this.branches.set(res.branches?.values || []);
-      this.allTags.set(res.tags?.values || []);
+    const type = side === 'from' ? this.fromType() : this.toType();
+    const searchText = side === 'from' ? this.fromSearch() : this.toSearch();
+    
+    let start = 0;
+    if (isLoadMore) {
+       start = side === 'from' ? this.fromStart() : this.toStart();
+    }
+    
+    if (side === 'from') {
+       if (isLoadMore && !this.fromHasMore()) return;
+       // Prevent duplicate parallel load-more requests
+       if (isLoadMore && this.fromLoadingOptions()) return;
+       
+       this.fromLoadingOptions.set(true);
+       if (!isLoadMore) {
+         this.fromOptions.set([]);
+         this.fromStart.set(0);
+       }
+    } else {
+       if (isLoadMore && !this.toHasMore()) return;
+       if (isLoadMore && this.toLoadingOptions()) return;
+
+       this.toLoadingOptions.set(true);
+       if (!isLoadMore) {
+         this.toOptions.set([]);
+         this.toStart.set(0);
+       }
+    }
+    
+    const obs: Observable<any> = type === 'branch' 
+      ? this.bitbucket.getBranches(repo, proj, searchText, start, 20)
+      : this.bitbucket.getTags(repo, proj, searchText, start, 20);
       
-      // Set initial options based on current types
-      this.fromOptions.set(this.fromType() === 'branch' ? this.branches() : this.allTags());
-      this.toOptions.set(this.toType() === 'branch' ? this.branches() : this.allTags());
-      
-      // Auto-select the configured default branch on the 'to' side if it's set to branch type
-      if (this.toType() === 'branch') {
-        const defaultBranch = this.authConfig.config().bitbucketDefaultBranch || 'main';
-        const preferred = this.branches().find(o => o.name === defaultBranch)
-          ?? this.branches().find(o => o.name === 'main' || o.name === 'master');
-        if (preferred) this.toRef.set(preferred.name);
-      } else if (this.allTags().length > 0) {
-        // Auto-select first tag if on tag type
-        this.toRef.set(this.allTags()[0].name);
-      }
+    obs.pipe(
+       finalize(() => {
+         if (side === 'from') this.fromLoadingOptions.set(false);
+         else this.toLoadingOptions.set(false);
+       })
+    ).subscribe((res: any) => {
+       const newItems = res.values || [];
+       if (side === 'from') {
+         if (isLoadMore) {
+           this.fromOptions.set([...this.fromOptions(), ...newItems]);
+         } else {
+           this.fromOptions.set(newItems);
+         }
+         this.fromHasMore.set(!res.isLastPage);
+         this.fromStart.set(res.nextPageStart || 0);
+       } else {
+         if (isLoadMore) {
+           this.toOptions.set([...this.toOptions(), ...newItems]);
+         } else {
+           this.toOptions.set(newItems);
+           
+           // Auto-select logic for initial load on the 'to' side
+           if (this.toType() === 'branch' && !this.toRef()) {
+             const defaultBranch = this.authConfig.config().bitbucketDefaultBranch || 'main';
+             const preferred = newItems.find((o: any) => o.name === defaultBranch)
+               ?? newItems.find((o: any) => o.name === 'main' || o.name === 'master');
+             if (preferred) this.toRef.set(preferred.name);
+           } else if (this.toType() === 'tag' && newItems.length > 0 && !this.toRef()) {
+             this.toRef.set(newItems[0].name);
+           }
+         }
+         this.toHasMore.set(!res.isLastPage);
+         this.toStart.set(res.nextPageStart || 0);
+       }
     });
   }
 

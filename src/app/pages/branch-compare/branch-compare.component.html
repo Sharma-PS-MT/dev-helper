@@ -57,7 +57,7 @@
         <div class="ref-controls">
           <mat-form-field appearance="outline" class="ref-sel">
             <mat-label>{{ fromType() === 'branch' ? 'Select Branch' : 'Select Tag' }}</mat-label>
-            <mat-select [ngModel]="fromRef()" (ngModelChange)="fromRef.set($event)">
+            <mat-select [ngModel]="fromRef()" (ngModelChange)="fromRef.set($event)" (openedChange)="registerScrollListener($event, 'from')">
               <div class="select-search-container" (keydown)="$event.stopPropagation()">
                 <input [placeholder]="'Search ' + fromType() + '...'" class="select-search-input"
                   [ngModel]="fromSearch()" (ngModelChange)="onFromSearch($event)"
@@ -101,7 +101,7 @@
         <div class="ref-controls">
           <mat-form-field appearance="outline" class="ref-sel">
             <mat-label>{{ toType() === 'branch' ? 'Select Branch' : 'Select Tag' }}</mat-label>
-            <mat-select [ngModel]="toRef()" (ngModelChange)="toRef.set($event)">
+            <mat-select [ngModel]="toRef()" (ngModelChange)="toRef.set($event)" (openedChange)="registerScrollListener($event, 'to')">
               <div class="select-search-container" (keydown)="$event.stopPropagation()">
                 <input [placeholder]="'Search ' + toType() + '...'" class="select-search-input"
                   [ngModel]="toSearch()" (ngModelChange)="onToSearch($event)"
