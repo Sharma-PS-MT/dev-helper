@@ -1,11 +1,17 @@
 """
-Dev-Helper Microservice — Main Entry Point  (v3.0.0)
+Dev-Helper Microservice — Main Entry Point  (v4.0.0)
 ====================================================
 Combines all feature routers into a single FastAPI application.
 
 Routers registered:
   - Crypto AI Predictions  →  /predict  /train  /backtest  /sentiment
   - ArgoCD Proxy           →  /argocd/session  /argocd/applications
+  - Jira Proxy             →  /jira/myself  /jira/issue  /jira/issues/batch
+                               /jira/search  /jira/worklog
+  - Bitbucket Proxy        →  /bitbucket/projects  /bitbucket/repos
+                               /bitbucket/branches  /bitbucket/tags
+                               /bitbucket/pull-request  /bitbucket/pull-request/commits
+                               /bitbucket/pull-requests/open  /bitbucket/commits-between
 
 Usage:
   pip install -r requirements.txt
@@ -17,11 +23,16 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from prediction_server import app as prediction_app   # Crypto AI routes
 from argocd_router import router as argocd_router      # ArgoCD proxy routes
+from jira_router import router as jira_router          # Jira proxy routes
+from bitbucket_router import router as bitbucket_router  # Bitbucket proxy routes
 
 app = FastAPI(
     title="Dev-Helper Microservice",
-    version="3.0.0",
-    description="Unified backend: Crypto AI predictions + ArgoCD proxy."
+    version="4.0.0",
+    description=(
+        "Unified backend: Crypto AI predictions + ArgoCD proxy "
+        "+ Jira proxy + Bitbucket proxy."
+    )
 )
 
 app.add_middleware(
@@ -37,17 +48,29 @@ for route in prediction_app.routes:
     if route.path not in ("/health", "/docs", "/redoc", "/openapi.json"):
         app.routes.append(route)
 
-# ── Mount ArgoCD proxy router ─────────────────────────────────────────────────
+# ── Mount proxy routers ────────────────────────────────────────────────────────
 app.include_router(argocd_router)
+app.include_router(jira_router)
+app.include_router(bitbucket_router)
 
 
 @app.get("/health", tags=["Health"])
 def health():
     return {
         "status": "ok",
-        "version": "3.0.0",
+        "version": "4.0.0",
         "services": {
-            "crypto_ai":    ["/predict", "/train", "/backtest", "/sentiment"],
-            "argocd_proxy": ["/argocd/session", "/argocd/applications"]
+            "crypto_ai":        ["/predict", "/train", "/backtest", "/sentiment"],
+            "argocd_proxy":     ["/argocd/session", "/argocd/applications"],
+            "jira_proxy":       [
+                "/jira/myself", "/jira/issue", "/jira/issues/batch",
+                "/jira/search", "/jira/worklog"
+            ],
+            "bitbucket_proxy":  [
+                "/bitbucket/projects", "/bitbucket/repos",
+                "/bitbucket/branches", "/bitbucket/tags",
+                "/bitbucket/pull-request", "/bitbucket/pull-request/commits",
+                "/bitbucket/pull-requests/open", "/bitbucket/commits-between"
+            ],
         }
     }

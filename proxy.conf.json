@@ -1,20 +1,4 @@
 {
-  "/jira-api": {
-    "target": "https://cloudsolutions-sa.atlassian.net",
-    "secure": false,
-    "changeOrigin": true,
-    "pathRewrite": {
-      "^/jira-api": ""
-    }
-  },
-  "/bitbucket-api": {
-    "target": "http://10.201.206.52:7990",
-    "secure": false,
-    "changeOrigin": true,
-    "pathRewrite": {
-      "^/bitbucket-api": ""
-    }
-  },
   "/binance-api": {
     "target": "https://api.binance.com",
     "secure": true,

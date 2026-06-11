@@ -122,12 +122,11 @@ export class SettingsComponent implements OnInit {
     if (!this.save()) return;
     this.bitbucketTesting.set(true);
     this.bitbucketStatus.set('idle');
-    const config = this.authConfig.config();
-    this.http.get(`${config.bitbucketBaseUrl}/rest/api/1.0/projects`).pipe(
+    this.bitbucket.getProjects().pipe(
       catchError(() => of(null))
     ).subscribe(res => {
       this.bitbucketTesting.set(false);
-      if (res) {
+      if (res && res.length >= 0) {
         this.bitbucketStatus.set('ok');
         this.notify.success('Bitbucket connection successful!');
       } else {

@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Observable, forkJoin, of } from 'rxjs';
 import { map, switchMap, catchError } from 'rxjs/operators';
 import { AuthConfigService } from './auth-config.service';
@@ -20,15 +20,21 @@ export class BitbucketService {
     private jira: JiraService,
   ) {}
 
-  private get base(): string { return this.authConfig.config().bitbucketBaseUrl; }
+  /** Build the common credentials payload sent to the Python proxy. */
+  private get creds() {
+    const c = this.authConfig.config();
+    return {
+      base_url: c.bitbucketBaseUrl,
+      token: c.bitbucketToken,
+    };
+  }
+
   private get ws(): string { return this.authConfig.config().bitbucketWorkspace; }
 
   // ── Projects ────────────────────────────────────────────────────────────────
   getProjects(): Observable<BitbucketProject[]> {
     return this.http
-      .get<PagedResponse<any>>(`${this.base}/rest/api/1.0/projects`, {
-        params: new HttpParams().set('limit', 100),
-      })
+      .post<PagedResponse<any>>('/python-ai/bitbucket/projects', this.creds)
       .pipe(
         map(r => r.values.map(p => ({
           key: p.key,
@@ -42,12 +48,8 @@ export class BitbucketService {
   // ── Repositories ────────────────────────────────────────────────────────────
   getRepositories(projectKey?: string): Observable<BitbucketRepo[]> {
     const pk = projectKey || this.ws;
-    const url = pk
-      ? `${this.base}/rest/api/1.0/projects/${pk}/repos`
-      : `${this.base}/rest/api/1.0/repos`;
-
     return this.http
-      .get<PagedResponse<any>>(url, { params: new HttpParams().set('limit', 100) })
+      .post<PagedResponse<any>>('/python-ai/bitbucket/repos', { ...this.creds, project_key: pk })
       .pipe(map(r => r.values.map(repo => ({
         slug: repo.slug,
         name: repo.name,
@@ -59,15 +61,15 @@ export class BitbucketService {
   // ── Branches ─────────────────────────────────────────────────────────────────
   getBranches(repoSlug: string, projectKey?: string, filterText?: string, start?: number, limit: number = 20): Observable<PagedResponse<BitbucketBranch>> {
     const pk = projectKey || this.ws;
-    let params = new HttpParams().set('limit', limit);
-    if (filterText) params = params.set('filterText', filterText);
-    if (start) params = params.set('start', start);
-
     return this.http
-      .get<PagedResponse<any>>(
-        `${this.base}/rest/api/1.0/projects/${pk}/repos/${repoSlug}/branches`,
-        { params }
-      )
+      .post<PagedResponse<any>>('/python-ai/bitbucket/branches', {
+        ...this.creds,
+        project_key: pk,
+        repo_slug: repoSlug,
+        ...(filterText ? { filter_text: filterText } : {}),
+        ...(start !== undefined ? { start } : {}),
+        limit,
+      })
       .pipe(map(r => ({
         ...r,
         values: r.values.map((b: any) => ({
@@ -80,15 +82,15 @@ export class BitbucketService {
   // ── Tags ─────────────────────────────────────────────────────────────────────
   getTags(repoSlug: string, projectKey?: string, filterText?: string, start?: number, limit: number = 20): Observable<PagedResponse<BitbucketTag>> {
     const pk = projectKey || this.ws;
-    let params = new HttpParams().set('limit', limit);
-    if (filterText) params = params.set('filterText', filterText);
-    if (start) params = params.set('start', start);
-
     return this.http
-      .get<PagedResponse<any>>(
-        `${this.base}/rest/api/1.0/projects/${pk}/repos/${repoSlug}/tags`,
-        { params }
-      )
+      .post<PagedResponse<any>>('/python-ai/bitbucket/tags', {
+        ...this.creds,
+        project_key: pk,
+        repo_slug: repoSlug,
+        ...(filterText ? { filter_text: filterText } : {}),
+        ...(start !== undefined ? { start } : {}),
+        limit,
+      })
       .pipe(map(r => ({
         ...r,
         values: r.values.map((t: any) => ({
@@ -120,9 +122,14 @@ export class BitbucketService {
 
   getPullRequest(repoSlug: string, prId: number, projectKey?: string): Observable<BitbucketPR> {
     const pk = projectKey || this.ws;
-    return this.http.get<any>(
-      `${this.base}/rest/api/1.0/projects/${pk}/repos/${repoSlug}/pull-requests/${prId}`
-    ).pipe(map(pr => this.mapPR(pr)));
+    return this.http
+      .post<any>('/python-ai/bitbucket/pull-request', {
+        ...this.creds,
+        project_key: pk,
+        repo_slug: repoSlug,
+        pr_id: prId,
+      })
+      .pipe(map(pr => this.mapPR(pr)));
   }
 
   private mapCommit(c: any): BitbucketCommit {
@@ -139,10 +146,12 @@ export class BitbucketService {
   getPRCommits(repoSlug: string, prId: number, projectKey?: string): Observable<BitbucketCommit[]> {
     const pk = projectKey || this.ws;
     return this.http
-      .get<PagedResponse<any>>(
-        `${this.base}/rest/api/1.0/projects/${pk}/repos/${repoSlug}/pull-requests/${prId}/commits`,
-        { params: new HttpParams().set('limit', 1000) }
-      )
+      .post<PagedResponse<any>>('/python-ai/bitbucket/pull-request/commits', {
+        ...this.creds,
+        project_key: pk,
+        repo_slug: repoSlug,
+        pr_id: prId,
+      })
       .pipe(map(r => r.values.map(c => this.mapCommit(c))));
   }
 
@@ -153,17 +162,18 @@ export class BitbucketService {
     if (num) return null;
     return null;
   }
-  
+
   getOpenPullRequests(repoSlug: string, projectKey?: string): Observable<BitbucketPR[]> {
     const pk = projectKey || this.ws;
     return this.http
-      .get<PagedResponse<any>>(
-        `${this.base}/rest/api/1.0/projects/${pk}/repos/${repoSlug}/pull-requests`,
-        { params: new HttpParams().set('state', 'OPEN').set('limit', 50) }
-      )
+      .post<PagedResponse<any>>('/python-ai/bitbucket/pull-requests/open', {
+        ...this.creds,
+        project_key: pk,
+        repo_slug: repoSlug,
+      })
       .pipe(map(r => r.values.map(pr => this.mapPR(pr))));
   }
-  
+
   // ── PR Analysis ──────────────────────────────────────────────────────────────
   analyzePR(repoSlug: string, prId: number, projectKey?: string): Observable<PRAnalysis> {
     return forkJoin({
@@ -176,7 +186,7 @@ export class BitbucketService {
         const regexIds = this.authConfig.extractTicketIds(allMessages);
         const propIds = commits.flatMap(c => c.ticketIds || []);
         const ticketIds = [...new Set([...regexIds, ...propIds])];
-        
+
         const descTickets = this.authConfig.extractTicketIds(descText);
 
         if (ticketIds.length === 0) {
@@ -256,10 +266,14 @@ export class BitbucketService {
   getCommitsBetween(repoSlug: string, from: string, to: string, projectKey?: string): Observable<BitbucketCommit[]> {
     const pk = projectKey || this.ws;
     return this.http
-      .get<PagedResponse<any>>(
-        `${this.base}/rest/api/1.0/projects/${pk}/repos/${repoSlug}/commits`,
-        { params: new HttpParams().set('since', from).set('until', to).set('limit', 1000) }
-      )
+      .post<PagedResponse<any>>('/python-ai/bitbucket/commits-between', {
+        ...this.creds,
+        project_key: pk,
+        repo_slug: repoSlug,
+        from_ref: from,
+        to_ref: to,
+        limit: 1000,
+      })
       .pipe(map(r => r.values.map(c => this.mapCommit(c))));
   }
 

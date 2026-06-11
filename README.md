@@ -37,7 +37,7 @@
 - **Backend Microservices:** Python 3.10+ & FastAPI
 - **Authentication:** Firebase Auth
 - **Data Persistence:** Cloud Firestore (User-isolated and Global configs)
-- **External Integration Proxy:** Server-side proxy for ArgoCD to bypass browser CORS.
+- **External Integration Proxy:** Server-side Python proxy for **Jira, Bitbucket, and ArgoCD** — all cross-origin API calls are forwarded by FastAPI, completely bypassing browser CORS/Strict-Origin restrictions.
 
 ---
 
@@ -134,15 +134,16 @@ graph TD
         Store[State Management]
     end
     
-    subgraph "Backend Proxy (Python)"
-        FastAPI[FastAPI Server]
-        ArgoProxy[ArgoCD Proxy Router]
-        AI[Crypto AI Engine]
+    subgraph "Backend Proxy (Python / FastAPI :8000)"
+        ArgoProxy["ArgoCD Proxy Router\n/argocd/*"]
+        JiraProxy["Jira Proxy Router\n/jira/*"]
+        BBProxy["Bitbucket Proxy Router\n/bitbucket/*"]
+        AI["Crypto AI Engine\n/predict /train .."]
     end
 
     subgraph "External Systems"
         Jira[Jira Cloud API]
-        BB[Bitbucket API]
+        BB[Bitbucket Server API]
         Argo[ArgoCD API]
         Firebase[Firebase Firestore]
     end
@@ -152,16 +153,15 @@ graph TD
     UI --> Store
     Store --> Firebase
     
-    %% Direct API calls (CORS handled by proxy.conf.json or domain config)
-    UI --> Jira
-    UI --> BB
+    %% ALL cross-origin calls are proxied server-side via Python (no browser CORS)
+    UI -- "/python-ai/jira/*" --> JiraProxy
+    UI -- "/python-ai/bitbucket/*" --> BBProxy
+    UI -- "/python-ai/argocd/*" --> ArgoProxy
+    UI -- "/python-ai/predict" --> AI
     
-    %% Proxied calls (CORS handled by Python backend)
-    UI --> ArgoProxy
+    JiraProxy --> Jira
+    BBProxy --> BB
     ArgoProxy --> Argo
-    
-    %% Prediction service
-    UI --> AI
 ```
 
 ---
@@ -170,11 +170,16 @@ graph TD
 
 1.  **Firebase:** Global configurations and user-isolated credentials are stored in Firebase Firestore.
 2.  **Settings:** Use the categorized **Configurations** menu to manage:
-    - **Bitbucket:** App Passwords and workspace settings.
-    - **JIRA:** Base URL, email, and API tokens.
+    - **Bitbucket:** Actual server URL (e.g. `http://10.201.206.52:7990`), access token, and workspace/project key.
+    - **JIRA:** Actual base URL (e.g. `https://company.atlassian.net`), email, and API token.
     - **Gemini AI:** API keys for code review and prediction interpretation.
     - **ArgoCD:** Global environment definitions (URLs, credentials).
-3.  **CORS:** Browser CORS issues for sensitive integrations (like ArgoCD) are handled via the Python proxy at `/python-ai/argocd`.
+3.  **CORS (Strict-Origin Fix):** All browser CORS restrictions for Jira, Bitbucket, and ArgoCD are eliminated by routing **every** external API call through the Python FastAPI proxy:
+    - `POST /python-ai/jira/*` → Jira Proxy Router
+    - `POST /python-ai/bitbucket/*` → Bitbucket Proxy Router
+    - `POST /python-ai/argocd/*` → ArgoCD Proxy Router
+    
+    Credentials are passed in the **POST body** and injected server-side — they never appear in browser request headers.
 
 ---
 

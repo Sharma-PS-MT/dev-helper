@@ -63,9 +63,13 @@ const STORAGE_KEY = 'dev_helper_config';
 const DEFAULTS: AppConfig = {
   bitbucketWorkspace: '',
   bitbucketToken: '',
-  bitbucketBaseUrl: '/bitbucket-api',
+  // Actual Bitbucket server URL — used for browse links and sent to the Python proxy.
+  // The Angular services call /python-ai/bitbucket/* directly; this value is forwarded
+  // server-side by the proxy, so browser CORS restrictions never apply.
+  bitbucketBaseUrl: '',
   bitbucketDefaultBranch: 'main',
-  jiraBaseUrl: '/jira-api',
+  // Actual Jira server URL — used for browse links and sent to the Python proxy.
+  jiraBaseUrl: '',
   jiraEmail: '',
   jiraToken: '',
   jiraAccountId: '',
