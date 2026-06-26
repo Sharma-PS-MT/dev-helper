@@ -31,6 +31,36 @@ export class DashboardComponent {
       color: '#bc8cff',
     },
     {
+      icon: 'assignment', title: 'My Tickets', route: '/my-tickets',
+      description: 'View and manage your assigned JIRA tickets.',
+      color: '#4caf50',
+    },
+    {
+      icon: 'analytics', title: 'Gap Analysis', route: '/gap-analysis',
+      description: 'Analyze gaps and view comprehensive metrics.',
+      color: '#ff9800',
+    },
+    {
+      icon: 'cloud_sync', title: 'ArgoCD Dashboard', route: '/argocd-dashboard',
+      description: 'Monitor your deployments via ArgoCD.',
+      color: '#2196f3',
+    },
+    {
+      icon: 'data_object', title: 'JSON Viewer', route: '/json-viewer',
+      description: 'Format, validate, and explore JSON data.',
+      color: '#9c27b0',
+    },
+    {
+      icon: 'transform', title: 'Base64 Viewer', route: '/base64-viewer',
+      description: 'Encode and decode Base64 strings easily.',
+      color: '#e91e63',
+    },
+    {
+      icon: 'vpn_key', title: 'Token Gen', route: '/token-gen',
+      description: 'Generate various tokens for local development.',
+      color: '#607d8b',
+    },
+    {
       icon: 'settings', title: 'Settings', route: '/settings',
       description: 'Configure your Bitbucket and JIRA API credentials and workspace.',
       color: '#f0883e',
