@@ -51,10 +51,17 @@ export class App {
     },
   ];
 
+  isCollapsed = false;
+
   toggleExpand(item: NavItem) {
+    if (this.isCollapsed) return; // Prevent expanding groups when mini
     if (item.children) {
       item.expanded = !item.expanded;
     }
+  }
+
+  toggleSidebar() {
+    this.isCollapsed = !this.isCollapsed;
   }
 
   isConfigured = computed(() => this.authConfig.isConfigured());

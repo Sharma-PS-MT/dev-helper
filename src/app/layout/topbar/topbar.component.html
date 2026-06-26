@@ -1,5 +1,8 @@
 <div class="topbar">
   <div class="topbar-left">
+    <button mat-icon-button (click)="toggleSidebar.emit()" matTooltip="Toggle Sidebar" class="menu-btn">
+      <mat-icon>menu</mat-icon>
+    </button>
     <h2 class="page-title">{{ pageTitle() }}</h2>
   </div>
   <div class="topbar-right">

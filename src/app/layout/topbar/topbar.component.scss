@@ -10,6 +10,12 @@
   top: 0;
   z-index: 100;
 
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
   .page-title {
     font-size: 16px;
     font-weight: 600;

@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, Output, EventEmitter } from '@angular/core';
 import { Router, NavigationEnd, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
@@ -23,6 +23,7 @@ const PAGE_TITLES: Record<string, string> = {
   styleUrls: ['./topbar.component.scss'],
 })
 export class TopbarComponent {
+  @Output() toggleSidebar = new EventEmitter<void>();
   private router = inject(Router);
   
   private navEnd = toSignal(

@@ -5,7 +5,7 @@
   </div>
 
   <!-- Config warning -->
-  <div class="config-alert" *ngIf="!isConfigured()">
+  <div class="config-alert glass-panel" *ngIf="!isConfigured()">
     <mat-icon>warning_amber</mat-icon>
     <div>
       <strong>Setup Required</strong>
@@ -15,7 +15,7 @@
   </div>
 
   <!-- Connected info -->
-  <div class="connected-bar" *ngIf="isConfigured()">
+  <div class="connected-bar glass-panel" *ngIf="isConfigured()">
     <div class="connected-item">
       <mat-icon>cloud_done</mat-icon>
       <span>Bitbucket: <strong>{{ workspace() }}</strong></span>
@@ -31,22 +31,24 @@
     <a
       *ngFor="let f of features"
       [routerLink]="f.route"
-      class="feature-card"
+      class="feature-card glass-panel"
       [style.--card-accent]="f.color"
     >
-      <div class="feature-icon" [style.background]="f.color + '20'" [style.color]="f.color">
-        <mat-icon>{{ f.icon }}</mat-icon>
+      <div class="card-header">
+        <div class="feature-icon" [style.background]="f.color + '20'" [style.color]="f.color">
+          <mat-icon>{{ f.icon }}</mat-icon>
+        </div>
+        <mat-icon class="arrow-icon">arrow_outward</mat-icon>
       </div>
       <div class="feature-content">
         <h3>{{ f.title }}</h3>
         <p>{{ f.description }}</p>
       </div>
-      <mat-icon class="arrow-icon">arrow_forward</mat-icon>
     </a>
   </div>
 
   <!-- Quick tips -->
-  <div class="section-card tips-card">
+  <div class="section-card tips-card glass-panel">
     <div class="section-title"><mat-icon>lightbulb</mat-icon> Quick Tips</div>
     <ul class="tips-list">
       <li><strong>PR Review:</strong> Paste a full Bitbucket PR URL or select repo + PR ID to detect gaps.</li>

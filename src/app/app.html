@@ -1,14 +1,13 @@
 <ng-container *ngIf="session.isLoggedIn()">
-  <mat-sidenav-container class="sidenav-container">
-    <mat-sidenav #drawer class="sidenav" mode="side" [opened]="true">
+  <mat-sidenav-container class="sidenav-container" autosize>
+    <mat-sidenav #drawer class="sidenav" mode="side" [opened]="true" [class.collapsed]="isCollapsed">
       <div class="sidebar-logo">
         <div class="logo-icon">
           <mat-icon>developer_mode</mat-icon>
         </div>
-        <div class="logo-text">
+        <div class="logo-text nav-label">
           <span class="logo-name">Dev Helper</span>
-          <span class="logo-sub">{{ session.session().domain === 'work' ? 'Enterprise Shell' : 'Personal Container'
-            }}</span>
+          <span class="logo-sub">{{ session.session().domain === 'work' ? 'Enterprise Shell' : 'Personal Container' }}</span>
         </div>
       </div>
 
@@ -18,7 +17,7 @@
           <a *ngIf="!item.children" [routerLink]="item.path" routerLinkActive="active" class="nav-item"
             [title]="item.label">
             <mat-icon>{{ item.icon }}</mat-icon>
-            <span>{{ item.label }}</span>
+            <span class="nav-label">{{ item.label }}</span>
             <span *ngIf="item.badge" class="nav-badge">{{ item.badge }}</span>
           </a>
 
@@ -26,7 +25,7 @@
           <ng-container *ngIf="item.children">
             <div class="nav-group-title" (click)="toggleExpand(item)" [class.expanded]="item.expanded">
               <mat-icon class="group-icon">{{ item.icon }}</mat-icon>
-              <span>{{ item.label }}</span>
+              <span class="nav-label">{{ item.label }}</span>
               <mat-icon class="chevron">{{ item.expanded ? 'expand_less' : 'expand_more' }}</mat-icon>
             </div>
 
@@ -34,7 +33,7 @@
               <a *ngFor="let child of item.children" [routerLink]="child.path" routerLinkActive="active"
                 class="nav-item child-item" [title]="child.label">
                 <mat-icon>{{ child.icon }}</mat-icon>
-                <span>{{ child.label }}</span>
+                <span class="nav-label">{{ child.label }}</span>
               </a>
             </div>
           </ng-container>
@@ -43,25 +42,33 @@
 
       <nav class="sidebar-nav" *ngIf="session.session().domain === 'personal'">
         <a class="nav-item" routerLink="/crypto-dashboard" routerLinkActive="active" title="Crypto AI">
-          <mat-icon>candlestick_chart</mat-icon><span>Crypto AI</span>
+          <mat-icon>candlestick_chart</mat-icon><span class="nav-label">Crypto AI</span>
         </a>
         <a class="nav-item" routerLink="/settings" routerLinkActive="active" title="Settings">
-          <mat-icon>settings</mat-icon><span>Settings</span>
+          <mat-icon>settings</mat-icon><span class="nav-label">Settings</span>
         </a>
       </nav>
 
       <div class="sidebar-footer">
         <div class="config-status" [class.configured]="isConfigured()" style="cursor: pointer;"
-          (click)="session.logout()">
+          (click)="session.logout()" matTooltip="Log Out">
           <mat-icon>logout</mat-icon>
-          <span>{{ session.session().username }} (Log Out)</span>
+          <span class="nav-label">{{ session.session().username }}</span>
         </div>
+        <button mat-icon-button (click)="toggleSidebar()" [matTooltip]="isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'" class="collapse-btn">
+          <mat-icon>{{ isCollapsed ? 'keyboard_double_arrow_right' : 'keyboard_double_arrow_left' }}</mat-icon>
+        </button>
       </div>
     </mat-sidenav>
 
     <mat-sidenav-content class="main-content">
-      <app-topbar></app-topbar>
+      <app-topbar (toggleSidebar)="toggleSidebar()"></app-topbar>
+      
       <div class="content-area">
+        <!-- Global Glassmorphism Background Blobs -->
+        <div class="glass-blob blob-1"></div>
+        <div class="glass-blob blob-2"></div>
+        
         <ng-container *ngIf="session.session().domain === 'work'">
           <router-outlet></router-outlet>
         </ng-container>
