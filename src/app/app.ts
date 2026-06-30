@@ -45,7 +45,7 @@ export class App {
         { label: 'Service Registry', icon: 'hub', path: '/settings/service-registry' },
         { label: 'Bitbucket', icon: 'cloud', path: '/settings/bitbucket' },
         { label: 'JIRA', icon: 'bug_report', path: '/settings/jira' },
-        { label: 'Gemini AI', icon: 'auto_awesome', path: '/settings/gemini' },
+        { label: 'AI Config', icon: 'auto_awesome', path: '/settings/gemini' },
         { label: 'ArgoCD', icon: 'public', path: '/settings/argocd' },
       ]
     },

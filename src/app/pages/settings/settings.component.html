@@ -1,9 +1,9 @@
 <div class="page-container fade-in-up">
   <div class="page-header">
-    <h1 style="text-transform: capitalize">{{ activeCategory() }} Configuration</h1>
+    <h1 style="text-transform: capitalize">{{ activeCategory() === 'gemini' ? 'AI' : activeCategory() }} Configuration</h1>
     <p *ngIf="activeCategory() === 'bitbucket'">Configure your Bitbucket App Passwords</p>
     <p *ngIf="activeCategory() === 'jira'">Configure your JIRA API credentials</p>
-    <p *ngIf="activeCategory() === 'gemini'">Configure Gemini API keys for code review</p>
+    <p *ngIf="activeCategory() === 'gemini'">Connect AI providers for intelligent code review &amp; analysis</p>
     <p *ngIf="activeCategory() === 'argocd'">Manage ArgoCD environment deployments globally</p>
     <p *ngIf="activeCategory() === 'service-registry'">Manage service-to-repository mappings for ArgoCD branch compare globally</p>
     
@@ -131,11 +131,33 @@
         </mat-form-field>
       </div>
 
-      <!-- Gemini AI Card -->
-      <div class="section-card" *ngIf="activeCategory() === 'gemini'">
-        <div class="section-title">
-          <mat-icon>auto_awesome</mat-icon> Gemini AI Configuration
+      <!-- ═══════════════════════════════════════════════════════════════════ -->
+      <!-- AI CONFIGURATION SECTION                                            -->
+      <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+      <!-- Provider header strip -->
+      <div class="ai-section-header" *ngIf="activeCategory() === 'gemini'" style="grid-column: 1 / -1;">
+        <mat-icon>psychology</mat-icon>
+        <span>AI Provider Configuration</span>
+        <span class="ai-header-sub">Configure one or more providers — models will be available across all AI-powered features</span>
+      </div>
+
+      <!-- ── Gemini Card ──────────────────────────────────────────────────── -->
+      <div class="section-card ai-provider-card" *ngIf="activeCategory() === 'gemini'">
+        <!-- Provider identity -->
+        <div class="ai-provider-header">
+          <div class="ai-provider-logo gemini-logo">
+            <mat-icon>auto_awesome</mat-icon>
+          </div>
+          <div class="ai-provider-info">
+            <div class="ai-provider-name">Google Gemini</div>
+            <div class="ai-provider-desc">Official Gemini API — fast, multimodal, generous free tier</div>
+          </div>
+          <span class="ai-provider-badge gemini-badge">Gemini</span>
         </div>
+
+        <mat-divider style="margin: 14px 0 18px;"></mat-divider>
+
         <div class="field-group">
           <mat-form-field appearance="outline">
             <mat-label>Gemini API Key</mat-label>
@@ -143,7 +165,94 @@
             <button mat-icon-button matSuffix type="button" (click)="showGeminiToken.set(!showGeminiToken())">
               <mat-icon>{{ showGeminiToken() ? 'visibility_off' : 'visibility' }}</mat-icon>
             </button>
+            <mat-hint>Get your key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com</a></mat-hint>
           </mat-form-field>
+        </div>
+      </div>
+
+      <!-- ── OpenRouter Card ──────────────────────────────────────────────── -->
+      <div class="section-card ai-provider-card" *ngIf="activeCategory() === 'gemini'">
+        <!-- Provider identity -->
+        <div class="ai-provider-header">
+          <div class="ai-provider-logo openrouter-logo">
+            <mat-icon>router</mat-icon>
+          </div>
+          <div class="ai-provider-info">
+            <div class="ai-provider-name">OpenRouter</div>
+            <div class="ai-provider-desc">Access 100+ LLMs via OpenAI-compatible API — including free-tier models</div>
+          </div>
+          <span class="ai-provider-badge or-badge" *ngIf="openRouterConnected()">Connected</span>
+          <span class="ai-provider-badge or-badge-idle" *ngIf="!openRouterConnected()">Not Connected</span>
+        </div>
+
+        <mat-divider style="margin: 14px 0 18px;"></mat-divider>
+
+        <div class="field-group">
+          <!-- API Key row -->
+          <div class="or-key-row">
+            <mat-form-field appearance="outline" style="flex:1;">
+              <mat-label>OpenRouter API Key</mat-label>
+              <input matInput formControlName="openRouterApiKey"
+                     [type]="showOpenRouterToken() ? 'text' : 'password'"
+                     placeholder="sk-or-v1-..." />
+              <button mat-icon-button matSuffix type="button" (click)="showOpenRouterToken.set(!showOpenRouterToken())">
+                <mat-icon>{{ showOpenRouterToken() ? 'visibility_off' : 'visibility' }}</mat-icon>
+              </button>
+              <mat-hint>Get your key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" class="visible-hint-link">openrouter.ai/keys</a></mat-hint>
+            </mat-form-field>
+
+            <button mat-flat-button class="or-connect-btn"
+                    type="button"
+                    (click)="connectOpenRouter()"
+                    [disabled]="openRouterConnecting()">
+              <mat-spinner *ngIf="openRouterConnecting()" diameter="16" style="margin-right:6px;"></mat-spinner>
+              <mat-icon *ngIf="!openRouterConnecting() && !openRouterConnected()">link</mat-icon>
+              <mat-icon *ngIf="!openRouterConnecting() && openRouterConnected()">sync</mat-icon>
+              {{ openRouterConnecting() ? 'Connecting...' : openRouterConnected() ? 'Reconnect' : 'Connect' }}
+            </button>
+          </div>
+
+          <!-- Error message -->
+          <div class="or-error" *ngIf="openRouterError()">
+            <mat-icon>error_outline</mat-icon>
+            {{ openRouterError() }}
+          </div>
+
+          <!-- Connected state: model selector -->
+          <ng-container *ngIf="openRouterConnected()">
+            <div class="or-connected-info">
+              <mat-icon>check_circle</mat-icon>
+              <span>{{ openRouterModels().length > 0 ? openRouterModels().length + ' free models loaded' : 'Connected — select a model below' }}</span>
+            </div>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Default Model</mat-label>
+              <mat-select formControlName="openRouterModel">
+                <!-- Search input container inside the select menu -->
+                <div class="select-search-container" (click)="$event.stopPropagation()">
+                  <mat-icon class="search-icon">search</mat-icon>
+                  <input class="select-search-input"
+                         placeholder="Search models..."
+                         [ngModel]="modelSearchQuery()"
+                         [ngModelOptions]="{standalone: true}"
+                         (input)="modelSearchQuery.set($any($event.target).value)" />
+                  <button mat-icon-button class="clear-btn" *ngIf="modelSearchQuery()" (click)="modelSearchQuery.set('')">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+                <mat-divider></mat-divider>
+                
+                <mat-option *ngFor="let model of filteredOpenRouterModels()" [value]="model.id">
+                  {{ model.name }}
+                </mat-option>
+                <mat-option *ngIf="filteredOpenRouterModels().length === 0" disabled>
+                  No models match your search
+                </mat-option>
+              </mat-select>
+              <mat-icon matSuffix>expand_more</mat-icon>
+              <mat-hint>Only free-tier models are listed. Paid models require usage credits.</mat-hint>
+            </mat-form-field>
+          </ng-container>
         </div>
       </div>
       <!-- ArgoCD Global Card -->

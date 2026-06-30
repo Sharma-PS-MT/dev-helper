@@ -12,6 +12,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatTableModule } from '@angular/material/table';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatSelectModule } from '@angular/material/select';
 import { AuthConfigService, AppConfig, ArgocdEnvConfig, ServiceRegistryEntry } from '../../core/services/auth-config.service';
 import { JiraService } from '../../core/services/jira.service';
 import { BitbucketService } from '../../core/services/bitbucket.service';
@@ -29,6 +30,7 @@ import { AuthSessionService } from '../../core/services/auth-session.service';
     MatCardModule, MatFormFieldModule, MatInputModule,
     MatButtonModule, MatIconModule, MatDividerModule,
     MatProgressSpinnerModule, MatTooltipModule, MatTableModule, MatChipsModule,
+    MatSelectModule,
   ],
   templateUrl: './settings.component.html',
   styleUrls: ['./settings.component.scss'],
@@ -50,13 +52,26 @@ export class SettingsComponent implements OnInit {
     jiraToken: [''],
     jiraTicketPattern: ['[A-Z]+-\\d+'],
     geminiApiKey: [''],
+    openRouterApiKey: [''],
+    openRouterModel: [''],
   });
 
   showBitToken = signal(false);
   showJiraToken = signal(false);
   showGeminiToken = signal(false);
+  showOpenRouterToken = signal(false);
   bitbucketTesting = signal(false);
   jiraTesting = signal(false);
+  openRouterConnecting = signal(false);
+  openRouterConnected = signal(false);
+  openRouterError = signal('');
+  openRouterModels = signal<{ id: string; name: string }[]>([]);
+  modelSearchQuery = signal<string>('');
+  filteredOpenRouterModels = computed(() => {
+    const q = this.modelSearchQuery().toLowerCase().trim();
+    if (!q) return this.openRouterModels();
+    return this.openRouterModels().filter(m => m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q));
+  });
   bitbucketStatus = signal<'idle' | 'ok' | 'fail'>('idle');
   jiraStatus = signal<'idle' | 'ok' | 'fail'>('idle');
 
@@ -96,7 +111,15 @@ export class SettingsComponent implements OnInit {
         jiraToken: c.jiraToken,
         jiraTicketPattern: c.jiraTicketPattern || '[A-Z]+-\\d+',
         geminiApiKey: c.geminiApiKey || '',
+        openRouterApiKey: c.openRouterApiKey || '',
+        openRouterModel: c.openRouterModel || '',
       });
+      // Restore connected state if a model is already saved
+      if (c.openRouterApiKey && c.openRouterModel) {
+        this.openRouterConnected.set(true);
+        // Pre-fetch models asynchronously since we have the key
+        this.fetchModelsSilently(c.openRouterApiKey);
+      }
     });
 
     this.route.paramMap.subscribe(params => {
@@ -116,6 +139,65 @@ export class SettingsComponent implements OnInit {
     this.authConfig.save(this.form.value as Partial<AppConfig>);
     this.notify.success('Configuration saved successfully!');
     return true;
+  }
+
+  connectOpenRouter(): void {
+    const apiKey = this.form.get('openRouterApiKey')?.value?.trim();
+    if (!apiKey) {
+      this.openRouterError.set('Please enter your OpenRouter API key first.');
+      return;
+    }
+    this.openRouterConnecting.set(true);
+    this.openRouterConnected.set(false);
+    this.openRouterError.set('');
+    this.openRouterModels.set([]);
+
+    this.http.get<any>('https://openrouter.ai/api/v1/models', {
+      headers: { Authorization: `Bearer ${apiKey}` }
+    }).pipe(
+      catchError((err) => {
+        this.openRouterConnecting.set(false);
+        this.openRouterError.set('Connection failed. Check your API key and try again.');
+        return of(null);
+      })
+    ).subscribe((res: any) => {
+      if (!res) return;
+      this.openRouterConnecting.set(false);
+      // Filter free models — those where pricing.prompt === '0'
+      const freeModels: { id: string; name: string }[] = (res.data || [])
+        .filter((m: any) => {
+          const promptPrice = parseFloat(m?.pricing?.prompt || '1');
+          const completionPrice = parseFloat(m?.pricing?.completion || '1');
+          return promptPrice === 0 && completionPrice === 0;
+        })
+        .map((m: any) => ({ id: m.id, name: m.name || m.id }))
+        .sort((a: any, b: any) => a.name.localeCompare(b.name));
+      this.openRouterModels.set(freeModels);
+      this.openRouterConnected.set(true);
+      // Save the API key immediately
+      const current = this.authConfig.config();
+      this.authConfig.save({ ...current, openRouterApiKey: apiKey });
+      this.notify.success(`Connected! ${freeModels.length} free models available.`);
+    });
+  }
+
+  private fetchModelsSilently(apiKey: string): void {
+    this.http.get<any>('https://openrouter.ai/api/v1/models', {
+      headers: { Authorization: `Bearer ${apiKey}` }
+    }).pipe(
+      catchError(() => of(null))
+    ).subscribe((res: any) => {
+      if (!res) return;
+      const freeModels: { id: string; name: string }[] = (res.data || [])
+        .filter((m: any) => {
+          const promptPrice = parseFloat(m?.pricing?.prompt || '1');
+          const completionPrice = parseFloat(m?.pricing?.completion || '1');
+          return promptPrice === 0 && completionPrice === 0;
+        })
+        .map((m: any) => ({ id: m.id, name: m.name || m.id }))
+        .sort((a: any, b: any) => a.name.localeCompare(b.name));
+      this.openRouterModels.set(freeModels);
+    });
   }
 
   testBitbucket(): void {

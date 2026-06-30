@@ -21,6 +21,10 @@ export interface AppConfig {
   // Gemini AI Code Review
   geminiApiKey: string;
 
+  // OpenRouter AI
+  openRouterApiKey: string;
+  openRouterModel: string;
+
   // NOTE: keycloakEnvs intentionally removed — now globally shared.
   // Access via AuthConfigService.keycloakEnvs signal.
 }
@@ -75,6 +79,8 @@ const DEFAULTS: AppConfig = {
   jiraAccountId: '',
   jiraTicketPattern: '[A-Z]+-\\d+',
   geminiApiKey: '',
+  openRouterApiKey: '',
+  openRouterModel: '',
 };
 
 @Injectable({ providedIn: 'root' })
