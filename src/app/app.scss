@@ -63,58 +63,60 @@
 
     .logo-icon {
       width: 38px; height: 38px;
-      background: linear-gradient(135deg, var(--accent-cyan), #2196f3);
-      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent-indigo), var(--accent-purple));
+      border-radius: 12px;
       display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 0 12px rgba(57,197,207,.35);
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.35);
       mat-icon { color: #fff; font-size: 20px; }
     }
 
     .logo-name { display: block; font-size: 15px; font-weight: 700; color: var(--text-primary); }
-    .logo-sub  { display: block; font-size: 10px; color: var(--text-muted); letter-spacing: 0.5px; }
+    .logo-sub  { display: block; font-size: 10px; color: var(--text-secondary); letter-spacing: 0.5px; }
   }
 
   .sidebar-nav {
-    flex: 1; padding: 12px 8px; display: flex; flex-direction: column; gap: 2px;
+    flex: 1; padding: 12px 8px; display: flex; flex-direction: column; gap: 4px;
 
     .nav-item {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 12px; border-radius: var(--radius-sm);
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 14px; border-radius: var(--radius-sm);
       color: var(--text-secondary); text-decoration: none;
       font-size: 13px; font-weight: 500;
-      transition: background var(--transition), color var(--transition);
+      transition: all var(--transition);
       position: relative;
 
       mat-icon { font-size: 20px; width: 20px; height: 20px; }
 
       &:hover {
-        background: var(--bg-elevated);
+        background: rgba(255, 255, 255, 0.04);
         color: var(--text-primary);
       }
 
       &.active {
-        background: rgba(57,197,207,.12);
-        color: var(--accent-cyan);
+        background: rgba(99, 102, 241, 0.12);
+        color: var(--text-primary);
+        font-weight: 600;
         &::before {
           content: ''; position: absolute; left: 0; top: 50%;
-          transform: translateY(-50%); height: 60%; width: 3px;
-          background: var(--accent-cyan); border-radius: 0 3px 3px 0;
+          transform: translateY(-50%); height: 50%; width: 3px;
+          background: linear-gradient(180deg, var(--accent-indigo), var(--accent-purple));
+          border-radius: 0 4px 4px 0;
         }
       }
 
       .nav-badge {
-        margin-left: auto; background: var(--accent-red);
+        margin-left: auto; background: var(--accent-indigo);
         color: white; font-size: 10px; padding: 1px 6px;
         border-radius: 10px; font-weight: 700;
       }
     }
 
     .nav-group-title {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 12px; border-radius: var(--radius-sm);
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 14px; border-radius: var(--radius-sm);
       color: var(--text-secondary); cursor: pointer;
-      font-size: 13px; font-weight: 600; text-transform: uppercase;
-      letter-spacing: 0.5px; margin-top: 8px; margin-bottom: 2px;
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 1px; margin-top: 14px; margin-bottom: 2px;
       transition: color var(--transition);
 
       .group-icon { font-size: 18px; width: 18px; height: 18px; }
@@ -124,45 +126,50 @@
     }
 
     .nav-children {
-      display: flex; flex-direction: column; gap: 2px;
-      padding-left: 24px;
-      border-left: 1px dashed var(--border-color);
-      margin-left: 20px;
+      display: flex; flex-direction: column; gap: 4px;
+      padding-left: 20px;
+      border-left: 1px solid rgba(255, 255, 255, 0.04);
+      margin-left: 22px;
       margin-bottom: 8px;
 
       .child-item {
         padding: 8px 12px;
-        font-size: 12px;
+        font-size: 13px;
+        border-radius: var(--radius-sm);
         
         mat-icon { font-size: 16px; width: 16px; height: 16px; }
         
         &.active::before {
-          height: 100%; border-radius: 2px;
-          left: -25px; /* Pull back to the dashed border */
+          display: none; /* Hide old border indicator for children */
+        }
+        &.active {
+          background: rgba(255, 255, 255, 0.05);
+          color: var(--text-primary);
         }
       }
     }
   }
 
   .sidebar-footer {
-    padding: 8px 16px; 
+    padding: 16px; 
     border-top: 1px solid var(--border-subtle);
+    background: rgba(10, 13, 20, 0.4);
     display: flex;
     align-items: center;
     justify-content: space-between;
 
     .config-status {
       display: flex; align-items: center; gap: 7px;
-      font-size: 11px; color: var(--status-todo);
-      mat-icon { font-size: 14px; width: 14px; height: 14px; }
+      font-size: 12px; color: var(--status-todo);
+      mat-icon { font-size: 16px; width: 16px; height: 16px; }
 
       &.configured { color: var(--status-done); }
     }
     
     .collapse-btn {
       color: var(--text-secondary);
-      transform: scale(0.85);
-      &:hover { color: var(--text-primary); }
+      transform: scale(0.9);
+      &:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.05); }
     }
   }
 }

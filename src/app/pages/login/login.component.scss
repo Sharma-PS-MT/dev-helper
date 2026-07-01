@@ -1,69 +1,113 @@
 .login-page {
   width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center;
-  background: radial-gradient(circle at center, var(--bg-card) 0%, var(--bg-body) 100%);
+  background: #06080e;
   position: relative; overflow: hidden;
-}
 
-.login-page::before {
-  content: ''; position: absolute; width: 600px; height: 600px; background: var(--accent-cyan);
-  filter: blur(200px); opacity: 0.1; top: -100px; left: -100px; border-radius: 50%;
-}
-.login-page::after {
-  content: ''; position: absolute; width: 600px; height: 600px; background: var(--accent-purple);
-  filter: blur(200px); opacity: 0.1; bottom: -100px; right: -100px; border-radius: 50%;
+  &::before {
+    content: ''; position: absolute; width: 50vw; height: 50vw;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, rgba(0,0,0,0) 70%);
+    top: -10%; left: -10%; pointer-events: none;
+  }
+  &::after {
+    content: ''; position: absolute; width: 50vw; height: 50vw;
+    background: radial-gradient(circle, rgba(6, 182, 212, 0.12) 0%, rgba(0,0,0,0) 70%);
+    bottom: -10%; right: -10%; pointer-events: none;
+  }
 }
 
 .login-wrapper {
-  width: 100%; max-width: 500px; padding: 24px; z-index: 1; position: relative;
+  width: 100%; max-width: 440px; padding: 24px; z-index: 2; position: relative;
 }
 
 .brand-header {
   text-align: center; margin-bottom: 32px;
   .logo-icon {
-    width: 64px; height: 64px; background: rgba(57,197,207,0.1); border-radius: 16px; margin: 0 auto 16px;
-    display: flex; align-items: center; justify-content: center; color: var(--accent-cyan);
-    mat-icon { font-size: 36px; width: 36px; height: 36px; }
+    width: 60px; height: 60px;
+    background: linear-gradient(135deg, var(--accent-indigo), var(--accent-purple));
+    border-radius: 16px; margin: 0 auto 16px;
+    display: flex; align-items: center; justify-content: center; color: #fff;
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
+    animation: float 4s ease-in-out infinite;
+    mat-icon { font-size: 30px; width: 30px; height: 30px; }
   }
-  h1 { font-size: 28px; font-weight: 700; color: var(--text-primary); margin: 0 0 8px 0; letter-spacing: -0.5px; }
-  p { color: var(--text-secondary); margin: 0; font-size: 15px; }
+  h1 { font-size: 32px; font-weight: 800; color: var(--text-primary); margin: 0 0 6px 0; letter-spacing: -0.8px; }
+  p { color: var(--text-secondary); margin: 0; font-size: 14px; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
 
 .login-card {
-  padding: 32px; background: rgba(22, 27, 34, 0.8); backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; box-shadow: 0 24px 48px rgba(0,0,0,0.5);
+  padding: 36px;
+  background: rgba(20, 25, 43, 0.6) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-lg) !important;
 }
 
 .w-full { width: 100%; display: block; }
 
 .domain-section {
   margin: 24px 0 32px 0;
-  .section-label { font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 16px; letter-spacing: 0.5px; }
+  .section-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    color: var(--text-secondary); margin-bottom: 12px; letter-spacing: 0.8px;
+  }
 }
 
 .domain-cards {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  display: flex; justify-content: center;
   .domain-card {
-    background: var(--bg-body); border: 2px solid var(--border-color); border-radius: 12px; padding: 20px 16px;
-    cursor: pointer; position: relative; transition: all 0.2s ease; text-align: center; overflow: hidden;
-    &:hover { border-color: rgba(57,197,207,0.4); transform: translateY(-2px); }
+    background: rgba(10, 13, 20, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-md); padding: 20px 24px;
+    cursor: pointer; position: relative; transition: all var(--transition);
+    text-align: center; overflow: hidden; width: 100%;
+    
+    &:hover { border-color: rgba(99, 102, 241, 0.3); transform: translateY(-2px); }
+    
     &.selected {
-      border-color: var(--accent-cyan); background: rgba(57,197,207,0.05);
-      .domain-icon { color: var(--accent-cyan); }
+      border-color: var(--accent-indigo);
+      background: rgba(99, 102, 241, 0.08);
+      box-shadow: 0 0 16px rgba(99, 102, 241, 0.15);
+      .domain-icon { color: var(--accent-indigo); }
     }
     
-    .domain-icon { font-size: 32px; width: 32px; height: 32px; color: var(--text-secondary); margin-bottom: 12px; transition: color 0.2s; }
-    h3 { font-size: 15px; font-weight: 600; color: var(--text-primary); margin: 0 0 8px 0; }
-    p { font-size: 12px; color: var(--text-muted); margin: 0; line-height: 1.4; }
+    .domain-icon { font-size: 32px; width: 32px; height: 32px; color: var(--text-secondary); margin-bottom: 12px; transition: color var(--transition); }
+    h3 { font-size: 15px; font-weight: 600; color: var(--text-primary); margin: 0 0 4px 0; }
+    p { font-size: 12px; color: var(--text-secondary); margin: 0; line-height: 1.4; }
     
     .check-ring {
-      position: absolute; top: 12px; right: 12px; width: 20px; height: 20px; background: var(--accent-cyan);
+      position: absolute; top: 12px; right: 12px; width: 18px; height: 18px;
+      background: linear-gradient(135deg, var(--accent-indigo), var(--accent-purple));
       border-radius: 50%; display: flex; align-items: center; justify-content: center;
-      mat-icon { font-size: 14px; width: 14px; height: 14px; color: #fff; font-weight: bold; }
+      mat-icon { font-size: 11px; width: 11px; height: 11px; color: #fff; font-weight: bold; }
     }
   }
 }
 
 .enter-btn { 
-  height: 54px; font-size: 16px; font-weight: 600; letter-spacing: 0.5px; 
-  border-radius: 8px; box-shadow: 0 8px 16px rgba(57,197,207,0.2); 
+  height: 50px; font-size: 15px; font-weight: 600; letter-spacing: 0.5px; 
+  border-radius: var(--radius-sm) !important;
+  background: linear-gradient(135deg, var(--accent-indigo), var(--accent-purple)) !important;
+  color: white !important;
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.25) !important;
+  transition: all var(--transition) !important;
+
+  &:hover:not([disabled]) {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(99, 102, 241, 0.4) !important;
+  }
+  &[disabled] {
+    opacity: 0.6;
+    background: rgba(255, 255, 255, 0.05) !important;
+    box-shadow: none !important;
+    color: var(--text-muted) !important;
+  }
 }
