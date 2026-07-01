@@ -21,9 +21,11 @@ export interface AppConfig {
   // Gemini AI Code Review
   geminiApiKey: string;
 
-  // OpenRouter AI
-  openRouterApiKey: string;
-  openRouterModel: string;
+  // OpenAI Compatible AI Provider
+  openaiBaseUrl: string;
+  openaiApiKey: string;
+  openaiModel: string;
+  openaiMaxTokens: number;
 
   // NOTE: keycloakEnvs intentionally removed — now globally shared.
   // Access via AuthConfigService.keycloakEnvs signal.
@@ -79,8 +81,10 @@ const DEFAULTS: AppConfig = {
   jiraAccountId: '',
   jiraTicketPattern: '[A-Z]+-\\d+',
   geminiApiKey: '',
-  openRouterApiKey: '',
-  openRouterModel: '',
+  openaiBaseUrl: 'https://openrouter.ai/api/v1',
+  openaiApiKey: '',
+  openaiModel: '',
+  openaiMaxTokens: 4096,
 };
 
 @Injectable({ providedIn: 'root' })
@@ -130,6 +134,20 @@ export class AuthConfigService {
     // 1. Load per-user private config from Firebase
     this.firebase.loadCredentials(s.username, s.domain).then(cloud => {
       if (cloud && Object.keys(cloud).length > 0) {
+        // Migrate old openRouter fields to openai if present
+        const c = cloud as any;
+        if (c.openRouterApiKey && !c.openaiApiKey) {
+          c.openaiApiKey = c.openRouterApiKey;
+        }
+        if (c.openRouterModel && !c.openaiModel) {
+          c.openaiModel = c.openRouterModel;
+        }
+        if (c.openRouterMaxTokens && !c.openaiMaxTokens) {
+          c.openaiMaxTokens = c.openRouterMaxTokens;
+        }
+        if (!c.openaiBaseUrl) {
+          c.openaiBaseUrl = 'https://openrouter.ai/api/v1';
+        }
         const merged = { ...this._config(), ...cloud };
         this._config.set(merged);
       }

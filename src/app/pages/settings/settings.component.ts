@@ -52,25 +52,27 @@ export class SettingsComponent implements OnInit {
     jiraToken: [''],
     jiraTicketPattern: ['[A-Z]+-\\d+'],
     geminiApiKey: [''],
-    openRouterApiKey: [''],
-    openRouterModel: [''],
+    openaiBaseUrl: ['https://openrouter.ai/api/v1'],
+    openaiApiKey: [''],
+    openaiModel: [''],
+    openaiMaxTokens: [4096, [Validators.min(1), Validators.max(100000)]],
   });
 
   showBitToken = signal(false);
   showJiraToken = signal(false);
   showGeminiToken = signal(false);
-  showOpenRouterToken = signal(false);
+  showOpenaiToken = signal(false);
   bitbucketTesting = signal(false);
   jiraTesting = signal(false);
-  openRouterConnecting = signal(false);
-  openRouterConnected = signal(false);
-  openRouterError = signal('');
-  openRouterModels = signal<{ id: string; name: string }[]>([]);
+  openaiConnecting = signal(false);
+  openaiConnected = signal(false);
+  openaiError = signal('');
+  openaiModels = signal<{ id: string; name: string }[]>([]);
   modelSearchQuery = signal<string>('');
-  filteredOpenRouterModels = computed(() => {
+  filteredOpenaiModels = computed(() => {
     const q = this.modelSearchQuery().toLowerCase().trim();
-    if (!q) return this.openRouterModels();
-    return this.openRouterModels().filter(m => m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q));
+    if (!q) return this.openaiModels();
+    return this.openaiModels().filter(m => m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q));
   });
   bitbucketStatus = signal<'idle' | 'ok' | 'fail'>('idle');
   jiraStatus = signal<'idle' | 'ok' | 'fail'>('idle');
@@ -111,14 +113,16 @@ export class SettingsComponent implements OnInit {
         jiraToken: c.jiraToken,
         jiraTicketPattern: c.jiraTicketPattern || '[A-Z]+-\\d+',
         geminiApiKey: c.geminiApiKey || '',
-        openRouterApiKey: c.openRouterApiKey || '',
-        openRouterModel: c.openRouterModel || '',
+        openaiBaseUrl: c.openaiBaseUrl || 'https://openrouter.ai/api/v1',
+        openaiApiKey: c.openaiApiKey || '',
+        openaiModel: c.openaiModel || '',
+        openaiMaxTokens: c.openaiMaxTokens || 4096,
       });
       // Restore connected state if a model is already saved
-      if (c.openRouterApiKey && c.openRouterModel) {
-        this.openRouterConnected.set(true);
-        // Pre-fetch models asynchronously since we have the key
-        this.fetchModelsSilently(c.openRouterApiKey);
+      if (c.openaiBaseUrl && c.openaiApiKey && c.openaiModel) {
+        this.openaiConnected.set(true);
+        // Pre-fetch models asynchronously since we have the key & url
+        this.fetchModelsSilently(c.openaiBaseUrl, c.openaiApiKey);
       }
     });
 
@@ -141,62 +145,93 @@ export class SettingsComponent implements OnInit {
     return true;
   }
 
-  connectOpenRouter(): void {
-    const apiKey = this.form.get('openRouterApiKey')?.value?.trim();
-    if (!apiKey) {
-      this.openRouterError.set('Please enter your OpenRouter API key first.');
+  connectOpenAI(): void {
+    const baseUrl = this.form.get('openaiBaseUrl')?.value?.trim();
+    const apiKey = this.form.get('openaiApiKey')?.value?.trim();
+    if (!baseUrl) {
+      this.openaiError.set('Please enter the OpenAI-compatible Base URL.');
       return;
     }
-    this.openRouterConnecting.set(true);
-    this.openRouterConnected.set(false);
-    this.openRouterError.set('');
-    this.openRouterModels.set([]);
+    if (!apiKey) {
+      this.openaiError.set('Please enter your API key.');
+      return;
+    }
+    this.openaiConnecting.set(true);
+    this.openaiConnected.set(false);
+    this.openaiError.set('');
+    this.openaiModels.set([]);
 
-    this.http.get<any>('https://openrouter.ai/api/v1/models', {
-      headers: { Authorization: `Bearer ${apiKey}` }
+    this.http.post<any>('/python-ai/openai/models', {
+      base_url: baseUrl,
+      api_key: apiKey
     }).pipe(
       catchError((err) => {
-        this.openRouterConnecting.set(false);
-        this.openRouterError.set('Connection failed. Check your API key and try again.');
+        this.openaiConnecting.set(false);
+        this.openaiError.set(err.error?.detail || 'Connection failed. Check your API key/URL and try again.');
         return of(null);
       })
     ).subscribe((res: any) => {
       if (!res) return;
-      this.openRouterConnecting.set(false);
-      // Filter free models — those where pricing.prompt === '0'
-      const freeModels: { id: string; name: string }[] = (res.data || [])
-        .filter((m: any) => {
-          const promptPrice = parseFloat(m?.pricing?.prompt || '1');
-          const completionPrice = parseFloat(m?.pricing?.completion || '1');
-          return promptPrice === 0 && completionPrice === 0;
-        })
-        .map((m: any) => ({ id: m.id, name: m.name || m.id }))
-        .sort((a: any, b: any) => a.name.localeCompare(b.name));
-      this.openRouterModels.set(freeModels);
-      this.openRouterConnected.set(true);
-      // Save the API key immediately
+      this.openaiConnecting.set(false);
+      
+      const rawModels = res.data || [];
+      let finalModels: { id: string; name: string }[] = [];
+
+      // If it is OpenRouter, filter for free models
+      if (baseUrl.toLowerCase().includes('openrouter.ai')) {
+        finalModels = rawModels
+          .filter((m: any) => {
+            const promptPrice = parseFloat(m?.pricing?.prompt || '1');
+            const completionPrice = parseFloat(m?.pricing?.completion || '1');
+            return promptPrice === 0 && completionPrice === 0;
+          })
+          .map((m: any) => ({ id: m.id, name: m.name || m.id }));
+      } else {
+        // Generic OpenAI Compatible: include all models
+        finalModels = rawModels.map((m: any) => ({ id: m.id, name: m.id }));
+      }
+
+      finalModels.sort((a: any, b: any) => a.name.localeCompare(b.name));
+      this.openaiModels.set(finalModels);
+      this.openaiConnected.set(true);
+      
+      // Save base URL and API key immediately
       const current = this.authConfig.config();
-      this.authConfig.save({ ...current, openRouterApiKey: apiKey });
-      this.notify.success(`Connected! ${freeModels.length} free models available.`);
+      this.authConfig.save({
+        ...current,
+        openaiBaseUrl: baseUrl,
+        openaiApiKey: apiKey
+      });
+      this.notify.success(`Connected! ${finalModels.length} models available.`);
     });
   }
 
-  private fetchModelsSilently(apiKey: string): void {
-    this.http.get<any>('https://openrouter.ai/api/v1/models', {
-      headers: { Authorization: `Bearer ${apiKey}` }
+  private fetchModelsSilently(baseUrl: string, apiKey: string): void {
+    this.http.post<any>('/python-ai/openai/models', {
+      base_url: baseUrl,
+      api_key: apiKey
     }).pipe(
       catchError(() => of(null))
     ).subscribe((res: any) => {
       if (!res) return;
-      const freeModels: { id: string; name: string }[] = (res.data || [])
-        .filter((m: any) => {
-          const promptPrice = parseFloat(m?.pricing?.prompt || '1');
-          const completionPrice = parseFloat(m?.pricing?.completion || '1');
-          return promptPrice === 0 && completionPrice === 0;
-        })
-        .map((m: any) => ({ id: m.id, name: m.name || m.id }))
-        .sort((a: any, b: any) => a.name.localeCompare(b.name));
-      this.openRouterModels.set(freeModels);
+      
+      const rawModels = res.data || [];
+      let finalModels: { id: string; name: string }[] = [];
+
+      if (baseUrl.toLowerCase().includes('openrouter.ai')) {
+        finalModels = rawModels
+          .filter((m: any) => {
+            const promptPrice = parseFloat(m?.pricing?.prompt || '1');
+            const completionPrice = parseFloat(m?.pricing?.completion || '1');
+            return promptPrice === 0 && completionPrice === 0;
+          })
+          .map((m: any) => ({ id: m.id, name: m.name || m.id }));
+      } else {
+        finalModels = rawModels.map((m: any) => ({ id: m.id, name: m.id }));
+      }
+
+      finalModels.sort((a: any, b: any) => a.name.localeCompare(b.name));
+      this.openaiModels.set(finalModels);
     });
   }
 

@@ -25,6 +25,7 @@ from prediction_server import app as prediction_app   # Crypto AI routes
 from argocd_router import router as argocd_router      # ArgoCD proxy routes
 from jira_router import router as jira_router          # Jira proxy routes
 from bitbucket_router import router as bitbucket_router  # Bitbucket proxy routes
+from openai_router import router as openai_router        # OpenAI proxy routes
 
 app = FastAPI(
     title="Dev-Helper Microservice",
@@ -52,6 +53,7 @@ for route in prediction_app.routes:
 app.include_router(argocd_router)
 app.include_router(jira_router)
 app.include_router(bitbucket_router)
+app.include_router(openai_router)
 
 
 @app.get("/health", tags=["Health"])
@@ -72,5 +74,7 @@ def health():
                 "/bitbucket/pull-request", "/bitbucket/pull-request/commits",
                 "/bitbucket/pull-requests/open", "/bitbucket/commits-between"
             ],
+            "openai_proxy":     ["/openai/models", "/openai/chat/completions"]
         }
     }
+

@@ -6,4 +6,3 @@ xgboost
 scikit-learn
 optuna
 requests
-pr-agent

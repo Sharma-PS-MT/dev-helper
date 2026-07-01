@@ -163,6 +163,46 @@ export class BitbucketService {
     return null;
   }
 
+  /** Fetch the unified diff text for a PR (via Python proxy). */
+  getPRDiff(repoSlug: string, prId: number, projectKey?: string): Observable<string> {
+    const pk = projectKey || this.ws;
+    return this.http
+      .post<{ diff: string }>('/python-ai/bitbucket/pull-request/diff', {
+        ...this.creds,
+        project_key: pk,
+        repo_slug: repoSlug,
+        pr_id: prId,
+        context_lines: 5,
+      })
+      .pipe(map(r => r.diff || ''));
+  }
+
+  /** Post a general comment on a PR (via Python proxy). */
+  postPRComment(
+    repoSlug: string,
+    prId: number,
+    text: string,
+    projectKey?: string,
+    filePath?: string,
+    line?: number,
+    lineType?: string
+  ): Observable<any> {
+    const pk = projectKey || this.ws;
+    return this.http.post<any>('/python-ai/bitbucket/pull-request/comment', {
+      ...this.creds,
+      project_key: pk,
+      repo_slug: repoSlug,
+      pr_id: prId,
+      text,
+      ...(filePath ? {
+        file_path: filePath,
+        file_type: 'TO',
+        ...(line != null ? { line, line_type: lineType ?? 'CONTEXT' } : {}),
+      } : {}),
+    });
+  }
+
+
   getOpenPullRequests(repoSlug: string, projectKey?: string): Observable<BitbucketPR[]> {
     const pk = projectKey || this.ws;
     return this.http

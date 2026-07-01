@@ -165,12 +165,12 @@
             <button mat-icon-button matSuffix type="button" (click)="showGeminiToken.set(!showGeminiToken())">
               <mat-icon>{{ showGeminiToken() ? 'visibility_off' : 'visibility' }}</mat-icon>
             </button>
-            <mat-hint>Get your key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com</a></mat-hint>
+            <mat-hint>Get your key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" class="visible-hint-link">aistudio.google.com</a></mat-hint>
           </mat-form-field>
         </div>
       </div>
 
-      <!-- ── OpenRouter Card ──────────────────────────────────────────────── -->
+      <!-- ── OpenAI Compatible Card ────────────────────────────────────────── -->
       <div class="section-card ai-provider-card" *ngIf="activeCategory() === 'gemini'">
         <!-- Provider identity -->
         <div class="ai-provider-header">
@@ -178,80 +178,98 @@
             <mat-icon>router</mat-icon>
           </div>
           <div class="ai-provider-info">
-            <div class="ai-provider-name">OpenRouter</div>
-            <div class="ai-provider-desc">Access 100+ LLMs via OpenAI-compatible API — including free-tier models</div>
+            <div class="ai-provider-name">OpenAI Compatible</div>
+            <div class="ai-provider-desc">Connect to any OpenAI-compatible API</div>
           </div>
-          <span class="ai-provider-badge or-badge" *ngIf="openRouterConnected()">Connected</span>
-          <span class="ai-provider-badge or-badge-idle" *ngIf="!openRouterConnected()">Not Connected</span>
+          <span class="ai-provider-badge or-badge" *ngIf="openaiConnected()">Connected</span>
+          <span class="ai-provider-badge or-badge-idle" *ngIf="!openaiConnected()">Not Connected</span>
         </div>
 
         <mat-divider style="margin: 14px 0 18px;"></mat-divider>
 
         <div class="field-group">
-          <!-- API Key row -->
-          <div class="or-key-row">
-            <mat-form-field appearance="outline" style="flex:1;">
-              <mat-label>OpenRouter API Key</mat-label>
-              <input matInput formControlName="openRouterApiKey"
-                     [type]="showOpenRouterToken() ? 'text' : 'password'"
-                     placeholder="sk-or-v1-..." />
-              <button mat-icon-button matSuffix type="button" (click)="showOpenRouterToken.set(!showOpenRouterToken())">
-                <mat-icon>{{ showOpenRouterToken() ? 'visibility_off' : 'visibility' }}</mat-icon>
-              </button>
-              <mat-hint>Get your key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" class="visible-hint-link">openrouter.ai/keys</a></mat-hint>
-            </mat-form-field>
+          <!-- Base URL Input -->
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>API Base URL</mat-label>
+            <input matInput formControlName="openaiBaseUrl" placeholder="https://openrouter.ai/api/v1" />
+            <mat-icon matSuffix>dns</mat-icon>
+            <mat-hint>For OpenRouter: <code>https://openrouter.ai/api/v1</code></mat-hint>
+          </mat-form-field>
 
-            <button mat-flat-button class="or-connect-btn"
+          <!-- API Key Input -->
+          <mat-form-field appearance="outline" class="w-full" style="margin-top: 8px;">
+            <mat-label>API Key / Token</mat-label>
+            <input matInput formControlName="openaiApiKey"
+                   [type]="showOpenaiToken() ? 'text' : 'password'"
+                   placeholder="sk-..." />
+            <button mat-icon-button matSuffix type="button" (click)="showOpenaiToken.set(!showOpenaiToken())">
+              <mat-icon>{{ showOpenaiToken() ? 'visibility_off' : 'visibility' }}</mat-icon>
+            </button>
+            <mat-hint>For local providers with no auth, enter any dummy string (e.g. <code>ollama</code>)</mat-hint>
+          </mat-form-field>
+
+          <!-- Connect Button -->
+          <div class="openai-action-row">
+            <button mat-flat-button class="openai-connect-btn"
                     type="button"
-                    (click)="connectOpenRouter()"
-                    [disabled]="openRouterConnecting()">
-              <mat-spinner *ngIf="openRouterConnecting()" diameter="16" style="margin-right:6px;"></mat-spinner>
-              <mat-icon *ngIf="!openRouterConnecting() && !openRouterConnected()">link</mat-icon>
-              <mat-icon *ngIf="!openRouterConnecting() && openRouterConnected()">sync</mat-icon>
-              {{ openRouterConnecting() ? 'Connecting...' : openRouterConnected() ? 'Reconnect' : 'Connect' }}
+                    (click)="connectOpenAI()"
+                    [disabled]="openaiConnecting()">
+              <mat-spinner *ngIf="openaiConnecting()" diameter="16"></mat-spinner>
+              <mat-icon *ngIf="!openaiConnecting() && !openaiConnected()">link</mat-icon>
+              <mat-icon *ngIf="!openaiConnecting() && openaiConnected()">sync</mat-icon>
+              <span>{{ openaiConnecting() ? 'Connecting...' : openaiConnected() ? 'Reconnect Provider' : 'Connect Provider' }}</span>
             </button>
           </div>
 
           <!-- Error message -->
-          <div class="or-error" *ngIf="openRouterError()">
+          <div class="or-error" *ngIf="openaiError()">
             <mat-icon>error_outline</mat-icon>
-            {{ openRouterError() }}
+            {{ openaiError() }}
           </div>
 
           <!-- Connected state: model selector -->
-          <ng-container *ngIf="openRouterConnected()">
+          <ng-container *ngIf="openaiConnected()">
             <div class="or-connected-info">
               <mat-icon>check_circle</mat-icon>
-              <span>{{ openRouterModels().length > 0 ? openRouterModels().length + ' free models loaded' : 'Connected — select a model below' }}</span>
+              <span>{{ openaiModels().length > 0 ? openaiModels().length + ' models loaded successfully' : 'Connected — select a model below' }}</span>
             </div>
 
-            <mat-form-field appearance="outline">
-              <mat-label>Default Model</mat-label>
-              <mat-select formControlName="openRouterModel">
-                <!-- Search input container inside the select menu -->
-                <div class="select-search-container" (click)="$event.stopPropagation()">
-                  <mat-icon class="search-icon">search</mat-icon>
-                  <input class="select-search-input"
-                         placeholder="Search models..."
-                         [ngModel]="modelSearchQuery()"
-                         [ngModelOptions]="{standalone: true}"
-                         (input)="modelSearchQuery.set($any($event.target).value)" />
-                  <button mat-icon-button class="clear-btn" *ngIf="modelSearchQuery()" (click)="modelSearchQuery.set('')">
-                    <mat-icon>close</mat-icon>
-                  </button>
-                </div>
-                <mat-divider></mat-divider>
-                
-                <mat-option *ngFor="let model of filteredOpenRouterModels()" [value]="model.id">
-                  {{ model.name }}
-                </mat-option>
-                <mat-option *ngIf="filteredOpenRouterModels().length === 0" disabled>
-                  No models match your search
-                </mat-option>
-              </mat-select>
-              <mat-icon matSuffix>expand_more</mat-icon>
-              <mat-hint>Only free-tier models are listed. Paid models require usage credits.</mat-hint>
-            </mat-form-field>
+            <div class="openai-models-row">
+              <mat-form-field appearance="outline" class="model-select-field">
+                <mat-label>Default Model</mat-label>
+                <mat-select formControlName="openaiModel">
+                  <!-- Search input container inside the select menu -->
+                  <div class="select-search-container" (click)="$event.stopPropagation()">
+                    <mat-icon class="search-icon">search</mat-icon>
+                    <input class="select-search-input"
+                           placeholder="Search models..."
+                           [ngModel]="modelSearchQuery()"
+                           [ngModelOptions]="{standalone: true}"
+                           (input)="modelSearchQuery.set($any($event.target).value)" />
+                    <button mat-icon-button class="clear-btn" *ngIf="modelSearchQuery()" (click)="modelSearchQuery.set('')">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
+                  <mat-divider></mat-divider>
+                  
+                  <mat-option *ngFor="let model of filteredOpenaiModels()" [value]="model.id">
+                    {{ model.name }}
+                  </mat-option>
+                  <mat-option *ngIf="filteredOpenaiModels().length === 0" disabled>
+                    No models match your search
+                  </mat-option>
+                </mat-select>
+                <mat-icon matSuffix>expand_more</mat-icon>
+                <mat-hint>Choose your default model for code reviews.</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="tokens-input-field">
+                <mat-label>Max Response Tokens</mat-label>
+                <input matInput type="number" formControlName="openaiMaxTokens" placeholder="4096" min="1" max="100000" />
+                <mat-icon matSuffix>token</mat-icon>
+                <mat-hint>Max response length.</mat-hint>
+              </mat-form-field>
+            </div>
           </ng-container>
         </div>
       </div>

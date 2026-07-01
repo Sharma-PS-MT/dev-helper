@@ -1,7 +1,7 @@
 <div class="page-container fade-in-up">
   <div class="page-header">
-    <h1>PR Review & Gap Analysis</h1>
-    <p>Analyze pull requests for missing Jira tickets and open issues</p>
+    <h1>PR Review &amp; Gap Analysis</h1>
+    <p>Analyze pull requests for missing Jira tickets, open issues, and AI-powered code review</p>
   </div>
 
   <!-- Search Card -->
@@ -86,10 +86,11 @@
 
   <!-- Results -->
   <ng-container *ngIf="result() as res">
-    <div class="results-grid fade-in-up mt-24">
+    <div class="results-layout fade-in-up mt-24">
 
-      <!-- Left Column: PR Info & Gaps -->
-      <div class="left-col">
+      <!-- ═══ Row 1: PR Info + Gap Analysis side by side ═══ -->
+      <div class="top-row">
+
         <!-- PR Summary -->
         <mat-card class="pr-summary-card">
           <div class="pr-header">
@@ -102,26 +103,41 @@
               Created {{ res.pr.created_on | date:'short' }}
             </div>
             <div class="branch-flow mt-10">
-              <span class="branch-pill target">{{ res.pr.source.branch.name }}</span>
+              <span class="branch-pill source">{{ res.pr.source.branch.name }}</span>
               <mat-icon class="arrow">arrow_right_alt</mat-icon>
               <span class="branch-pill dest">{{ res.pr.destination.branch.name }}</span>
             </div>
 
-            <div class="ai-controls mt-20">
-              <button mat-stroked-button color="accent" (click)="initiateAIReview()" [disabled]="aiReviewing()">
-                <mat-icon>auto_awesome</mat-icon> {{ aiReviewing() ? 'Gemini is Analyzing...' : 'Initiate AI Review' }}
-              </button>
-            </div>
+            <!-- AI Review Trigger Zone -->
+            <div class="ai-trigger-zone mt-20">
+              <!-- Provider info strip -->
+              <div class="ai-provider-strip">
+                <ng-container *ngIf="openRouter.isConfigured; else notConfigured">
+                  <div class="provider-dot or-dot"></div>
+                  <span class="provider-label">Open AI</span>
+                  <span class="model-tag">{{ openRouter.modelName }}</span>
+                </ng-container>
+                <ng-template #notConfigured>
+                  <div class="provider-dot unconfigured-dot"></div>
+                  <span class="provider-label unconfigured-label">Not Configured</span>
+                  <a routerLink="/settings/gemini" class="config-link" matTooltip="Configure OpenRouter in AI Config">
+                    <mat-icon>settings</mat-icon> Set up AI
+                  </a>
+                </ng-template>
+              </div>
 
-            <div *ngIf="aiReviewResult()" class="ai-review-box mt-16 fade-in-up">
-              <div class="ai-header"><mat-icon inline>auto_awesome</mat-icon> Gemini Analysis Status</div>
-              <pre>{{ aiReviewResult() }}</pre>
+              <button class="ai-review-btn" (click)="initiateAIReview()" [disabled]="aiReviewing()">
+                <span class="ai-btn-glow" *ngIf="!aiReviewing()"></span>
+                <mat-spinner *ngIf="aiReviewing()" diameter="16" class="btn-spinner"></mat-spinner>
+                <mat-icon *ngIf="!aiReviewing()">auto_awesome</mat-icon>
+                <span>{{ aiReviewing() ? 'Analyzing code...' : (aiReviewDone() ? 'Re-run AI Review' : 'Initiate AI Review') }}</span>
+              </button>
             </div>
           </div>
         </mat-card>
 
         <!-- Gap Analysis -->
-        <mat-card class="gaps-card mt-20">
+        <mat-card class="gaps-card">
           <div class="card-title">
             <mat-icon>report_problem</mat-icon> Gap Analysis
             <span class="badge" [class.success]="res.gaps.length === 0">{{ res.gaps.length }}</span>
@@ -145,38 +161,259 @@
         </mat-card>
       </div>
 
-      <!-- Right Column: Commits -->
-      <div class="right-col">
-        <mat-card class="commits-card">
-          <div class="card-title">
-            <mat-icon>commit</mat-icon> Commits
-            <span class="text-muted ml-auto font-normal text-sm">{{ res.commits.length }} commits</span>
+      <!-- ═══ Row 2: AI Code Review — Wide Panel ═══ -->
+
+      <!-- Loading shimmer -->
+      <div class="ai-review-panel loading-panel" *ngIf="aiReviewing()">
+        <div class="review-panel-header">
+          <div class="shimmer-bar" style="width: 200px; height: 22px;"></div>
+          <div class="shimmer-bar" style="width: 100px; height: 16px; margin-left: auto;"></div>
+        </div>
+        <div class="shimmer-group" *ngFor="let g of [1,2,3]">
+          <div class="shimmer-bar" style="width: 180px; height: 14px; margin-bottom: 16px;"></div>
+          <div class="shimmer-suggestion" *ngFor="let i of [1,2]">
+            <div class="shimmer-bar" style="width: 140px; height: 12px;"></div>
+            <div class="shimmer-bar" style="width: 100%; height: 12px; margin-top: 8px;"></div>
+            <div class="shimmer-bar" style="width: 80%; height: 12px; margin-top: 6px;"></div>
+            <div class="shimmer-bar" style="width: 100%; height: 80px; margin-top: 10px; border-radius: 8px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Error state -->
+      <div class="ai-error-panel fade-in-up" *ngIf="!aiReviewing() && aiError()">
+        <mat-icon>error_outline</mat-icon>
+        <div>
+          <div class="error-title">AI Review Failed</div>
+          <div class="error-body">{{ aiError() }}</div>
+        </div>
+        <a routerLink="/settings/gemini" mat-stroked-button class="config-btn">Configure AI</a>
+      </div>
+
+      <!-- ════ Main AI Review Panel ════ -->
+      <div class="ai-review-panel fade-in-up" *ngIf="aiReviewDone() && !aiReviewing()">
+
+        <!-- Panel Header -->
+        <div class="review-panel-header">
+          <div class="panel-title">
+            <mat-icon>auto_awesome</mat-icon>
+            AI Code Review
+          </div>
+          <div class="panel-meta">
+            <span class="provider-chip or-chip">⚡ {{ aiModelName() }}</span>
+            <span class="sections-count">{{ totalItems }} findings</span>
           </div>
 
-          <div class="commits-list">
-            <div *ngFor="let commit of paginatedCommits()" class="commit-item">
-              <div class="commit-hash" [title]="commit.hash">{{ commit.hash | slice:0:7 }}</div>
-              <div class="commit-msg">
-                <div class="msg-text">{{ commit.message.split('\n')[0] }}</div>
-                <div class="author">{{ commit.author.user?.display_name || commit.author.raw.split('<')[0].trim() }}
-                    &bull; {{ commit.date | date:'MMM d, y' }}</div>
+          <!-- Post All -->
+          <div class="post-all-zone" *ngIf="totalItems > 0">
+            <span class="post-progress">{{ postedCount }}/{{ totalItems }} posted</span>
+            <button mat-stroked-button class="post-all-btn" (click)="postAllComments()"
+              [disabled]="postedCount === totalItems">
+              <mat-icon>send</mat-icon> Post All to Bitbucket
+            </button>
+          </div>
+        </div>
 
-                    <div class="ticket-chips">
-                      <!-- Custom component for each Jira ticket found in this commit -->
-                      <app-ticket-badge *ngFor="let tid of (commit['ticketIds'] || [])" [ticket]="getTicket(tid)"
-                        [ticketId]="tid">
-                      </app-ticket-badge>
-                    </div>
+        <!-- Tab Bar -->
+        <div class="review-tabs">
+          <button class="tab-btn" [class.active]="activeTab() === 'suggestions'" (click)="activeTab.set('suggestions')">
+            <mat-icon>lightbulb</mat-icon>
+            <span>Inline Suggestions</span>
+            <span class="tab-count suggestion-count">{{ suggestionItems().length }}</span>
+          </button>
+          <button class="tab-btn" [class.active]="activeTab() === 'risks'" (click)="activeTab.set('risks')">
+            <mat-icon>warning</mat-icon>
+            <span>Risks &amp; Concerns</span>
+            <span class="tab-count risk-count">{{ riskItems().length }}</span>
+          </button>
+          <button class="tab-btn" [class.active]="activeTab() === 'good'" (click)="activeTab.set('good')">
+            <mat-icon>thumb_up</mat-icon>
+            <span>Good Practices</span>
+            <span class="tab-count good-count">{{ goodItems().length }}</span>
+          </button>
+        </div>
+
+        <!-- ── Tab: Inline Suggestions ── -->
+        <div class="tab-content" *ngIf="activeTab() === 'suggestions'">
+          <div *ngIf="suggestionItems().length === 0" class="empty-tab">
+            <mat-icon>check_circle_outline</mat-icon>
+            <p>No inline suggestions — code looks clean!</p>
+          </div>
+
+          <div *ngFor="let ri of suggestionItems()" class="suggestion-card" [class.posted]="ri.posted">
+            <!-- Card Header: file + line + post button -->
+            <div class="sc-header">
+              <div class="sc-file-info">
+                <span class="sc-file-icon">
+                  <mat-icon>insert_drive_file</mat-icon>
+                </span>
+                <span class="sc-file-path" [matTooltip]="ri.item.filePath || ''">
+                  {{ getFileName(ri.item.filePath) }}
+                </span>
+                <span class="sc-file-full-path" *ngIf="ri.item.filePath">{{ ri.item.filePath }}</span>
+                <span class="sc-line-badge" *ngIf="ri.item.lineNumber">
+                  <mat-icon>tag</mat-icon>L{{ ri.item.lineNumber }}
+                </span>
+                <span class="sc-ext-badge" *ngIf="getFileExt(ri.item.filePath)">{{ getFileExt(ri.item.filePath) }}</span>
+              </div>
+              <div class="sc-actions">
+                <span class="posted-badge" *ngIf="ri.posted">
+                  <mat-icon>check_circle</mat-icon> Posted
+                </span>
+                <span class="error-badge" *ngIf="ri.error" [matTooltip]="ri.error">
+                  <mat-icon>error</mat-icon>
+                </span>
+                <button class="sc-toggle-btn" *ngIf="ri.item.originalCode || ri.item.suggestedCode"
+                        (click)="toggleDiff(ri)" [matTooltip]="ri.showDiff ? 'Hide diff' : 'Show code diff'">
+                  <mat-icon>{{ ri.showDiff ? 'code_off' : 'code' }}</mat-icon>
+                  {{ ri.showDiff ? 'Hide Diff' : 'View Diff' }}
+                </button>
+                <button mat-flat-button class="sc-post-btn" *ngIf="!ri.posted"
+                        (click)="postComment(ri)" [disabled]="ri.posting">
+                  <mat-spinner *ngIf="ri.posting" diameter="14"></mat-spinner>
+                  <mat-icon *ngIf="!ri.posting">comment</mat-icon>
+                  {{ ri.posting ? 'Posting...' : (ri.item.filePath ? 'Post File Comment' : 'Post PR Comment') }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Title & Body -->
+            <div class="sc-body">
+              <div class="sc-title" [matTooltip]="ri.item.fullTitle || ''" [innerHTML]="formatMarkdown(ri.item.title)"></div>
+              <p class="sc-description" *ngIf="ri.item.body" [innerHTML]="formatMarkdown(ri.item.body)"></p>
+            </div>
+
+            <!-- Code Diff Block -->
+            <div class="code-diff-block" *ngIf="ri.showDiff && (ri.item.originalCode || ri.item.suggestedCode)">
+              <div class="diff-columns">
+                <!-- Original -->
+                <div class="diff-col diff-original" *ngIf="ri.item.originalCode">
+                  <div class="diff-col-header">
+                    <mat-icon>remove_circle_outline</mat-icon>
+                    Original
+                  </div>
+                  <pre class="diff-code"><code>{{ ri.item.originalCode }}</code></pre>
+                </div>
+                <!-- Suggested -->
+                <div class="diff-col diff-suggested" *ngIf="ri.item.suggestedCode">
+                  <div class="diff-col-header">
+                    <mat-icon>add_circle_outline</mat-icon>
+                    Suggested
+                  </div>
+                  <pre class="diff-code"><code>{{ ri.item.suggestedCode }}</code></pre>
                 </div>
               </div>
             </div>
 
-            <mat-paginator [length]="res.commits.length" [pageSize]="pageSize()" [pageSizeOptions]="[5, 10, 25, 50]"
-              (page)="onPageChange($event)">
-            </mat-paginator>
-        </mat-card>
+            <!-- Posted footer -->
+            <div class="sc-posted-footer" *ngIf="ri.posted">
+              <mat-icon>check_circle</mat-icon> Comment posted to Bitbucket
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Tab: Risks & Concerns ── -->
+        <div class="tab-content" *ngIf="activeTab() === 'risks'">
+          <div *ngIf="riskItems().length === 0" class="empty-tab">
+            <mat-icon>shield</mat-icon>
+            <p>No risks identified — PR looks safe!</p>
+          </div>
+
+          <div *ngFor="let ri of riskItems()" class="risk-card" [class]="ri.item.severity" [class.posted]="ri.posted">
+            <!-- Severity ribbon -->
+            <div class="risk-ribbon" [class]="ri.item.severity">
+              <mat-icon>{{ getSeverityIcon(ri.item.severity) }}</mat-icon>
+              <span>{{ ri.item.severity === 'error' ? 'HIGH' : ri.item.severity === 'warn' ? 'MEDIUM' : 'LOW' }}</span>
+            </div>
+
+            <div class="risk-body">
+              <!-- File reference -->
+              <div class="risk-file" *ngIf="ri.item.filePath">
+                <mat-icon>insert_drive_file</mat-icon>
+                <span class="risk-file-path">{{ ri.item.filePath }}</span>
+                <span class="risk-line" *ngIf="ri.item.lineNumber">:{{ ri.item.lineNumber }}</span>
+              </div>
+
+              <div class="risk-title" [matTooltip]="ri.item.fullTitle || ''" [innerHTML]="formatMarkdown(ri.item.title)"></div>
+              <p class="risk-description" [innerHTML]="formatMarkdown(ri.item.body)"></p>
+
+              <!-- PR Comment Preview -->
+              <div class="risk-comment-preview" *ngIf="!ri.posted">
+                <div class="preview-label">
+                  <mat-icon>preview</mat-icon>
+                  Comment preview
+                </div>
+                <div class="preview-content" [innerHTML]="formatMarkdown(ri.item.body)"></div>
+              </div>
+
+              <div class="risk-actions">
+                <span class="posted-badge" *ngIf="ri.posted">
+                  <mat-icon>check_circle</mat-icon> Posted to Bitbucket
+                </span>
+                <span class="error-badge" *ngIf="ri.error" [matTooltip]="ri.error">
+                  <mat-icon>error</mat-icon> {{ ri.error }}
+                </span>
+                <button mat-flat-button class="risk-post-btn" *ngIf="!ri.posted"
+                        (click)="postComment(ri)" [disabled]="ri.posting">
+                  <mat-spinner *ngIf="ri.posting" diameter="14"></mat-spinner>
+                  <mat-icon *ngIf="!ri.posting">send</mat-icon>
+                  {{ ri.posting ? 'Posting...' : 'Post as PR Comment' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Tab: Good Practices ── -->
+        <div class="tab-content" *ngIf="activeTab() === 'good'">
+          <div *ngIf="goodItems().length === 0" class="empty-tab">
+            <mat-icon>sentiment_satisfied_alt</mat-icon>
+            <p>No specific good practices flagged.</p>
+          </div>
+
+          <div *ngFor="let ri of goodItems()" class="good-card">
+            <div class="good-icon-wrap">
+              <mat-icon>thumb_up</mat-icon>
+            </div>
+            <div class="good-body">
+              <div class="good-title" [matTooltip]="ri.item.fullTitle || ''" [innerHTML]="formatMarkdown(ri.item.title)"></div>
+              <p class="good-description" *ngIf="ri.item.body && ri.item.body !== ri.item.title" [innerHTML]="formatMarkdown(ri.item.body)"></p>
+            </div>
+          </div>
+        </div>
+
       </div>
+
+      <!-- ═══ Row 3: Commits ═══ -->
+      <mat-card class="commits-card mt-24">
+        <div class="card-title">
+          <mat-icon>commit</mat-icon> Commits
+          <span class="text-muted ml-auto font-normal text-sm">{{ res.commits.length }} commits</span>
+        </div>
+
+        <div class="commits-list">
+          <div *ngFor="let commit of paginatedCommits()" class="commit-item">
+            <div class="commit-hash" [title]="commit.hash">{{ commit.hash | slice:0:7 }}</div>
+            <div class="commit-msg">
+              <div class="msg-text">{{ commit.message.split('\n')[0] }}</div>
+              <div class="author">{{ commit.author.user?.display_name || commit.author.raw.split('<')[0].trim() }}
+                  &bull; {{ commit.date | date:'MMM d, y' }}</div>
+
+                  <div class="ticket-chips">
+                    <app-ticket-badge *ngFor="let tid of (commit['ticketIds'] || [])" [ticket]="getTicket(tid)"
+                      [ticketId]="tid">
+                    </app-ticket-badge>
+                  </div>
+              </div>
+            </div>
+
+          <mat-paginator [length]="res.commits.length" [pageSize]="pageSize()" [pageSizeOptions]="[5, 10, 25, 50]"
+            (page)="onPageChange($event)">
+          </mat-paginator>
+        </div>
+      </mat-card>
 
     </div>
   </ng-container>
+
 </div>
