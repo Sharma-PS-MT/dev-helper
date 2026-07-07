@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev-helper-frontend",
+      "runtimeExecutable": "cmd.exe",
+      "runtimeArgs": [
+        "/c",
+        "D:\\Projects\\Comapny\\dev-helper\\.claude\\skills\\run-dev-helper\\start-frontend.cmd"
+      ],
+      "port": 4201
+    }
+  ]
+}

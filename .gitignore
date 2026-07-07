@@ -50,6 +50,16 @@ __pycache__/
 *$py.class
 *.stackdump
 
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
 # Graphify
 /graphify-out/
 

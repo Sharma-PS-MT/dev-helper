@@ -33,7 +33,7 @@
 
 ## 🛠️ Tech Stack
 
-- **Frontend:** Angular 19+ with SCSS (Dark Mode Optimized)
+- **Frontend:** Angular 21 with SCSS (Dark Mode Optimized)
 - **Backend Microservices:** Python 3.10+ & FastAPI
 - **Authentication:** Firebase Auth
 - **Data Persistence:** Cloud Firestore (User-isolated and Global configs)
@@ -185,24 +185,16 @@ graph TD
 
 ## 🔧 Service Registry
 
-The `SERVICE_REGISTRY` is a central configuration that maps ArgoCD application names (and image aliases) to Bitbucket projects and repositories. This enables automated navigation from the ArgoCD dashboard to the **Branch & Tag Compare** page.
+The Service Registry maps ArgoCD application names (and image aliases) to Bitbucket projects and repositories. This enables automated navigation from the ArgoCD dashboard to the **Branch & Tag Compare** page.
 
-### Configuration Path
-`src/app/core/config/service-registry.ts`
+Entries are managed dynamically through the **Settings → Service Registry** page and persisted globally in Firebase (`global/serviceRegistry`), shared across all users — no code changes or redeploys required to add a new service mapping. The static `SERVICE_REGISTRY` object in `src/app/core/config/service-registry.ts` is intentionally empty and only serves as a fallback resolution path.
 
-### Example Entry
-```typescript
-BM_INVOICE: {
-  displayName: 'BM Invoice',
-  project: 'BM',
-  repository: 'csi-bm-invoice-java-service',
-  aliases: [
-    'csi-bm-invoice-java-service',
-    'prod-bminvoicejava',
-    'bminvoicejava',
-  ]
-}
-```
+### Adding a Service
+From **Settings → Service Registry**, add an entry with:
+- **Display name** — human-readable label shown in the UI
+- **Project** — Bitbucket project key (e.g. `BM`)
+- **Repository** — Bitbucket repo slug (e.g. `csi-bm-invoice-java-service`)
+- **Aliases** — ArgoCD app names / image substrings that identify this service (case-insensitive substring match)
 
 ### Automation Flow
 1.  **Single Selection:** Selecting one app in the dashboard allows comparing its current sync tag against the `main` branch.
