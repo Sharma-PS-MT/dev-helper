@@ -168,6 +168,26 @@
   }
 }
 
+.filter-card {
+  margin-bottom: 20px;
+  padding: 16px;
+}
+
+.filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.ticket-link {
+  color: var(--accent-indigo);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 .service-result {
   margin-bottom: 32px;
 
@@ -188,6 +208,21 @@
       strong {
         color: var(--text-primary);
         font-weight: 600;
+      }
+    }
+
+    .service-link-btn {
+      border: none;
+      background: transparent;
+      padding: 0;
+      margin: 0;
+      color: var(--accent-indigo);
+      cursor: pointer;
+      font: inherit;
+      text-align: left;
+
+      &:hover {
+        text-decoration: underline;
       }
     }
 
@@ -318,9 +353,9 @@
   }
   
   &.status-diff {
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--text-secondary);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--accent-blue);
+    border: 1px solid rgba(59, 130, 246, 0.3);
   }
 
   &.status-diff-msg {

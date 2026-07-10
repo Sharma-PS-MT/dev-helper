@@ -31,6 +31,15 @@ export class BitbucketService {
 
   private get ws(): string { return this.authConfig.config().bitbucketWorkspace; }
 
+  private normalizeTicketId(ticketId: string): string {
+    const match = ticketId.trim().toUpperCase().match(/[A-Z][A-Z0-9_]*-\d+/);
+    return match ? match[0] : '';
+  }
+
+  private normalizeTicketIds(ticketIds: string[]): string[] {
+    return [...new Set(ticketIds.map(id => this.normalizeTicketId(id)).filter(Boolean))];
+  }
+
   // ── Projects ────────────────────────────────────────────────────────────────
   getProjects(): Observable<BitbucketProject[]> {
     return this.http
@@ -223,11 +232,11 @@ export class BitbucketService {
       switchMap(({ pr, commits }) => {
         const allMessages = commits.map(c => c.message).join('\n');
         const descText = pr.description || '';
-        const regexIds = this.authConfig.extractTicketIds(allMessages);
-        const propIds = commits.flatMap(c => c.ticketIds || []);
+        const regexIds = this.normalizeTicketIds(this.authConfig.extractTicketIds(allMessages));
+        const propIds = this.normalizeTicketIds(commits.flatMap(c => c.ticketIds || []));
         const ticketIds = [...new Set([...regexIds, ...propIds])];
 
-        const descTickets = this.authConfig.extractTicketIds(descText);
+        const descTickets = this.normalizeTicketIds(this.authConfig.extractTicketIds(descText));
 
         if (ticketIds.length === 0) {
           return of({ pr, commits, ticketIds, missingTicketCommits: commits, gaps: this.buildGaps(pr, commits, ticketIds, [], descTickets), tickets: [] });
@@ -236,7 +245,7 @@ export class BitbucketService {
         return this.jira.getIssues(ticketIds).pipe(
           map(tickets => {
             const missingTicketCommits = commits.filter(c => {
-               const ids = [...new Set([...this.authConfig.extractTicketIds(c.message), ...(c.ticketIds || [])])];
+               const ids = this.normalizeTicketIds([...this.authConfig.extractTicketIds(c.message), ...(c.ticketIds || [])]);
                return ids.length === 0;
             });
             const gaps = this.buildGaps(pr, commits, ticketIds, tickets, descTickets);
@@ -361,13 +370,13 @@ export class BitbucketService {
         // Collect all unique ticket IDs from both sets
         const allCommits = [...criticalCommits, ...incomingCommits];
         const allText = allCommits.map(c => c.message).join('\n');
-        const regexIds = this.authConfig.extractTicketIds(allText);
-        const propIds = allCommits.flatMap(c => c.ticketIds || []);
+        const regexIds = this.normalizeTicketIds(this.authConfig.extractTicketIds(allText));
+        const propIds = this.normalizeTicketIds(allCommits.flatMap(c => c.ticketIds || []));
         const ticketIds = [...new Set([...regexIds, ...propIds])];
 
         const enrichCommits = (commits: BitbucketCommit[], tickets: Map<string, JiraTicket>): CommitWithTickets[] =>
           commits.map(c => {
-            const ids = [...new Set([...this.authConfig.extractTicketIds(c.message), ...(c.ticketIds || [])])];
+            const ids = this.normalizeTicketIds([...this.authConfig.extractTicketIds(c.message), ...(c.ticketIds || [])]);
             return { commit: c, ticketIds: ids, tickets: ids.map(id => tickets.get(id)).filter(Boolean) as JiraTicket[] };
           });
 
@@ -383,7 +392,7 @@ export class BitbucketService {
 
         return this.jira.getIssues(ticketIds).pipe(
           map(tickets => {
-            const ticketMap = new Map(tickets.map(t => [t.key, t]));
+            const ticketMap = new Map(tickets.map(t => [this.normalizeTicketId(t.key), t]));
             return {
               fromRef, toRef,
               criticalCommits: enrichCommits(criticalCommits, ticketMap),
@@ -401,8 +410,8 @@ export class BitbucketService {
     return this.getCommitsBetween(repoSlug, from, to, projectKey).pipe(
       switchMap(commits => {
         const allText = commits.map(c => c.message).join('\n');
-        const regexIds = this.authConfig.extractTicketIds(allText);
-        const propIds = commits.flatMap(c => c.ticketIds || []);
+        const regexIds = this.normalizeTicketIds(this.authConfig.extractTicketIds(allText));
+        const propIds = this.normalizeTicketIds(commits.flatMap(c => c.ticketIds || []));
         const ticketIds = [...new Set([...regexIds, ...propIds])];
 
         if (ticketIds.length === 0) {
@@ -412,9 +421,9 @@ export class BitbucketService {
 
         return this.jira.getIssues(ticketIds).pipe(
           map(tickets => {
-            const ticketMap = new Map(tickets.map(t => [t.key, t]));
+            const ticketMap = new Map(tickets.map(t => [this.normalizeTicketId(t.key), t]));
             const cwt: CommitWithTickets[] = commits.map(c => {
-              const ids = [...new Set([...this.authConfig.extractTicketIds(c.message), ...(c.ticketIds || [])])];
+              const ids = this.normalizeTicketIds([...this.authConfig.extractTicketIds(c.message), ...(c.ticketIds || [])]);
               return { commit: c, ticketIds: ids, tickets: ids.map(id => ticketMap.get(id)).filter(Boolean) as JiraTicket[] };
             });
             return { fromRef: from, toRef: to, commits: cwt, ticketSummary: this.buildSummary(tickets) };

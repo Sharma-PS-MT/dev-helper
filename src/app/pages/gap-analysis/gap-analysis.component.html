@@ -58,6 +58,25 @@
         </button>
       </div>
     </div>
+
+    <mat-card class="glass-card filter-card">
+      <div class="filters-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Text Search</mat-label>
+          <input matInput [(ngModel)]="filterTextSearch" placeholder="Search ticket, commit, author, impact">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>All Statuses</mat-label>
+          <mat-select [(ngModel)]="filterGapStatuses" multiple>
+            <mat-option *ngFor="let status of gapStatusOptions" [value]="status">
+              {{ getStatusLabel(status) }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+      </div>
+    </mat-card>
     
     <!-- Version List for selected services -->
     <mat-card class="glass-card result-card" style="margin-bottom: 24px;">
@@ -95,14 +114,24 @@
     <div *ngFor="let result of results" class="service-result">
       <mat-card class="glass-card result-card">
         <div class="service-header">
-          <h3>Service: <strong>{{ result.serviceName }}</strong></h3>
+          <h3>
+            Service:
+            <button type="button" class="service-link-btn" (click)="openServiceCompare(result.serviceName)">
+              <strong>{{ result.serviceName }}</strong>
+            </button>
+          </h3>
         </div>
 
         <table mat-table [dataSource]="getDisplayGaps(result.gaps)" class="mat-elevation-z0 transparent-table">
           <!-- Ticket ID -->
           <ng-container matColumnDef="ticketId">
             <th mat-header-cell *matHeaderCellDef> Ticket ID </th>
-            <td mat-cell *matCellDef="let gap" class="bold-text"> {{ gap.ticketId }} </td>
+            <td mat-cell *matCellDef="let gap" class="bold-text">
+              <a *ngIf="gap.ticketUrl; else plainTicket" class="ticket-link" [href]="gap.ticketUrl" target="_blank" rel="noopener">
+                {{ gap.ticketId }}
+              </a>
+              <ng-template #plainTicket>{{ gap.ticketId }}</ng-template>
+            </td>
           </ng-container>
 
           <!-- Commit / Summary -->
@@ -112,25 +141,11 @@
               <ng-container *ngIf="gap.isGrouped">
                 <div *ngFor="let c of gap.commits" style="margin-bottom: 8px;">
                   <div class="commit-text">{{ c.message }}</div>
-                  <div class="sha-text" style="font-size: 11px;">{{ c.sha }}</div>
                 </div>
               </ng-container>
               <ng-container *ngIf="!gap.isGrouped">
                 <div class="commit-text">{{ gap.commitMessage }}</div>
-                <div class="sha-text">{{ gap.commitSha }}</div>
               </ng-container>
-            </td>
-          </ng-container>
-
-          <!-- Direction -->
-          <ng-container matColumnDef="direction">
-            <th mat-header-cell *matHeaderCellDef> Direction </th>
-            <td mat-cell *matCellDef="let gap">
-              <mat-chip-set>
-                <mat-chip [ngClass]="{'dir-forward': gap.direction === 'Forward', 'dir-reverse': gap.direction === 'Reverse', 'dir-both': gap.direction === 'Both'}">
-                  {{ gap.direction }}
-                </mat-chip>
-              </mat-chip-set>
             </td>
           </ng-container>
 
@@ -138,7 +153,16 @@
           <ng-container matColumnDef="status">
             <th mat-header-cell *matHeaderCellDef> Gap Status </th>
             <td mat-cell *matCellDef="let gap"> 
-              <span class="status-badge" [ngClass]="getStatusClass(gap.status)">{{ gap.status }}</span>
+              <span class="status-badge" [ngClass]="getStatusClass(gap.status)" [matTooltip]="getStatusHint(gap.status)">
+                {{ getStatusLabel(gap.status) }}
+              </span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="jiraStatus">
+            <th mat-header-cell *matHeaderCellDef> Jira Status </th>
+            <td mat-cell *matCellDef="let gap" class="impact-text">
+              {{ gap.jiraStatus || 'N/A' }}
             </td>
           </ng-container>
 

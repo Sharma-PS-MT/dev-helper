@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -10,12 +10,32 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { FormsModule } from '@angular/forms';
-import { GapAnalysisEngineService, ServiceGapResult, GapEntry } from '../../core/services/gap-analysis-engine.service';
+import { GapAnalysisEngineService, ServiceGapResult, GapEntry, GapStatus } from '../../core/services/gap-analysis-engine.service';
 import { GapAnalysisStateService, GapServiceState } from '../../core/services/gap-analysis-state.service';
 import { AuthConfigService } from '../../core/services/auth-config.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { VersionSelectDialogComponent } from './version-select-dialog.component';
+
+interface GroupedCommitItem {
+  message: string;
+}
+
+interface GroupedGapRow {
+  ticketId: string;
+  commits: GroupedCommitItem[];
+  status: GapStatus;
+  jiraStatus?: string;
+  actionImpact: string;
+  author?: string;
+  ticketUrl?: string;
+  isGrouped: true;
+}
+
+type DisplayGapRow = GapEntry | GroupedGapRow;
 
 @Component({
   selector: 'app-gap-analysis',
@@ -24,12 +44,26 @@ import { VersionSelectDialogComponent } from './version-select-dialog.component'
     CommonModule, RouterModule, FormsModule,
     MatCardModule, MatButtonModule, MatIconModule,
     MatProgressBarModule, MatTableModule, MatChipsModule, MatTooltipModule,
-    MatSlideToggleModule, MatDialogModule
+    MatSlideToggleModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule
   ],
   templateUrl: './gap-analysis.component.html',
   styleUrls: ['./gap-analysis.component.scss']
 })
 export class GapAnalysisComponent implements OnInit {
+  readonly gapStatusOptions: GapStatus[] = ['NEW_ADDED', 'REMOVED', 'DIFF_COMMIT', 'DIFF_MESSAGE'];
+  readonly statusLabelMap: Record<GapStatus, string> = {
+    NEW_ADDED: '✅ Added',
+    REMOVED: '❌ Removed',
+    DIFF_COMMIT: '🔗 Synced',
+    DIFF_MESSAGE: '⚠️ Diverged'
+  };
+  readonly statusHintMap: Record<GapStatus, string> = {
+    NEW_ADDED: 'New content introduced.',
+    REMOVED: 'Content taken out.',
+    DIFF_COMMIT: 'Code moved across branches with matching commit message.',
+    DIFF_MESSAGE: 'Mismatch requiring review where both directions contain ticket-related commits.'
+  };
+
   sourceEnv = '';
   targetEnv = '';
   selectedProjects: GapServiceState[] = [];
@@ -39,10 +73,12 @@ export class GapAnalysisComponent implements OnInit {
   hasProcessed = false;
 
   results: ServiceGapResult[] = [];
-  displayedColumns = ['ticketId', 'commitMessage', 'direction', 'status', 'actionImpact'];
+  displayedColumns = ['ticketId', 'commitMessage', 'status', 'jiraStatus', 'actionImpact'];
 
   isGroupedByTicket = false;
   excludeMergeAndPR = true;
+  filterTextSearch = '';
+  filterGapStatuses: GapStatus[] = [];
 
   private static readonly MERGE_PATTERNS = [
     /^merge branch /i,
@@ -148,14 +184,41 @@ export class GapAnalysisComponent implements OnInit {
   getStatusClass(status: string): string {
     switch(status) {
       case 'NEW_ADDED': return 'status-new';
-      case 'REMOVING': return 'status-removing';
+      case 'REMOVED': return 'status-removing';
       case 'DIFF_COMMIT': return 'status-diff';
-      case 'DIFF_COMMIT_MESSAGE': return 'status-diff-msg';
+      case 'DIFF_MESSAGE': return 'status-diff-msg';
       default: return 'status-default';
     }
   }
 
-  getDisplayGaps(gaps: GapEntry[]): any[] {
+  getStatusLabel(status: GapStatus): string {
+    return this.statusLabelMap[status];
+  }
+
+  getStatusHint(status: GapStatus): string {
+    return this.statusHintMap[status];
+  }
+
+  openServiceCompare(serviceName: string): void {
+    const service = this.selectedProjects.find(project => project.appName === serviceName);
+    if (!service) {
+      this.notify.error(`Unable to locate compare details for ${serviceName}.`);
+      return;
+    }
+
+    const baseUrl = this.authConfig.config().bitbucketBaseUrl?.trim().replace(/\/$/, '');
+    if (!baseUrl || !service.project || !service.repository || !service.sourceVersion || !service.targetVersion) {
+      this.notify.error(`Missing Bitbucket compare information for ${serviceName}.`);
+      return;
+    }
+
+    const sourceRef = this.toBitbucketRef(service.sourceVersion);
+    const targetRef = this.toBitbucketRef(service.targetVersion);
+    const compareUrl = `${baseUrl}/projects/${encodeURIComponent(service.project)}/repos/${encodeURIComponent(service.repository)}/compare/commits?sourceBranch=${encodeURIComponent(sourceRef)}&targetBranch=${encodeURIComponent(targetRef)}`;
+    window.open(compareUrl, '_blank', 'noopener');
+  }
+
+  getDisplayGaps(gaps: GapEntry[]): DisplayGapRow[] {
     // 1. Filter out Merge and PR commits if the toggle is ON
     let filteredGaps = gaps;
     if (this.excludeMergeAndPR) {
@@ -169,29 +232,140 @@ export class GapAnalysisComponent implements OnInit {
 
     // 2. Return flat list if grouping is OFF
     if (!this.isGroupedByTicket) {
-      return filteredGaps;
+      return this.filterRows(filteredGaps);
     }
 
     // 3. Group by Ticket ID
-    const map = new Map<string, any>();
+    const map = new Map<string, {
+      ticketId: string;
+      commits: GroupedCommitItem[];
+      forwardMessages: Set<string>;
+      reverseMessages: Set<string>;
+      jiraStatuses: Set<string>;
+      actionImpacts: Set<string>;
+      authors: Set<string>;
+      ticketUrl: string;
+      isGrouped: true;
+    }>();
+
     for (const gap of filteredGaps) {
       const key = gap.ticketId || 'No Ticket';
       if (!map.has(key)) {
         map.set(key, {
-          ticketId: gap.ticketId,
+          ticketId: key,
           commits: [],
-          direction: gap.direction,
-          status: gap.status,
-          actionImpact: gap.actionImpact,
-          author: gap.author,
-          jiraStatus: gap.jiraStatus,
-          ticketUrl: gap.ticketUrl,
+          forwardMessages: new Set<string>(),
+          reverseMessages: new Set<string>(),
+          jiraStatuses: new Set<string>(),
+          actionImpacts: new Set<string>(),
+          authors: new Set<string>(),
+          ticketUrl: '',
           isGrouped: true
         });
       }
-      map.get(key).commits.push({ sha: gap.commitSha, message: gap.commitMessage });
+      const grouped = map.get(key);
+      if (!grouped) {
+        continue;
+      }
+
+      grouped.commits.push({ message: gap.commitMessage });
+      grouped.actionImpacts.add(gap.actionImpact);
+      if (gap.jiraStatus) {
+        gap.jiraStatus
+          .split(',')
+          .map(status => status.trim())
+          .filter(status => status.length > 0 && status.toUpperCase() !== 'N/A')
+          .forEach(status => grouped.jiraStatuses.add(status));
+      }
+      if (gap.author) {
+        grouped.authors.add(gap.author);
+      }
+      if (!grouped.ticketUrl && gap.ticketUrl) {
+        grouped.ticketUrl = gap.ticketUrl;
+      }
+
+      const normalizedMessage = gap.commitMessage.trim().toLowerCase();
+      if (gap.status === 'NEW_ADDED') {
+        grouped.forwardMessages.add(normalizedMessage);
+      } else if (gap.status === 'REMOVED') {
+        grouped.reverseMessages.add(normalizedMessage);
+      } else {
+        grouped.forwardMessages.add(normalizedMessage);
+        grouped.reverseMessages.add(normalizedMessage);
+      }
     }
-    return Array.from(map.values());
+
+    const groupedRows: GroupedGapRow[] = Array.from(map.values()).map(group => {
+      const status = this.deriveGroupedStatus(group.forwardMessages, group.reverseMessages);
+      return {
+        ticketId: group.ticketId,
+        commits: group.commits,
+        status,
+        jiraStatus: Array.from(group.jiraStatuses).join(', '),
+        actionImpact: Array.from(group.actionImpacts).join(' | '),
+        author: Array.from(group.authors).join(', '),
+        ticketUrl: group.ticketUrl,
+        isGrouped: true
+      };
+    });
+
+    return this.filterRows(groupedRows);
+  }
+
+  private deriveGroupedStatus(forwardMessages: Set<string>, reverseMessages: Set<string>): GapStatus {
+    if (forwardMessages.size > 0 && reverseMessages.size === 0) {
+      return 'NEW_ADDED';
+    }
+
+    if (reverseMessages.size > 0 && forwardMessages.size === 0) {
+      return 'REMOVED';
+    }
+
+    const hasSameMessage = Array.from(forwardMessages).some(message => reverseMessages.has(message));
+    return hasSameMessage ? 'DIFF_COMMIT' : 'DIFF_MESSAGE';
+  }
+
+  private filterRows(rows: DisplayGapRow[]): DisplayGapRow[] {
+    return rows.filter(row => {
+      const statusMatch = this.filterGapStatuses.length === 0 || this.filterGapStatuses.includes(row.status);
+      const searchText = [
+        row.ticketId,
+        this.getCommitTextForFilter(row),
+        row.jiraStatus || '',
+        row.actionImpact,
+        row.author || '',
+      ].join(' ');
+
+      return (
+        statusMatch &&
+        this.containsText(searchText, this.filterTextSearch)
+      );
+    });
+  }
+
+  private getCommitTextForFilter(row: DisplayGapRow): string {
+    if ('isGrouped' in row && row.isGrouped) {
+      return row.commits.map(c => c.message).join(' ');
+    }
+
+    return row.commitMessage;
+  }
+
+  private containsText(value: string, filter: string): boolean {
+    if (!filter.trim()) {
+      return true;
+    }
+
+    return value.toLowerCase().includes(filter.trim().toLowerCase());
+  }
+
+  private toBitbucketRef(value: string): string {
+    const trimmedValue = value.trim();
+    if (trimmedValue.startsWith('refs/')) {
+      return trimmedValue;
+    }
+
+    return `refs/tags/${trimmedValue}`;
   }
 
   copyToConfluence() {
@@ -229,7 +403,7 @@ export class GapAnalysisComponent implements OnInit {
       const displayGaps = this.getDisplayGaps(result.gaps);
       if (displayGaps.length === 0) continue;
 
-      const gapHeaders = ['#', 'Ticket', 'Status', 'Author', 'Remark']
+      const gapHeaders = ['#', 'Ticket', 'Status', 'Jira Status', 'Author', 'Remark']
         .map(h => `<th style="${thStyle}">${h}</th>`).join('');
 
       const gapRows = displayGaps.map((gap, index) => {
@@ -247,15 +421,15 @@ export class GapAnalysisComponent implements OnInit {
 
         // Map status to UI text (using actionImpact or status)
         // The user requested Status in the format: Gap-Status (e.g. NEW_ADDED)
-        const remark = gap.status;
+        const remark = gap.actionImpact;
+        const jiraStatus = gap.jiraStatus || 'N/A';
         const author = gap.author || 'Unknown';
-        const jStatus = gap.jiraStatus || 'N/A';
-
         return `
           <tr>
             <td style="${tdStyle}">${index + 1}</td>
             <td style="${tdStyle}">${ticketCell}</td>
-            <td style="${tdStyle}">${jStatus}</td>
+            <td style="${tdStyle}">${this.getStatusLabel(gap.status)}</td>
+            <td style="${tdStyle}">${jiraStatus}</td>
             <td style="${tdStyle}">${author}</td>
             <td style="${tdStyle}">${remark}</td>
           </tr>

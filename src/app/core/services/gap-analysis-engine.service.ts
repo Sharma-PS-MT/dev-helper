@@ -5,18 +5,17 @@ import { BitbucketService } from './bitbucket.service';
 import { GapServiceState } from './gap-analysis-state.service';
 import { BranchGapAnalysis, CommitWithTickets } from '../models/bitbucket.models';
 
-export type GapStatus = 'NEW_ADDED' | 'REMOVING' | 'DIFF_COMMIT' | 'DIFF_COMMIT_MESSAGE';
+export type GapStatus = 'NEW_ADDED' | 'REMOVED' | 'DIFF_COMMIT' | 'DIFF_MESSAGE';
 
 export interface GapEntry {
   ticketId: string;
-  commitSha: string;
   commitMessage: string;
-  direction: 'Forward' | 'Reverse' | 'Both';
   status: GapStatus;
   actionImpact: string;
   author?: string;
   jiraStatus?: string;
   ticketUrl?: string;
+  isGrouped?: false;
 }
 
 export interface ServiceGapResult {
@@ -52,12 +51,12 @@ export class GapAnalysisEngineService {
 
           // Forward Gaps (NEW_ADDED)
           analysis.criticalCommits.forEach(cwt => {
-            gaps.push(this.mapCommitToGap(cwt, 'Forward', 'NEW_ADDED', `Will be introduced to ${targetEnv}.`));
+            gaps.push(...this.mapCommitToGaps(cwt, 'Forward', 'NEW_ADDED', `Will be introduced to ${targetEnv}.`));
           });
 
-          // Reverse Gaps (REMOVING)
+          // Reverse Gaps (REMOVED)
           analysis.incomingCommits.forEach(cwt => {
-            gaps.push(this.mapCommitToGap(cwt, 'Reverse', 'REMOVING', `Alert: This code is missing from ${sourceEnv} and will be deleted from ${targetEnv}.`));
+            gaps.push(...this.mapCommitToGaps(cwt, 'Reverse', 'REMOVED', `Alert: This code is missing from ${sourceEnv} and will be deleted from ${targetEnv}.`));
           });
 
           return {
@@ -75,10 +74,8 @@ export class GapAnalysisEngineService {
             targetEnv,
             gaps: [{
               ticketId: 'ERROR',
-              commitSha: 'N/A',
               commitMessage: `Failed to fetch gap analysis from Bitbucket: ${err.message || 'Unknown error'}`,
-              direction: 'Both',
-              status: 'DIFF_COMMIT_MESSAGE', // Use this as an error indicator
+              status: 'DIFF_MESSAGE', // Use this as an error indicator
               actionImpact: 'API Request Failed'
             }]
           } as ServiceGapResult);
@@ -89,31 +86,27 @@ export class GapAnalysisEngineService {
     return forkJoin(requests);
   }
 
-  private mapCommitToGap(cwt: CommitWithTickets, direction: 'Forward' | 'Reverse', status: GapStatus, actionImpact: string): GapEntry {
-    let ticketId = 'No Ticket';
-    if (cwt.ticketIds && cwt.ticketIds.length > 0) {
-      ticketId = cwt.ticketIds.join(', ');
-    }
-
+  private mapCommitToGaps(cwt: CommitWithTickets, direction: 'Forward' | 'Reverse', status: GapStatus, actionImpact: string): GapEntry[] {
     const author = cwt.commit.author?.user?.display_name || cwt.commit.author?.raw?.split('<')[0]?.trim() || 'Unknown';
-    const jiraStatus = cwt.tickets?.length > 0 
-      ? cwt.tickets.map(t => t.status?.name || 'Unknown').join(', ') 
-      : 'N/A';
-    
-    // We can assume Jira base URL from AuthConfig if needed, but JiraTicket might already have url
-    // For now, if t.url is missing, we'll construct it in the component if we have the base URL
-    const ticketUrl = cwt.tickets?.find(t => t.url)?.url || '';
+    const commitMessage = cwt.commit.message.split('\n')[0];
+    const ticketIds = cwt.ticketIds && cwt.ticketIds.length > 0 ? cwt.ticketIds : ['No Ticket'];
+    const ticketMap = new Map((cwt.tickets || []).map(ticket => [ticket.key, ticket]));
 
-    return {
-      ticketId,
-      commitSha: cwt.commit.hash.substring(0, 8),
-      commitMessage: cwt.commit.message.split('\n')[0], // First line of commit message
-      direction,
-      status,
-      actionImpact,
-      author,
-      jiraStatus,
-      ticketUrl
-    };
+    return ticketIds.map(ticketId => {
+      const jiraTicket = ticketMap.get(ticketId);
+      const jiraStatus = ticketId === 'No Ticket'
+        ? 'N/A'
+        : jiraTicket?.status?.name || 'Not Found in Jira';
+
+      return {
+        ticketId,
+        commitMessage,
+        status,
+        actionImpact,
+        author,
+        jiraStatus,
+        ticketUrl: jiraTicket?.url || '',
+      };
+    });
   }
 }
