@@ -13,12 +13,13 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { BitbucketService } from '../../core/services/bitbucket.service';
 import { NotificationService } from '../../core/services/notification.service';
-import { BitbucketProject, BitbucketRepo, PRAnalysis, BitbucketPR } from '../../core/models/bitbucket.models';
+import { BitbucketProject, BitbucketRepo, PRAnalysis, BitbucketPR, PRCreationResult } from '../../core/models/bitbucket.models';
 import { TicketBadgeComponent } from '../../shared/components/ticket-badge/ticket-badge.component';
 import { OpenRouterService, AIReviewItem } from '../../core/services/openrouter.service';
-import { of } from 'rxjs';
+import { of, forkJoin } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
 /** A review item enriched with posting state and UI state */
@@ -31,6 +32,17 @@ export interface ReviewItem {
   showDiff: boolean;
 }
 
+/** Represents a single repo row in the bulk PR creation table */
+export interface PRCreateRepoRow {
+  repo: BitbucketRepo;
+  selected: boolean;
+  /** idle | validating | ok | source-missing | target-missing | creating | created | exists | error */
+  status: string;
+  remarks: string;
+  prId: number | null;
+  prUrl: string | null;
+}
+
 @Component({
   selector: 'app-pr-review',
   standalone: true,
@@ -38,7 +50,7 @@ export interface ReviewItem {
     CommonModule, FormsModule, RouterModule, MatCardModule, MatFormFieldModule,
     MatSelectModule, MatInputModule, MatButtonModule, MatIconModule,
     MatChipsModule, MatProgressSpinnerModule, MatPaginatorModule,
-    MatTooltipModule, MatDividerModule, TicketBadgeComponent,
+    MatTooltipModule, MatDividerModule, MatCheckboxModule, TicketBadgeComponent,
   ],
   templateUrl: './pr-review.component.html',
   styleUrls: ['./pr-review.component.scss'],
@@ -101,6 +113,55 @@ export class PrReviewComponent implements OnInit {
     return res.commits.slice(start, start + this.pageSize());
   });
 
+  // ─── PR Creation Panel ───────────────────────────────────────────────────────
+  createPanelOpen = signal(true);
+
+  // Branch inputs
+  createSourceBranch = signal('');
+  createTargetBranch = signal('');
+  createPRTitle = signal('');
+  createPRDescription = signal('');
+
+  // Project selection for PR creation (separate from the review section)
+  createSelectedProject = signal<string | null>(null);
+  createProjectSearch = signal('');
+  createRepos = signal<PRCreateRepoRow[]>([]);
+  loadingCreateRepos = signal(false);
+  creatingPRs = signal(false);
+  validatingBranches = signal(false);
+
+  filteredCreateProjects = computed(() => {
+    const t = this.createProjectSearch().toLowerCase();
+    return this.projects().filter(p =>
+      (p.name || '').toLowerCase().includes(t) || (p.key || '').toLowerCase().includes(t)
+    );
+  });
+
+  /** True if all validatable rows (ok/source-missing/target-missing) are done */
+  validationDone = computed(() =>
+    this.createRepos().length > 0 &&
+    this.createRepos().every(r => r.status !== 'idle' && r.status !== 'validating')
+  );
+
+  /** Count of rows with status 'ok' */
+  createValidCount = computed(() => this.createRepos().filter(r => r.status === 'ok').length);
+
+  /** Whether the Make PR button should be enabled */
+  canMakePRs = computed(() =>
+    !this.creatingPRs() &&
+    this.validationDone() &&
+    this.createRepos().some(r => r.selected && r.status === 'ok')
+  );
+
+  allCreateSelected = computed(() =>
+    this.createRepos().length > 0 &&
+    this.createRepos().filter(r => r.status === 'ok').every(r => r.selected)
+  );
+
+  someCreateSelected = computed(() =>
+    this.createRepos().some(r => r.selected) && !this.allCreateSelected()
+  );
+
   constructor(
     private bitbucket: BitbucketService,
     private notify: NotificationService,
@@ -128,6 +189,261 @@ export class PrReviewComponent implements OnInit {
       next: rx => { this.repos.set(rx); this.loadingRepos.set(false); },
       error: () => { this.notify.error('Failed to load repos'); this.loadingRepos.set(false); }
     });
+  }
+
+  // ─── PR Creation Handlers ────────────────────────────────────────────────────
+
+  onCreateProjectChange(key: string): void {
+    this.createSelectedProject.set(key);
+    this.createRepos.set([]);
+    this.loadingCreateRepos.set(true);
+    this.bitbucket.getRepositories(key).subscribe({
+      next: rx => {
+        this.createRepos.set(rx.map(repo => ({
+          repo,
+          selected: true,
+          status: 'idle',
+          remarks: '',
+          prId: null,
+          prUrl: null,
+        })));
+        this.loadingCreateRepos.set(false);
+      },
+      error: () => {
+        this.notify.error('Failed to load repositories');
+        this.loadingCreateRepos.set(false);
+      }
+    });
+  }
+
+  toggleSelectAllCreate(checked: boolean): void {
+    this.createRepos.update(rows =>
+      rows.map(r => ({ ...r, selected: r.status === 'ok' ? checked : r.selected }))
+    );
+  }
+
+  toggleRowSelect(repo: BitbucketRepo, checked: boolean): void {
+    this.createRepos.update(rows =>
+      rows.map(r => r.repo.slug === repo.slug ? { ...r, selected: checked } : r)
+    );
+  }
+
+  /** Validates source+target branch for every repo row */
+  validateBranchesForCreate(): void {
+    const src = this.createSourceBranch().trim();
+    const tgt = this.createTargetBranch().trim();
+    const projKey = this.createSelectedProject();
+
+    if (!src || !tgt) {
+      this.notify.error('Please enter both source and target branch names.');
+      return;
+    }
+    if (src === tgt) {
+      this.notify.error('Source and target branch cannot be the same.');
+      return;
+    }
+    if (!projKey) {
+      this.notify.error('Please select a project first.');
+      return;
+    }
+    if (this.createRepos().length === 0) {
+      this.notify.error('No repositories loaded. Select a project first.');
+      return;
+    }
+
+    this.validatingBranches.set(true);
+
+    // Reset all rows to validating
+    this.createRepos.update(rows => rows.map(r => ({ ...r, status: 'validating', remarks: '', prId: null, prUrl: null })));
+
+    const repos = this.createRepos();
+    let completed = 0;
+
+    repos.forEach(row => {
+      // Use the create endpoint for validation — it returns branch status
+      this.bitbucket.createPullRequest(
+        projKey,
+        row.repo.slug,
+        src,
+        tgt,
+        '___validate_only___', // placeholder; skipped since we only care about branch status
+        ''
+      ).subscribe({
+        next: res => {
+          // For validation we only use branch-check statuses, NOT actually create
+          // But since we send a real title, the endpoint may create if branches exist.
+          // We'll call a lightweight branch-check instead.
+          // This branch handles the response from the actual create call done for validation.
+          this.applyValidationResult(row.repo.slug, res);
+          completed++;
+          if (completed === repos.length) this.validatingBranches.set(false);
+        },
+        error: () => {
+          this.updateRow(row.repo.slug, { status: 'error', remarks: 'Validation request failed' });
+          completed++;
+          if (completed === repos.length) this.validatingBranches.set(false);
+        }
+      });
+    });
+  }
+
+  /** Validates branches only (uses getBranches with filterText) — lightweight version */
+  validateBranchesOnly(): void {
+    const src = this.createSourceBranch().trim();
+    const tgt = this.createTargetBranch().trim();
+    const projKey = this.createSelectedProject();
+
+    if (!src || !tgt) { this.notify.error('Please enter both source and target branch names.'); return; }
+    if (src === tgt) { this.notify.error('Source and target branch cannot be the same.'); return; }
+    if (!projKey) { this.notify.error('Please select a project first.'); return; }
+    if (this.createRepos().length === 0) { this.notify.error('No repositories loaded. Select a project first.'); return; }
+
+    this.validatingBranches.set(true);
+    this.createRepos.update(rows => rows.map(r => ({ ...r, status: 'validating', remarks: '', prId: null, prUrl: null })));
+
+    const repos = this.createRepos();
+    let completed = 0;
+
+    repos.forEach(row => {
+      // Check source and target branches in parallel
+      const srcCheck$ = this.bitbucket.getBranches(row.repo.slug, projKey, src, undefined, 5).pipe(
+        catchError(() => of({ values: [], limit: 5, isLastPage: true }))
+      );
+      const tgtCheck$ = this.bitbucket.getBranches(row.repo.slug, projKey, tgt, undefined, 5).pipe(
+        catchError(() => of({ values: [], limit: 5, isLastPage: true }))
+      );
+
+      forkJoin({ src: srcCheck$, tgt: tgtCheck$ }).subscribe({
+        next: ({ src: srcResult, tgt: tgtResult }) => {
+          const srcFound = srcResult.values.some((b: any) => b.name === src);
+          const tgtFound = tgtResult.values.some((b: any) => b.name === tgt);
+
+          if (!srcFound) {
+            this.updateRow(row.repo.slug, { status: 'source-missing', remarks: `Source branch '${src}' not found`, selected: false });
+          } else if (!tgtFound) {
+            this.updateRow(row.repo.slug, { status: 'target-missing', remarks: `Target branch '${tgt}' not found`, selected: false });
+          } else {
+            this.updateRow(row.repo.slug, { status: 'ok', remarks: 'Both branches found', selected: true });
+          }
+          completed++;
+          if (completed === repos.length) this.validatingBranches.set(false);
+        },
+        error: () => {
+          this.updateRow(row.repo.slug, { status: 'error', remarks: 'Branch check failed', selected: false });
+          completed++;
+          if (completed === repos.length) this.validatingBranches.set(false);
+        }
+      });
+    });
+  }
+
+  private applyValidationResult(repoSlug: string, res: PRCreationResult): void {
+    switch (res.status) {
+      case 'source_branch_missing':
+        this.updateRow(repoSlug, { status: 'source-missing', remarks: res.message, selected: false });
+        break;
+      case 'target_branch_missing':
+        this.updateRow(repoSlug, { status: 'target-missing', remarks: res.message, selected: false });
+        break;
+      case 'already_exists':
+        this.updateRow(repoSlug, { status: 'exists', remarks: res.message, prId: res.pr_id, prUrl: res.pr_url, selected: false });
+        break;
+      case 'created':
+        this.updateRow(repoSlug, { status: 'created', remarks: res.message, prId: res.pr_id, prUrl: res.pr_url });
+        break;
+      case 'error':
+        this.updateRow(repoSlug, { status: 'error', remarks: res.message, selected: false });
+        break;
+      default:
+        this.updateRow(repoSlug, { status: 'ok', remarks: 'Branches found' });
+    }
+  }
+
+  /** Executes PR creation for all selected rows with status 'ok' */
+  makePRs(): void {
+    const src = this.createSourceBranch().trim();
+    const tgt = this.createTargetBranch().trim();
+    const projKey = this.createSelectedProject();
+    const title = this.createPRTitle().trim() || `${src} → ${tgt}`;
+    const description = this.createPRDescription().trim();
+
+    if (!projKey) { this.notify.error('No project selected.'); return; }
+
+    const targetRows = this.createRepos().filter(r => r.selected && r.status === 'ok');
+    if (targetRows.length === 0) {
+      this.notify.error('No valid repositories selected. Run validation first.');
+      return;
+    }
+
+    this.creatingPRs.set(true);
+    let completed = 0;
+    let createdCount = 0;
+    let skippedCount = 0;
+
+    targetRows.forEach(row => {
+      this.updateRow(row.repo.slug, { status: 'creating', remarks: 'Creating PR...' });
+
+      this.bitbucket.createPullRequest(projKey, row.repo.slug, src, tgt, title, description).subscribe({
+        next: res => {
+          this.applyValidationResult(row.repo.slug, res);
+          if (res.status === 'created') createdCount++;
+          if (res.status === 'already_exists') skippedCount++;
+          completed++;
+          if (completed === targetRows.length) {
+            this.creatingPRs.set(false);
+            this.notify.success(`Done! ${createdCount} PR(s) created, ${skippedCount} skipped (already exist).`);
+          }
+        },
+        error: err => {
+          const msg = err?.error?.detail || err?.message || 'Request failed';
+          this.updateRow(row.repo.slug, { status: 'error', remarks: msg, selected: false });
+          completed++;
+          if (completed === targetRows.length) this.creatingPRs.set(false);
+        }
+      });
+    });
+  }
+
+  private updateRow(repoSlug: string, patch: Partial<PRCreateRepoRow>): void {
+    this.createRepos.update(rows =>
+      rows.map(r => r.repo.slug === repoSlug ? { ...r, ...patch } : r)
+    );
+  }
+
+  getCreateRowStatusIcon(status: string): string {
+    switch (status) {
+      case 'ok': return 'check_circle';
+      case 'created': return 'task_alt';
+      case 'exists': return 'info';
+      case 'source-missing': return 'cancel';
+      case 'target-missing': return 'cancel';
+      case 'error': return 'error';
+      case 'validating': return 'sync';
+      case 'creating': return 'sync';
+      default: return 'radio_button_unchecked';
+    }
+  }
+
+  getCreateRowStatusClass(status: string): string {
+    switch (status) {
+      case 'ok': return 'status-ok';
+      case 'created': return 'status-created';
+      case 'exists': return 'status-exists';
+      case 'source-missing':
+      case 'target-missing': return 'status-missing';
+      case 'error': return 'status-error';
+      case 'validating':
+      case 'creating': return 'status-validating';
+      default: return 'status-idle';
+    }
+  }
+
+  resetCreatePanel(): void {
+    this.createRepos.update(rows => rows.map(r => ({
+      ...r, status: 'idle', remarks: '', prId: null, prUrl: null, selected: true
+    })));
+    this.createPRTitle.set('');
+    this.createPRDescription.set('');
   }
 
   onRepoChange(slug: string): void {

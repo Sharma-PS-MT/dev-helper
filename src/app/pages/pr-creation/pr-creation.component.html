@@ -1,0 +1,332 @@
+<div class="page-container fade-in-up">
+
+  <!-- ═══ Page Header ════════════════════════════════════════════════════════ -->
+  <div class="page-header">
+    <div class="header-icon-wrap">
+      <mat-icon>call_merge</mat-icon>
+    </div>
+    <div class="header-text">
+      <h1>Create Pull Requests</h1>
+      <p>Bulk-create PRs across multiple repositories from a single branch pair. Validates branches and skips duplicates automatically.</p>
+    </div>
+    <div class="header-actions" *ngIf="repos().length > 0">
+      <div class="stats-bar">
+        <div class="stat stat-total">
+          <span class="stat-num">{{ repos().length }}</span>
+          <span class="stat-lbl">Repos</span>
+        </div>
+        <div class="stat stat-ok" *ngIf="countOk() > 0">
+          <span class="stat-num">{{ countOk() }}</span>
+          <span class="stat-lbl">Ready</span>
+        </div>
+        <div class="stat stat-created" *ngIf="countCreated() > 0">
+          <span class="stat-num">{{ countCreated() }}</span>
+          <span class="stat-lbl">Created</span>
+        </div>
+        <div class="stat stat-error" *ngIf="countError() + countMissing() > 0">
+          <span class="stat-num">{{ countError() + countMissing() }}</span>
+          <span class="stat-lbl">Issues</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Configuration Card ══════════════════════════════════════════════════ -->
+  <mat-card class="config-card">
+    <div class="config-card-header">
+      <mat-icon>tune</mat-icon>
+      <span>PR Configuration</span>
+    </div>
+
+    <!-- Branch + Title + Description grid -->
+    <div class="config-grid">
+
+      <!-- Source Branch -->
+      <mat-form-field appearance="outline" class="w-full">
+        <mat-label>Source Branch</mat-label>
+        <input matInput
+          [ngModel]="createSourceBranch()"
+          (ngModelChange)="createSourceBranch.set($event)"
+          placeholder="e.g. feature/my-feature" />
+        <mat-icon matPrefix>call_split</mat-icon>
+        <mat-hint>Branch you want to merge FROM</mat-hint>
+      </mat-form-field>
+
+      <!-- Target Branch -->
+      <mat-form-field appearance="outline" class="w-full">
+        <mat-label>Target Branch</mat-label>
+        <input matInput
+          [ngModel]="createTargetBranch()"
+          (ngModelChange)="createTargetBranch.set($event)"
+          placeholder="e.g. develop" />
+        <mat-icon matPrefix>merge_type</mat-icon>
+        <mat-hint>Branch you want to merge INTO</mat-hint>
+      </mat-form-field>
+
+      <!-- PR Title -->
+      <mat-form-field appearance="outline" class="w-full">
+        <mat-label>PR Title</mat-label>
+        <input matInput
+          [ngModel]="createPRTitle()"
+          (ngModelChange)="createPRTitle.set($event)"
+          placeholder="Defaults to: source → target" />
+        <mat-icon matPrefix>title</mat-icon>
+        <mat-hint>Leave blank to use branch names as title</mat-hint>
+      </mat-form-field>
+
+      <!-- PR Description -->
+      <mat-form-field appearance="outline" class="w-full">
+        <mat-label>PR Description</mat-label>
+        <input matInput
+          [ngModel]="createPRDescription()"
+          (ngModelChange)="createPRDescription.set($event)"
+          placeholder="Optional description..." />
+        <mat-icon matPrefix>notes</mat-icon>
+      </mat-form-field>
+
+    </div>
+
+    <!-- Project selector row -->
+    <div class="project-row">
+      <mat-form-field appearance="outline" class="project-field">
+        <mat-label>Project</mat-label>
+        <mat-select
+          [ngModel]="selectedProject()"
+          (ngModelChange)="onProjectChange($event)"
+          [disabled]="loadingProjects() || loadingRepos()">
+          <div class="select-search-container" (keydown)="$event.stopPropagation()">
+            <input
+              placeholder="Search project..."
+              class="select-search-input"
+              [ngModel]="projectSearch()"
+              (ngModelChange)="projectSearch.set($event)"
+              (click)="$event.stopPropagation()">
+          </div>
+          <mat-option *ngIf="loadingProjects()">Loading projects...</mat-option>
+          <mat-option *ngFor="let p of filteredProjects()" [value]="p.key">
+            {{ p.name }}
+          </mat-option>
+        </mat-select>
+        <mat-spinner *ngIf="loadingRepos()" matSuffix diameter="20"></mat-spinner>
+        <mat-hint *ngIf="repos().length > 0">{{ repos().length }} repositories loaded</mat-hint>
+      </mat-form-field>
+
+      <!-- Action buttons -->
+      <div class="action-buttons">
+        <button mat-stroked-button class="validate-btn"
+          id="btn-validate-branches"
+          (click)="validateBranchesOnly()"
+          [disabled]="validatingBranches() || creatingPRs() || !selectedProject() || repos().length === 0 || !createSourceBranch() || !createTargetBranch()">
+          <mat-spinner *ngIf="validatingBranches()" diameter="16"></mat-spinner>
+          <mat-icon *ngIf="!validatingBranches()">fact_check</mat-icon>
+          {{ validatingBranches() ? 'Validating...' : 'Validate Branches' }}
+        </button>
+
+        <button mat-flat-button class="make-pr-btn"
+          id="btn-make-prs"
+          (click)="makePRs()"
+          [disabled]="!canMakePRs()">
+          <mat-spinner *ngIf="creatingPRs()" diameter="16"></mat-spinner>
+          <mat-icon *ngIf="!creatingPRs()">call_merge</mat-icon>
+          {{ creatingPRs() ? 'Creating PRs...' : 'Make PR' }}
+        </button>
+
+        <button mat-icon-button
+          matTooltip="Reset validation results"
+          (click)="resetResults()"
+          *ngIf="validationDone()"
+          class="reset-btn">
+          <mat-icon>refresh</mat-icon>
+        </button>
+
+        <button mat-icon-button
+          matTooltip="Clear all"
+          (click)="clearAll()"
+          *ngIf="selectedProject()"
+          class="clear-btn">
+          <mat-icon>clear_all</mat-icon>
+        </button>
+      </div>
+    </div>
+  </mat-card>
+
+  <!-- ═══ Validation Summary Bar ════════════════════════════════════════════ -->
+  <div class="validation-summary fade-in-up" *ngIf="validationDone()">
+    <div class="summary-chip summary-ok">
+      <mat-icon>check_circle</mat-icon>
+      <span>{{ countOk() }} Ready</span>
+    </div>
+    <div class="summary-chip summary-created" *ngIf="countCreated() > 0">
+      <mat-icon>task_alt</mat-icon>
+      <span>{{ countCreated() }} Created</span>
+    </div>
+    <div class="summary-chip summary-exists" *ngIf="countExists() > 0">
+      <mat-icon>info</mat-icon>
+      <span>{{ countExists() }} Already Exists</span>
+    </div>
+    <div class="summary-chip summary-missing" *ngIf="countMissing() > 0">
+      <mat-icon>cancel</mat-icon>
+      <span>{{ countMissing() }} Branch Missing</span>
+    </div>
+    <div class="summary-chip summary-error" *ngIf="countError() > 0">
+      <mat-icon>error</mat-icon>
+      <span>{{ countError() }} Errors</span>
+    </div>
+
+    <div class="summary-spacer"></div>
+
+    <div class="summary-action-hint" *ngIf="countOk() > 0 && !creatingPRs()">
+      <mat-icon>touch_app</mat-icon>
+      {{ repos().filter(r => r.selected && r.status === 'ok').length }} repos selected — click <strong>Make PR</strong> to proceed
+    </div>
+  </div>
+
+  <!-- ═══ Repository Table ═══════════════════════════════════════════════════ -->
+  <mat-card class="repo-table-card fade-in-up" *ngIf="repos().length > 0">
+
+    <div class="table-header">
+      <div class="table-title">
+        <mat-icon>storage</mat-icon>
+        Repositories
+        <span class="table-count">{{ repos().length }}</span>
+      </div>
+      <div class="table-meta text-muted" *ngIf="validationDone()">
+        {{ repos().filter(r => r.selected).length }} of {{ repos().length }} selected
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="repo-table">
+        <thead>
+          <tr>
+            <th class="col-check">
+              <mat-checkbox
+                [checked]="allSelected()"
+                [indeterminate]="someSelected()"
+                (change)="toggleSelectAll($event.checked)"
+                [disabled]="creatingPRs() || validatingBranches()"
+                matTooltip="Select / deselect all valid repositories">
+              </mat-checkbox>
+            </th>
+            <th class="col-repo">Repository</th>
+            <th class="col-status">Branch Status</th>
+            <th class="col-remarks">Remarks / Response</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of repos(); let i = index"
+            class="repo-row"
+            [class.row-selected]="row.selected"
+            [class.row-error]="row.status === 'source-missing' || row.status === 'target-missing' || row.status === 'error'"
+            [class.row-ok]="row.status === 'ok'"
+            [class.row-created]="row.status === 'created'"
+            [class.row-exists]="row.status === 'exists'">
+
+            <!-- Checkbox -->
+            <td class="col-check">
+              <mat-checkbox
+                [checked]="row.selected"
+                (change)="toggleRowSelect(row.repo, $event.checked)"
+                [disabled]="row.status === 'source-missing' ||
+                            row.status === 'target-missing' ||
+                            row.status === 'error' ||
+                            row.status === 'creating' ||
+                            creatingPRs() ||
+                            validatingBranches()"
+                [matTooltip]="(row.status === 'source-missing' || row.status === 'target-missing') ? 'Cannot select — branch missing' : (row.status === 'created' || row.status === 'exists') ? 'Already processed' : ''">
+              </mat-checkbox>
+            </td>
+
+            <!-- Repository -->
+            <td class="col-repo">
+              <div class="repo-name-cell">
+                <div class="repo-index">{{ i + 1 }}</div>
+                <div class="repo-info">
+                  <span class="repo-name">{{ row.repo.name }}</span>
+                  <span class="repo-slug">{{ row.repo.slug }}</span>
+                </div>
+              </div>
+            </td>
+
+            <!-- Branch Status -->
+            <td class="col-status">
+              <div class="status-badge" [class]="getStatusClass(row.status)">
+                <mat-icon class="status-icon"
+                  [class.spin-icon]="row.status === 'validating' || row.status === 'creating'">
+                  {{ getStatusIcon(row.status) }}
+                </mat-icon>
+                <span class="status-label">
+                  <ng-container [ngSwitch]="row.status">
+                    <ng-container *ngSwitchCase="'idle'">Pending</ng-container>
+                    <ng-container *ngSwitchCase="'validating'">Checking...</ng-container>
+                    <ng-container *ngSwitchCase="'ok'">Branches Found</ng-container>
+                    <ng-container *ngSwitchCase="'source-missing'">Source Missing</ng-container>
+                    <ng-container *ngSwitchCase="'target-missing'">Target Missing</ng-container>
+                    <ng-container *ngSwitchCase="'creating'">Creating PR...</ng-container>
+                    <ng-container *ngSwitchCase="'created'">PR Created</ng-container>
+                    <ng-container *ngSwitchCase="'exists'">Already Exists</ng-container>
+                    <ng-container *ngSwitchCase="'error'">Error</ng-container>
+                  </ng-container>
+                </span>
+              </div>
+            </td>
+
+            <!-- Remarks / Response -->
+            <td class="col-remarks">
+              <div class="remarks-cell">
+                <ng-container *ngIf="row.prUrl; else remarkText">
+                  <a [href]="row.prUrl" target="_blank" class="pr-link"
+                    matTooltip="Open PR in Bitbucket">
+                    <mat-icon>open_in_new</mat-icon>
+                    {{ row.remarks }}
+                  </a>
+                </ng-container>
+                <ng-template #remarkText>
+                  <span
+                    [class.remark-error]="row.status === 'source-missing' || row.status === 'target-missing' || row.status === 'error'"
+                    [class.remark-success]="row.status === 'created'"
+                    [class.remark-info]="row.status === 'exists'">
+                    {{ row.remarks || '—' }}
+                  </span>
+                </ng-template>
+              </div>
+            </td>
+
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </mat-card>
+
+  <!-- ═══ Empty / Loading States ════════════════════════════════════════════ -->
+  <div class="empty-state fade-in-up"
+    *ngIf="!selectedProject() && !loadingProjects() && repos().length === 0">
+    <div class="empty-icon-wrap">
+      <mat-icon>call_merge</mat-icon>
+    </div>
+    <h3>Select a Project to Get Started</h3>
+    <p>Choose a Bitbucket project above, fill in the branch names, validate, then create PRs across all repositories in one click.</p>
+    <div class="empty-steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">Enter source &amp; target branch names</div>
+      </div>
+      <div class="step-arrow"><mat-icon>chevron_right</mat-icon></div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">Select a project — all repos load automatically</div>
+      </div>
+      <div class="step-arrow"><mat-icon>chevron_right</mat-icon></div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">Validate branches, then click Make PR</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading-state" *ngIf="loadingRepos()">
+    <mat-spinner diameter="40"></mat-spinner>
+    <p>Loading repositories...</p>
+  </div>
+
+</div>

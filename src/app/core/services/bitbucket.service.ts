@@ -5,7 +5,7 @@ import { map, switchMap, catchError } from 'rxjs/operators';
 import { AuthConfigService } from './auth-config.service';
 import {
   BitbucketProject, BitbucketRepo, BitbucketBranch, BitbucketTag,
-  BitbucketCommit, BitbucketPR, PRAnalysis, PRGap, CommitWithTickets, BranchComparison, TicketSummary, BranchGapAnalysis
+  BitbucketCommit, BitbucketPR, PRAnalysis, PRGap, CommitWithTickets, BranchComparison, TicketSummary, BranchGapAnalysis, PRCreationResult
 } from '../models/bitbucket.models';
 import { JiraService } from './jira.service';
 import { JiraTicket, resolveStatusCategory } from '../models/jira.models';
@@ -444,5 +444,31 @@ export class BitbucketService {
       else summary.other++;
     }
     return summary;
+  }
+
+  // ── Create Pull Request ──────────────────────────────────────────────────────
+
+  /**
+   * Create a PR from sourceBranch → targetBranch in the given repo.
+   * The backend handles: branch existence check, duplicate PR detection, creation.
+   * Returns a PRCreationResult with status/remarks for the UI table.
+   */
+  createPullRequest(
+    projectKey: string,
+    repoSlug: string,
+    sourceBranch: string,
+    targetBranch: string,
+    title: string,
+    description: string = ''
+  ): Observable<PRCreationResult> {
+    return this.http.post<PRCreationResult>('/python-ai/bitbucket/pull-request/create', {
+      ...this.creds,
+      project_key: projectKey,
+      repo_slug: repoSlug,
+      source_branch: sourceBranch,
+      target_branch: targetBranch,
+      title,
+      description,
+    });
   }
 }

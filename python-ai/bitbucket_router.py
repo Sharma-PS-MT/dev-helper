@@ -143,12 +143,14 @@ def bb_get_branches(req: BBBranchRequest):
         params["filterText"] = req.filter_text
     if req.start is not None:
         params["start"] = req.start
+    params["boostMatches"] = "true"
 
     return _bb_get(
         req.base_url, req.token,
-        f"/rest/api/1.0/projects/{req.project_key}/repos/{req.repo_slug}/branches",
+        f"/rest/api/latest/projects/{req.project_key}/repos/{req.repo_slug}/branches",
         params
     )
+
 
 
 @router.post("/tags")
@@ -275,6 +277,15 @@ class BBPRCommentRequest(BBBase):
     line_type: Optional[str] = None   # "CONTEXT" | "ADDED" | "REMOVED"
 
 
+class BBCreatePRRequest(BBBase):
+    project_key: str
+    repo_slug: str
+    source_branch: str
+    target_branch: str
+    title: str
+    description: Optional[str] = ""
+
+
 @router.post("/pull-request/comment")
 def bb_post_pr_comment(req: BBPRCommentRequest):
     """
@@ -317,3 +328,137 @@ def bb_post_pr_comment(req: BBPRCommentRequest):
     except requests.exceptions.Timeout:
         raise HTTPException(status_code=504, detail="Bitbucket server timed out posting comment")
 
+
+# ── Create Pull Request ───────────────────────────────────────────────────────
+
+def _branch_exists(base_url: str, token: str, project_key: str, repo_slug: str, branch_name: str) -> bool:
+    """Return True if the given branch exists in the repo (uses filterText search)."""
+    try:
+        data = _bb_get(
+            base_url, token,
+            f"/rest/api/latest/projects/{project_key}/repos/{repo_slug}/branches",
+            {"filterText": branch_name, "start": 0, "limit": 20, "boostMatches": "true"},
+        )
+        return any(b.get("displayId") == branch_name for b in data.get("values", []))
+    except HTTPException:
+        return False
+
+
+
+def _find_open_pr(base_url: str, token: str, project_key: str, repo_slug: str, source_branch: str, target_branch: str) -> Optional[Dict]:
+    """Return the first open PR matching source→target, or None."""
+    try:
+        data = _bb_get(
+            base_url, token,
+            f"/rest/api/1.0/projects/{project_key}/repos/{repo_slug}/pull-requests",
+            {"state": "OPEN", "limit": 100, "at": f"refs/heads/{target_branch}"},
+        )
+        for pr in data.get("values", []):
+            from_id = pr.get("fromRef", {}).get("displayId", "")
+            to_id = pr.get("toRef", {}).get("displayId", "")
+            if from_id == source_branch and to_id == target_branch:
+                return pr
+    except HTTPException:
+        pass
+    return None
+
+
+@router.post("/pull-request/create")
+def bb_create_pull_request(req: BBCreatePRRequest):
+    """
+    Create a Pull Request from source_branch → target_branch in a repository.
+
+    Validation steps:
+      1. Check source branch exists.
+      2. Check target branch exists.
+      3. Check if an open PR with the same from/to already exists (skip if so).
+      4. Create the PR if all checks pass.
+
+    Returns a structured status response so the Angular UI can show per-repo remarks.
+    """
+    # 1. Check source branch
+    if not _branch_exists(req.base_url, req.token, req.project_key, req.repo_slug, req.source_branch):
+        return {
+            "status": "source_branch_missing",
+            "pr_id": None,
+            "pr_url": None,
+            "message": f"Source branch '{req.source_branch}' not found in this repository.",
+        }
+
+    # 2. Check target branch
+    if not _branch_exists(req.base_url, req.token, req.project_key, req.repo_slug, req.target_branch):
+        return {
+            "status": "target_branch_missing",
+            "pr_id": None,
+            "pr_url": None,
+            "message": f"Target branch '{req.target_branch}' not found in this repository.",
+        }
+
+    # 3. Check for existing open PR
+    existing = _find_open_pr(req.base_url, req.token, req.project_key, req.repo_slug, req.source_branch, req.target_branch)
+    if existing:
+        pr_url = existing.get("links", {}).get("self", [{}])[0].get("href", "")
+        return {
+            "status": "already_exists",
+            "pr_id": existing.get("id"),
+            "pr_url": pr_url,
+            "message": f"PR #{existing.get('id')} already exists ({req.source_branch} → {req.target_branch}).",
+        }
+
+    # 4. Create the PR
+    url = (
+        req.base_url.rstrip("/")
+        + f"/rest/api/1.0/projects/{req.project_key}/repos/{req.repo_slug}/pull-requests"
+    )
+    headers = {
+        "Authorization": _auth_header(req.token),
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    body = {
+        "title": req.title,
+        "description": req.description or "",
+        "state": "OPEN",
+        "open": True,
+        "closed": False,
+        "fromRef": {
+            "id": f"refs/heads/{req.source_branch}",
+            "repository": {
+                "slug": req.repo_slug,
+                "project": {"key": req.project_key},
+            },
+        },
+        "toRef": {
+            "id": f"refs/heads/{req.target_branch}",
+            "repository": {
+                "slug": req.repo_slug,
+                "project": {"key": req.project_key},
+            },
+        },
+        "locked": False,
+        "reviewers": [],
+    }
+
+    try:
+        resp = requests.post(url, headers=headers, json=body, timeout=30, verify=False)
+        if resp.status_code == 401:
+            raise HTTPException(status_code=401, detail="Bitbucket authentication failed — check token.")
+        if not resp.ok:
+            return {
+                "status": "error",
+                "pr_id": None,
+                "pr_url": None,
+                "message": f"Bitbucket error {resp.status_code}: {resp.text[:300]}",
+            }
+        data = resp.json()
+        pr_url = data.get("links", {}).get("self", [{}])[0].get("href", "")
+        return {
+            "status": "created",
+            "pr_id": data.get("id"),
+            "pr_url": pr_url,
+            "message": f"PR #{data.get('id')} created successfully.",
+        }
+    except requests.exceptions.ConnectionError as exc:
+        raise HTTPException(status_code=503, detail=f"Cannot reach Bitbucket server: {exc}")
+    except requests.exceptions.Timeout:
+        raise HTTPException(status_code=504, detail="Bitbucket server timed out creating PR")

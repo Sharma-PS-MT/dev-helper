@@ -11,6 +11,7 @@ import { AuthConfigService } from '../../core/services/auth-config.service';
 const PAGE_TITLES: Record<string, string> = {
   '/dashboard': 'Dashboard',
   '/pr-review': 'PR Review',
+  '/pr-creation': 'Create Pull Requests',
   '/branch-compare': 'Branch / Tag Compare',
   '/settings': 'Settings',
 };

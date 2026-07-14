@@ -114,3 +114,11 @@ export interface BranchGapAnalysis {
   /** Raw total commits fetched to→from before dedup */
   totalReverse: number;
 }
+
+/** Response from POST /bitbucket/pull-request/create */
+export interface PRCreationResult {
+  status: 'created' | 'already_exists' | 'source_branch_missing' | 'target_branch_missing' | 'error';
+  pr_id: number | null;
+  pr_url: string | null;
+  message: string;
+}

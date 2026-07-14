@@ -35,6 +35,7 @@ export class App {
     { label: 'My Tickets',     icon: 'assignment_ind',   path: '/my-tickets' },
     { label: 'ArgoCD Apps',    icon: 'apps',             path: '/argocd-dashboard' },
     { label: 'PR Review',      icon: 'rate_review',      path: '/pr-review' },
+    { label: 'Create PR',      icon: 'call_merge',       path: '/pr-creation' },
     { label: 'Branch Compare', icon: 'compare_arrows',   path: '/branch-compare' },
     { label: 'IAM Tokens',     icon: 'vpn_key',          path: '/token-gen' },
     { label: 'JSON Beautifier',icon: 'data_object',      path: '/json-viewer' },

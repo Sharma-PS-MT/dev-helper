@@ -11,6 +11,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/pr-review/pr-review.component').then(m => m.PrReviewComponent),
   },
   {
+    path: 'pr-creation',
+    loadComponent: () => import('./pages/pr-creation/pr-creation.component').then(m => m.PrCreationComponent),
+  },
+  {
     path: 'branch-compare',
     loadComponent: () => import('./pages/branch-compare/branch-compare.component').then(m => m.BranchCompareComponent),
   },
