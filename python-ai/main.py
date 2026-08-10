@@ -7,7 +7,7 @@ Routers registered:
   - Crypto AI Predictions  →  /predict  /train  /backtest  /sentiment
   - ArgoCD Proxy           →  /argocd/session  /argocd/applications
   - Jira Proxy             →  /jira/myself  /jira/issue  /jira/issues/batch
-                               /jira/search  /jira/worklog
+                               /jira/search
   - Bitbucket Proxy        →  /bitbucket/projects  /bitbucket/repos
                                /bitbucket/branches  /bitbucket/tags
                                /bitbucket/pull-request  /bitbucket/pull-request/commits
@@ -66,7 +66,7 @@ def health():
             "argocd_proxy":     ["/argocd/session", "/argocd/applications"],
             "jira_proxy":       [
                 "/jira/myself", "/jira/issue", "/jira/issues/batch",
-                "/jira/search", "/jira/worklog"
+                "/jira/search"
             ],
             "bitbucket_proxy":  [
                 "/bitbucket/projects", "/bitbucket/repos",

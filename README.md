@@ -16,7 +16,6 @@
 *   **Bitbucket & Jira Integration:** Deep integration with Atlassian suite for real-time tracking.
 *   **PR Review & Gap Analysis:** Automated identification of missing Jira tickets or open issues in Pull Requests.
 *   **Branch & Tag Comparison:** Visual comparison of repository states with associated Jira ticket statuses.
-*   **Worked Tickets Report:** Comprehensive analysis of your worklogs and Jira activity within custom date ranges.
 
 ### 🏠 Personal Domain (Private)
 *   **AI Crypto Prediction:** Advanced price forecasting using FastAPI-based ML models.

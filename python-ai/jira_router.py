@@ -76,10 +76,6 @@ class JiraSearchRequest(JiraBase):
     start_at: int = 0
 
 
-class JiraWorklogRequest(JiraBase):
-    issue_key: str
-
-
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/myself")
@@ -146,14 +142,3 @@ def jira_search(req: JiraSearchRequest):
     return {"issues": data.get("issues", []), "total": data.get("total", 0)}
 
 
-@router.post("/worklog")
-def jira_get_worklog(req: JiraWorklogRequest):
-    """
-    Fetch all worklogs for a specific Jira issue key.
-    Returns { worklogs: [...] }.
-    """
-    data = _jira_get(
-        req.base_url, req.email, req.token,
-        f"/rest/api/2/issue/{req.issue_key}/worklog"
-    )
-    return {"worklogs": data.get("worklogs", [])}

@@ -40,10 +40,6 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/crypto-dashboard/crypto-dashboard.component').then(m => m.CryptoDashboardComponent),
   },
   {
-    path: 'my-tickets',
-    loadComponent: () => import('./pages/my-tickets/my-tickets.component').then(m => m.MyTicketsComponent),
-  },
-  {
     path: 'argocd-dashboard',
     loadComponent: () => import('./pages/argocd-dashboard/argocd-dashboard.component').then(m => m.ArgocdDashboardComponent),
   },

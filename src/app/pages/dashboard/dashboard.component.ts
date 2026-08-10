@@ -31,11 +31,6 @@ export class DashboardComponent {
       color: '#bc8cff',
     },
     {
-      icon: 'assignment', title: 'My Tickets', route: '/my-tickets',
-      description: 'View and manage your assigned JIRA tickets.',
-      color: '#4caf50',
-    },
-    {
       icon: 'analytics', title: 'Gap Analysis', route: '/gap-analysis',
       description: 'Analyze gaps and view comprehensive metrics.',
       color: '#ff9800',

@@ -32,7 +32,6 @@ interface NavItem {
 export class App {
   navItems: NavItem[] = [
     { label: 'Dashboard',      icon: 'dashboard',        path: '/dashboard' },
-    { label: 'My Tickets',     icon: 'assignment_ind',   path: '/my-tickets' },
     { label: 'ArgoCD Apps',    icon: 'apps',             path: '/argocd-dashboard' },
     { label: 'PR Review',      icon: 'rate_review',      path: '/pr-review' },
     { label: 'Create PR',      icon: 'call_merge',       path: '/pr-creation' },

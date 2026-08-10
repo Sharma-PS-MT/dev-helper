@@ -67,7 +67,6 @@ All routes are lazy-loaded standalone components. The app has no NgModules.
 | `branch-compare` | Side-by-side diff between branches |
 | `argocd-dashboard` | ArgoCD environment status + compare dialog |
 | `gap-analysis` | Version gap analysis across ArgoCD environments |
-| `my-tickets` | Personal Jira tickets |
 | `json-viewer` | JSON/JSONPath inspector |
 | `base64-viewer` | Base64 encode/decode utility |
 | `token-gen` | Keycloak token generator |

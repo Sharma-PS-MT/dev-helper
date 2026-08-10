@@ -97,15 +97,6 @@ export class JiraService {
       );
   }
 
-  /** Fetch all worklogs for an issue key; returns raw Jira worklog entries. */
-  getWorklogsForIssue(issueKey: string): Observable<any[]> {
-    return this.http
-      .post<any>('/python-ai/jira/worklog', { ...this.creds, issue_key: issueKey })
-      .pipe(
-        map(res => res.worklogs || []),
-        catchError(() => of([]))
-      );
-  }
 
   getTicketUrl(key: string): string {
     return `${this.authConfig.config().jiraBaseUrl}/browse/${key}`;
