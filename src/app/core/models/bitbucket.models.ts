@@ -122,3 +122,12 @@ export interface PRCreationResult {
   pr_url: string | null;
   message: string;
 }
+
+/** Response from POST /bitbucket/branch/create */
+export interface BranchCreationResult {
+  status: 'created' | 'already_exists' | 'source_missing' | 'error';
+  branch_name: string;
+  branch_url: string | null;
+  message: string;
+}
+

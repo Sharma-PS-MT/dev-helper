@@ -5,7 +5,7 @@ import { map, switchMap, catchError } from 'rxjs/operators';
 import { AuthConfigService } from './auth-config.service';
 import {
   BitbucketProject, BitbucketRepo, BitbucketBranch, BitbucketTag,
-  BitbucketCommit, BitbucketPR, PRAnalysis, PRGap, CommitWithTickets, BranchComparison, TicketSummary, BranchGapAnalysis, PRCreationResult
+  BitbucketCommit, BitbucketPR, PRAnalysis, PRGap, CommitWithTickets, BranchComparison, TicketSummary, BranchGapAnalysis, PRCreationResult, BranchCreationResult
 } from '../models/bitbucket.models';
 import { JiraService } from './jira.service';
 import { JiraTicket, resolveStatusCategory } from '../models/jira.models';
@@ -469,6 +469,26 @@ export class BitbucketService {
       target_branch: targetBranch,
       title,
       description,
+    });
+  }
+
+  /**
+   * Create a new branch (newBranchName) from startPoint branch in the given repo.
+   * The backend resolves the commit hash, checks for duplicates, then creates the branch.
+   * Returns a BranchCreationResult with status/remarks for the UI table.
+   */
+  createBranch(
+    projectKey: string,
+    repoSlug: string,
+    newBranchName: string,
+    startPoint: string
+  ): Observable<BranchCreationResult> {
+    return this.http.post<BranchCreationResult>('/python-ai/bitbucket/branch/create', {
+      ...this.creds,
+      project_key: projectKey,
+      repo_slug: repoSlug,
+      new_branch_name: newBranchName,
+      start_point: startPoint,
     });
   }
 }

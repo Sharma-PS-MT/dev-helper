@@ -34,13 +34,13 @@ export class App {
     { label: 'Dashboard',      icon: 'dashboard',        path: '/dashboard' },
     { label: 'ArgoCD Apps',    icon: 'apps',             path: '/argocd-dashboard' },
     { label: 'PR Review',      icon: 'rate_review',      path: '/pr-review' },
-    { label: 'Create PR',      icon: 'call_merge',       path: '/pr-creation' },
+    { label: 'Create PR & Branch',      icon: 'call_merge',       path: '/pr-creation' },
     { label: 'Branch Compare', icon: 'compare_arrows',   path: '/branch-compare' },
     { label: 'IAM Tokens',     icon: 'vpn_key',          path: '/token-gen' },
     { label: 'JSON Beautifier',icon: 'data_object',      path: '/json-viewer' },
     { label: 'Base64 to Image',icon: 'image',            path: '/base64-viewer' },
     { 
-      label: 'Configurations', icon: 'settings', expanded: true,
+      label: 'Configurations', icon: 'settings', expanded: false,
       children: [
         { label: 'Service Registry', icon: 'hub', path: '/settings/service-registry' },
         { label: 'Bitbucket', icon: 'cloud', path: '/settings/bitbucket' },

@@ -462,3 +462,110 @@ def bb_create_pull_request(req: BBCreatePRRequest):
         raise HTTPException(status_code=503, detail=f"Cannot reach Bitbucket server: {exc}")
     except requests.exceptions.Timeout:
         raise HTTPException(status_code=504, detail="Bitbucket server timed out creating PR")
+
+
+# ── Create Branch ─────────────────────────────────────────────────────────────
+
+class BBCreateBranchRequest(BBBase):
+    project_key: str
+    repo_slug: str
+    new_branch_name: str
+    start_point: str   # Name of the branch to branch FROM (e.g. "develop")
+
+
+def _get_branch_hash(base_url: str, token: str, project_key: str, repo_slug: str, branch_name: str) -> Optional[str]:
+    """Return the latestCommit hash of a branch, or None if not found."""
+    try:
+        data = _bb_get(
+            base_url, token,
+            f"/rest/api/latest/projects/{project_key}/repos/{repo_slug}/branches",
+            {"filterText": branch_name, "start": 0, "limit": 20, "boostMatches": "true"},
+        )
+        for b in data.get("values", []):
+            if b.get("displayId") == branch_name:
+                return b.get("latestCommit")
+    except HTTPException:
+        pass
+    return None
+
+
+@router.post("/branch/create")
+def bb_create_branch(req: BBCreateBranchRequest):
+    """
+    Create a new branch from a start-point branch in a Bitbucket repository.
+
+    Validation steps:
+      1. Check the start_point branch exists — surface its latest commit hash.
+      2. Check if new_branch_name already exists (return 'already_exists', not error).
+      3. POST to Bitbucket to create the branch.
+
+    Returns a structured status response so the Angular UI can show per-repo remarks.
+    """
+    # 1. Resolve start_point → commit hash
+    start_hash = _get_branch_hash(
+        req.base_url, req.token, req.project_key, req.repo_slug, req.start_point
+    )
+    if not start_hash:
+        return {
+            "status": "source_missing",
+            "branch_name": req.new_branch_name,
+            "branch_url": None,
+            "message": f"Source branch '{req.start_point}' not found in this repository.",
+        }
+
+    # 2. Check if the new branch already exists
+    if _branch_exists(req.base_url, req.token, req.project_key, req.repo_slug, req.new_branch_name):
+        branch_url = (
+            req.base_url.rstrip("/")
+            + f"/projects/{req.project_key}/repos/{req.repo_slug}/browse?at=refs%2Fheads%2F{req.new_branch_name}"
+        )
+        return {
+            "status": "already_exists",
+            "branch_name": req.new_branch_name,
+            "branch_url": branch_url,
+            "message": f"Branch '{req.new_branch_name}' already exists.",
+        }
+
+    # 3. Create the branch
+    url = (
+        req.base_url.rstrip("/")
+        + f"/rest/api/latest/projects/{req.project_key}/repos/{req.repo_slug}/branches"
+    )
+    headers = {
+        "Authorization": _auth_header(req.token),
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    body = {
+        "name": req.new_branch_name,
+        "startPoint": start_hash,
+    }
+
+    try:
+        resp = requests.post(url, headers=headers, json=body, timeout=30, verify=False)
+        if resp.status_code == 401:
+            raise HTTPException(status_code=401, detail="Bitbucket authentication failed — check token.")
+        if not resp.ok:
+            return {
+                "status": "error",
+                "branch_name": req.new_branch_name,
+                "branch_url": None,
+                "message": f"Bitbucket error {resp.status_code}: {resp.text[:300]}",
+            }
+        data = resp.json()
+        display_id = data.get("displayId", req.new_branch_name)
+        branch_url = (
+            req.base_url.rstrip("/")
+            + f"/projects/{req.project_key}/repos/{req.repo_slug}/browse?at=refs%2Fheads%2F{display_id}"
+        )
+        return {
+            "status": "created",
+            "branch_name": display_id,
+            "branch_url": branch_url,
+            "message": f"Branch '{display_id}' created successfully from '{req.start_point}'.",
+        }
+    except requests.exceptions.ConnectionError as exc:
+        raise HTTPException(status_code=503, detail=f"Cannot reach Bitbucket server: {exc}")
+    except requests.exceptions.Timeout:
+        raise HTTPException(status_code=504, detail="Bitbucket server timed out creating branch")
+

@@ -437,3 +437,349 @@
     &::placeholder { color: var(--text-muted); }
   }
 }
+
+// ─── Tab Group ────────────────────────────────────────────────────────────────
+.main-tab-group {
+  ::ng-deep {
+    .mat-mdc-tab-header {
+      margin-bottom: 4px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px 12px 0 0;
+      padding: 4px 8px 0;
+    }
+
+    .mat-mdc-tab {
+      min-width: 160px;
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: 0.2px;
+      color: var(--text-muted);
+      opacity: 1;
+
+      &.mdc-tab--active {
+        color: #a5b4fc;
+        .mdc-tab__text-label { color: #a5b4fc; }
+      }
+    }
+
+    .mat-mdc-tab-body-wrapper {
+      padding-top: 20px;
+    }
+
+    .mdc-tab-indicator__content--underline {
+      border-color: #6366f1;
+    }
+  }
+
+  .tab-icon {
+    font-size: 18px; width: 18px; height: 18px;
+    margin-right: 6px; vertical-align: middle;
+  }
+
+  .tab-badge {
+    margin-left: 8px;
+    font-size: 10px; font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 999px;
+
+    &.tab-badge-ok {
+      background: rgba(34,197,94,.15);
+      color: #4ade80;
+      border: 1px solid rgba(34,197,94,.3);
+    }
+  }
+}
+
+// ─── Create Branch config card ────────────────────────────────────────────────
+.cb-config-card {
+  .config-grid {
+    grid-template-columns: 1fr 1fr;
+    @media (max-width: 640px) { grid-template-columns: 1fr; }
+  }
+}
+
+// ─── Scope Selector ───────────────────────────────────────────────────────────
+.scope-selector {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+
+  .scope-label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: var(--text-muted);
+  }
+
+  .scope-toggle-group {
+    display: flex;
+    gap: 8px;
+  }
+
+  .scope-btn {
+    height: 38px;
+    padding: 0 18px;
+    font-size: 13px; font-weight: 600;
+    border-radius: 8px;
+    display: flex; align-items: center; gap: 6px;
+    border-color: var(--border-subtle);
+    color: var(--text-muted);
+    transition: all 0.18s;
+
+    mat-icon { font-size: 16px; width: 16px; height: 16px; }
+
+    &:hover {
+      border-color: rgba(99,102,241,.5);
+      color: #a5b4fc;
+      background: rgba(99,102,241,.06);
+    }
+
+    &.scope-btn-active {
+      background: rgba(99,102,241,.12);
+      border-color: #6366f1;
+      color: #a5b4fc;
+      box-shadow: 0 0 0 2px rgba(99,102,241,.2);
+    }
+  }
+}
+
+// ─── Scope Select Row ─────────────────────────────────────────────────────────
+.scope-select-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+
+  .project-field {
+    flex: 1;
+    min-width: 280px;
+
+    ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+      display: none;
+    }
+  }
+
+  .action-buttons {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .validate-btn {
+    height: 56px; padding: 0 24px;
+    font-weight: 600; font-size: 13px;
+    border-color: rgba(99,102,241,.5);
+    color: #a5b4fc;
+    display: flex; align-items: center; gap: 6px;
+    border-radius: 8px;
+    transition: all 0.2s;
+
+    &:not(:disabled):hover {
+      background: rgba(99,102,241,.1);
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99,102,241,.15);
+    }
+    mat-spinner { margin-right: 4px; }
+  }
+
+  .make-pr-btn {
+    height: 56px; padding: 0 28px;
+    font-weight: 700; font-size: 14px;
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    color: #fff;
+    display: flex; align-items: center; gap: 8px;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(34,197,94,.35);
+    transition: all 0.2s;
+
+    &:not(:disabled):hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 24px rgba(34,197,94,.5);
+    }
+
+    &:disabled {
+      background: var(--bg-secondary);
+      color: var(--text-muted);
+      box-shadow: none;
+    }
+
+    mat-spinner { margin-right: 4px; }
+  }
+
+  .reset-btn { color: var(--text-muted); &:hover { color: var(--accent-cyan); } }
+  .clear-btn  { color: var(--text-muted); &:hover { color: #f87171; } }
+}
+
+// ─── CB Branch display (in table header) ──────────────────────────────────────
+.cb-branch-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 12px;
+
+  .branch-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 12px; font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-family: 'Consolas', monospace;
+
+    mat-icon { font-size: 13px; width: 13px; height: 13px; }
+
+    &.source-chip {
+      background: rgba(99,102,241,.12); color: #a5b4fc;
+      border: 1px solid rgba(99,102,241,.3);
+    }
+
+    &.new-chip {
+      background: rgba(34,197,94,.12); color: #4ade80;
+      border: 1px solid rgba(34,197,94,.3);
+    }
+  }
+
+  .branch-arrow {
+    color: var(--text-muted);
+    font-size: 16px; width: 16px; height: 16px;
+  }
+}
+
+// ─── Project Key Badge ────────────────────────────────────────────────────────
+.project-key-badge {
+  display: inline-flex;
+  font-size: 11px; font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: rgba(168,85,247,.1);
+  color: #e879f9;
+  border: 1px solid rgba(168,85,247,.25);
+  font-family: 'Consolas', monospace;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+// ─── CB Project column ────────────────────────────────────────────────────────
+.col-project { width: 120px; text-align: center; }
+
+// ─── Result Cards (post-creation) ─────────────────────────────────────────────
+.result-cards-section {
+  border-top: 1px solid var(--border-subtle);
+  padding: 20px;
+
+  .result-cards-title {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.7px; color: var(--text-muted);
+    margin-bottom: 14px;
+    mat-icon { font-size: 16px; width: 16px; height: 16px; }
+  }
+
+  .result-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+  }
+
+  .result-card {
+    border-radius: 12px;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-elevated);
+    overflow: hidden;
+    animation: cardSlideIn 0.35s cubic-bezier(0.16,1,0.3,1) both;
+
+    @keyframes cardSlideIn {
+      from { opacity: 0; transform: translateY(10px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    &.result-card-created {
+      border-color: rgba(34,197,94,.3);
+      background: linear-gradient(135deg, rgba(34,197,94,.06), rgba(16,185,129,.04));
+    }
+
+    &.result-card-exists {
+      border-color: rgba(59,130,246,.3);
+      background: rgba(59,130,246,.04);
+    }
+
+    .result-card-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 16px 8px;
+
+      mat-icon {
+        font-size: 18px; width: 18px; height: 18px;
+        .result-card-created & { color: #4ade80; }
+        .result-card-exists & { color: #93c5fd; }
+      }
+
+      .result-card-repo {
+        flex: 1;
+        font-size: 13px; font-weight: 700; color: var(--text-primary);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+
+      .result-card-tag {
+        font-size: 10px; font-weight: 800;
+        text-transform: uppercase; letter-spacing: 0.6px;
+        padding: 2px 8px; border-radius: 999px;
+
+        .result-card-created & { background: rgba(34,197,94,.15); color: #4ade80; }
+        .result-card-exists & { background: rgba(59,130,246,.12); color: #93c5fd; }
+      }
+    }
+
+    .result-card-body {
+      padding: 0 16px 14px;
+
+      .result-branch-name {
+        display: inline-flex; align-items: center; gap: 5px;
+        font-size: 12px; font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 8px;
+        background: rgba(34,197,94,.1); color: #4ade80;
+        font-family: 'Consolas', monospace;
+        margin-bottom: 8px;
+        mat-icon { font-size: 13px; width: 13px; height: 13px; }
+      }
+
+      .result-card-msg {
+        font-size: 12px; color: var(--text-muted);
+        line-height: 1.5; margin-bottom: 10px;
+      }
+
+      .result-card-link {
+        display: inline-flex; align-items: center; gap: 4px;
+        font-size: 12px; font-weight: 600;
+        color: #93c5fd; text-decoration: none;
+        transition: color 0.15s;
+        mat-icon { font-size: 13px; width: 13px; height: 13px; }
+        &:hover { color: #a5b4fc; text-decoration: underline; }
+      }
+    }
+  }
+}
+
+// ─── CB Empty state variant ───────────────────────────────────────────────────
+.cb-empty-icon {
+  background: linear-gradient(135deg, rgba(34,197,94,.12), rgba(16,185,129,.08)) !important;
+  border-color: rgba(34,197,94,.25) !important;
+  mat-icon { color: #4ade80 !important; }
+}
+
+// ─── Fade-in animation ────────────────────────────────────────────────────────
+.fade-in-up {
+  animation: fadeInUp 0.4s cubic-bezier(0.16,1,0.3,1) both;
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+// ─── Misc helpers ─────────────────────────────────────────────────────────────
+.w-full { width: 100%; }
+.text-muted { color: var(--text-muted); }
+
