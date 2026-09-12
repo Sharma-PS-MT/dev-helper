@@ -1,4 +1,11 @@
-import { Component, computed, inject, Output, EventEmitter } from '@angular/core';
+import {
+  Component,
+  computed,
+  inject,
+  Output,
+  EventEmitter,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { Router, NavigationEnd, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
@@ -21,15 +28,14 @@ const PAGE_TITLES: Record<string, string> = {
   standalone: true,
   imports: [CommonModule, RouterModule, MatIconModule, MatButtonModule, MatTooltipModule],
   templateUrl: './topbar.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./topbar.component.scss'],
 })
 export class TopbarComponent {
   @Output() toggleSidebar = new EventEmitter<void>();
   private router = inject(Router);
-  
-  private navEnd = toSignal(
-    this.router.events.pipe(filter(e => e instanceof NavigationEnd))
-  );
+
+  private navEnd = toSignal(this.router.events.pipe(filter((e) => e instanceof NavigationEnd)));
 
   pageTitle = computed(() => {
     this.navEnd(); // reactive dependency
@@ -38,7 +44,5 @@ export class TopbarComponent {
 
   workspace = computed(() => this.authConfig.config().bitbucketWorkspace || null);
 
-  constructor(
-    private authConfig: AuthConfigService,
-  ) {}
+  constructor(private authConfig: AuthConfigService) {}
 }

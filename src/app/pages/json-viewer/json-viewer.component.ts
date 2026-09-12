@@ -1,4 +1,4 @@
-import { Component, signal, computed } from '@angular/core';
+import { Component, signal, computed, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -21,21 +21,30 @@ import { TemplateRef, ViewChild } from '@angular/core';
   selector: 'app-json-viewer',
   standalone: true,
   imports: [
-    CommonModule, FormsModule,
-    MatCardModule, MatFormFieldModule, MatInputModule,
-    MatButtonModule, MatIconModule, MatTooltipModule,
-    MatSelectModule, MatOptionModule, MatAutocompleteModule,
-    MatMenuModule, MatDialogModule
+    CommonModule,
+    FormsModule,
+    MatCardModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatButtonModule,
+    MatIconModule,
+    MatTooltipModule,
+    MatSelectModule,
+    MatOptionModule,
+    MatAutocompleteModule,
+    MatMenuModule,
+    MatDialogModule,
   ],
   templateUrl: './json-viewer.component.html',
-  styleUrls: ['./json-viewer.component.scss']
+  changeDetection: ChangeDetectionStrategy.Eager,
+  styleUrls: ['./json-viewer.component.scss'],
 })
 export class JsonViewerComponent {
   rawJson = signal<string>('');
   parsedObj = signal<any>(null);
   isValid = signal<boolean>(true);
   errorMsg = signal<string>('');
-  
+
   // Highlighted HTML output safely typed for strict parsing
   highlightedHtml = signal<SafeHtml>('');
   // Highlighted HTML for the active query result (null = show full JSON)
@@ -51,7 +60,7 @@ export class JsonViewerComponent {
   isFooterExpanded = signal<boolean>(false);
 
   // Suggestions
-  suggestions = signal<{display: string, value: string}[]>([]);
+  suggestions = signal<{ display: string; value: string }[]>([]);
   /** Maps a normalised path-segment string to the keys available at that level. */
   pathIndex = signal<Map<string, Set<string>>>(new Map());
 
@@ -76,7 +85,7 @@ export class JsonViewerComponent {
   constructor(
     private sanitizer: DomSanitizer,
     private notify: NotificationService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
   ) {}
 
   onPaste(event: ClipboardEvent) {
@@ -127,7 +136,8 @@ export class JsonViewerComponent {
         let queryStr = query.replace(/×/g, '*');
         queryStr = queryStr.replace(
           /\[@\.([a-zA-Z0-9_]+)\s*(>|<|>=|<=|==|!=)\s*([^\]]+)\]/g,
-          (_: string, field: string, op: string, val: string) => `[?(@.${field}${op}${val.trim()})]`
+          (_: string, field: string, op: string, val: string) =>
+            `[?(@.${field}${op}${val.trim()})]`,
         );
 
         // ── Mode 1: @.field formula syntax ──────────────────────────────────────────
@@ -137,29 +147,37 @@ export class JsonViewerComponent {
         const hasAtRef = atFormulaMatch && /@\.[a-zA-Z0-9_]+/.test(atFormulaMatch[2]);
 
         if (hasAtRef && atFormulaMatch) {
-          const basePath = atFormulaMatch[1];        // e.g. $.[*].services[*]
+          const basePath = atFormulaMatch[1]; // e.g. $.[*].services[*]
           const formulaTemplate = atFormulaMatch[2]; // e.g. ((@.companyTax * 100) / @.companyShareAmount)
 
-          const items: any[] = JSONPath({ path: this.normalizeJsonPath(basePath), json: obj }) || [];
+          const items: any[] =
+            JSONPath({ path: this.normalizeJsonPath(basePath), json: obj }) || [];
           const results = items.map((item: any) => {
             if (typeof item !== 'object' || item === null) return null;
 
             // Substitute every @.fieldName with its numeric value
-            const expr = formulaTemplate.replace(/@\.([a-zA-Z0-9_]+)/g, (_: string, field: string) => {
-              const val = item[field];
-              return (val !== undefined && val !== null) ? String(val) : 'NaN';
-            });
+            const expr = formulaTemplate.replace(
+              /@\.([a-zA-Z0-9_]+)/g,
+              (_: string, field: string) => {
+                const val = item[field];
+                return val !== undefined && val !== null ? String(val) : 'NaN';
+              },
+            );
 
             // Safety-guard: allow only numbers and arithmetic symbols
             if (/^[0-9\+\-\*\/\(\)\.\s]+$/.test(expr)) {
-              try { return +(new Function('return (' + expr + ')')()).toFixed(4); } catch { return null; }
+              try {
+                return +new Function('return (' + expr + ')')().toFixed(4);
+              } catch {
+                return null;
+              }
             }
             return null;
           });
           this.queryResult.set(results);
 
-        // ── Mode 2: dual $-path arithmetic  ─────────────────────────────────────────
-        // e.g. ($.[*].services[*].companyTax * 100) / $.[*].services[*].companyShareAmount
+          // ── Mode 2: dual $-path arithmetic  ─────────────────────────────────────────
+          // e.g. ($.[*].services[*].companyTax * 100) / $.[*].services[*].companyShareAmount
         } else {
           const pathRegex = /\$(?:(?:\.[a-zA-Z0-9_]+)|(?:\[[^\]]+\])|(?:\.\*))*/g;
           let pIndex = 0;
@@ -168,8 +186,12 @@ export class JsonViewerComponent {
           const paths = queryStr.match(pathRegex);
 
           if (hasMathOperator && paths && paths.length > 1) {
-            const evaluatedPaths = paths.map(p => JSONPath({ path: this.normalizeJsonPath(p), json: obj }) || []);
-            const maxLength = Math.max(...evaluatedPaths.map(arr => Array.isArray(arr) ? arr.length : 1));
+            const evaluatedPaths = paths.map(
+              (p) => JSONPath({ path: this.normalizeJsonPath(p), json: obj }) || [],
+            );
+            const maxLength = Math.max(
+              ...evaluatedPaths.map((arr) => (Array.isArray(arr) ? arr.length : 1)),
+            );
 
             if (maxLength === 0) {
               this.queryResult.set([]);
@@ -181,12 +203,21 @@ export class JsonViewerComponent {
                 for (let j = 0; j < paths.length; j++) {
                   const valArr = evaluatedPaths[j];
                   const val = Array.isArray(valArr) ? valArr[i] : valArr;
-                  if (val === undefined || val === null) { valid = false; break; }
+                  if (val === undefined || val === null) {
+                    valid = false;
+                    break;
+                  }
                   expr = expr.replace(`__VAR_${j}__`, String(val));
                 }
                 if (valid && /^[0-9\+\-\*\/\(\)\.\s]+$/.test(expr)) {
-                  try { results.push(+(new Function('return (' + expr + ')')()).toFixed(4)); } catch { results.push(null); }
-                } else { results.push(null); }
+                  try {
+                    results.push(+new Function('return (' + expr + ')')().toFixed(4));
+                  } catch {
+                    results.push(null);
+                  }
+                } else {
+                  results.push(null);
+                }
               }
               this.queryResult.set(results);
             }
@@ -201,7 +232,7 @@ export class JsonViewerComponent {
         // Regex search
         const regex = new RegExp(query, 'i');
         const results: any[] = [];
-        
+
         const search = (item: any) => {
           if (typeof item === 'string' && regex.test(item)) {
             results.push(item);
@@ -211,7 +242,7 @@ export class JsonViewerComponent {
             Object.values(item).forEach(search);
           }
         };
-        
+
         search(obj);
         this.queryResult.set(results);
       }
@@ -226,8 +257,6 @@ export class JsonViewerComponent {
     }
   }
 
-
-
   updateSuggestions(query: string) {
     if (this.queryType() !== 'jsonpath') {
       this.suggestions.set([]);
@@ -241,7 +270,10 @@ export class JsonViewerComponent {
     }
 
     const index = this.pathIndex();
-    if (index.size === 0) { this.suggestions.set([]); return; }
+    if (index.size === 0) {
+      this.suggestions.set([]);
+      return;
+    }
 
     // ── @.field suggestions (inside filter [?(@.xx)] or formula .(... @.xx)) ──
     // Triggered whenever the cursor is sitting after an `@.` token.
@@ -251,14 +283,13 @@ export class JsonViewerComponent {
 
       // Find where the filter/formula context block starts so we can determine
       // which collection's keys to suggest.
-      const filterIdx = query.lastIndexOf('[?(');  // filter:  [?(@.field
-      const formulaIdx = query.lastIndexOf('.(');  // formula: .((@.field
+      const filterIdx = query.lastIndexOf('[?('); // filter:  [?(@.field
+      const formulaIdx = query.lastIndexOf('.('); // formula: .((@.field
       const cutIdx = Math.max(filterIdx, formulaIdx);
 
       // basePath is everything before the filter/formula block
-      const basePath = cutIdx >= 0
-        ? query.substring(0, cutIdx)
-        : query.replace(/@\.[a-zA-Z0-9_]*$/, '');
+      const basePath =
+        cutIdx >= 0 ? query.substring(0, cutIdx) : query.replace(/@\.[a-zA-Z0-9_]*$/, '');
 
       // Normalise basePath then append [*] to step into array items
       const normBase = this.normalisePathKey(basePath);
@@ -271,9 +302,11 @@ export class JsonViewerComponent {
         const prefix = query.substring(0, query.length - atRefMatch[0].length);
 
         const filtered = Array.from(keysAtLevel)
-          .filter(k => k !== '[*]' && (!partial || k.toLowerCase().startsWith(partial.toLowerCase())))
+          .filter(
+            (k) => k !== '[*]' && (!partial || k.toLowerCase().startsWith(partial.toLowerCase())),
+          )
           .slice(0, 6)
-          .map(k => ({ display: k, value: prefix + '@.' + k }));
+          .map((k) => ({ display: k, value: prefix + '@.' + k }));
 
         this.suggestions.set(filtered);
         return;
@@ -301,9 +334,9 @@ export class JsonViewerComponent {
     }
 
     const filtered = Array.from(keysAtLevel)
-      .filter(k => !partial || k.toLowerCase().startsWith(partial.toLowerCase()))
+      .filter((k) => !partial || k.toLowerCase().startsWith(partial.toLowerCase()))
       .slice(0, 5)
-      .map(k => {
+      .map((k) => {
         let fullPath = '';
         if (contextPath.endsWith('.')) {
           fullPath = contextPath + k;
@@ -321,16 +354,16 @@ export class JsonViewerComponent {
           if (k.startsWith('[')) fullPath = contextPath + k;
           else fullPath = contextPath + (contextPath ? '.' : '') + k;
         }
-        
+
         // Clean up any double dots or brackets
         fullPath = fullPath.replace(/\.\./g, '.').replace(/\[\[/g, '[').replace(/\]\]/g, ']');
-        
+
         // Auto-append dot if it has children (i.e. if it's an object/array)
         const norm = this.normalisePathKey(fullPath);
         if (index.has(norm)) {
           fullPath += '.';
         }
-        
+
         return { display: k, value: fullPath };
       });
 
@@ -341,14 +374,14 @@ export class JsonViewerComponent {
   private normalisePathKey(path: string): string {
     let p = path
       .replace(/\[(?:\?|\d)[^\]]*\]/g, '[*]') // collapse numeric indices, slices, and filters [?(...)]
-      .replace(/\.$/, '')           // trailing dot
-      .replace(/\[$/, '')           // trailing open bracket
-      .replace(/\.\./g, '.**.')     // recursive descent marker
-      .replace(/\.\[/g, '[');       // collapse optional dot before array bracket
-    
+      .replace(/\.$/, '') // trailing dot
+      .replace(/\[$/, '') // trailing open bracket
+      .replace(/\.\./g, '.**.') // recursive descent marker
+      .replace(/\.\[/g, '['); // collapse optional dot before array bracket
+
     if (!p) return '$';
     if (!p.startsWith('$')) p = '$' + (p.startsWith('.') ? p : '.' + p);
-    
+
     // Clean up double dots or $. at start
     p = p.replace(/^\$\./, '$');
     if (p === '') return '$';
@@ -370,7 +403,7 @@ export class JsonViewerComponent {
           walk(item[0], pathKey + '[*]');
         }
       } else if (typeof item === 'object' && item !== null) {
-        Object.keys(item).forEach(k => {
+        Object.keys(item).forEach((k) => {
           addKey(pathKey, k);
           walk(item[k], pathKey + (pathKey === '$' ? '' : '.') + k);
         });
@@ -397,7 +430,9 @@ export class JsonViewerComponent {
       const effective = Array.isArray(data) && data.length === 1 ? data[0] : data;
 
       if (Array.isArray(effective)) {
-        this.calculationResult.set(`Array (${effective.length} item${effective.length === 1 ? '' : 's'})`);
+        this.calculationResult.set(
+          `Array (${effective.length} item${effective.length === 1 ? '' : 's'})`,
+        );
       } else if (effective !== null && typeof effective === 'object') {
         const keyCount = Object.keys(effective).length;
         this.calculationResult.set(`Object (${keyCount} key${keyCount === 1 ? '' : 's'})`);
@@ -411,8 +446,8 @@ export class JsonViewerComponent {
     // Ensure we have a flat array of numbers for calculations
     const items = Array.isArray(data) ? data.flat(Infinity) : [data];
     const numericItems = items
-      .map(item => (typeof item === 'number' ? item : parseFloat(item)))
-      .filter(item => !isNaN(item));
+      .map((item) => (typeof item === 'number' ? item : parseFloat(item)))
+      .filter((item) => !isNaN(item));
 
     switch (type) {
       case 'count':
@@ -422,7 +457,11 @@ export class JsonViewerComponent {
         this.calculationResult.set(numericItems.reduce((a, b) => a + b, 0));
         break;
       case 'avg':
-        this.calculationResult.set(numericItems.length > 0 ? (numericItems.reduce((a, b) => a + b, 0) / numericItems.length).toFixed(2) : 0);
+        this.calculationResult.set(
+          numericItems.length > 0
+            ? (numericItems.reduce((a, b) => a + b, 0) / numericItems.length).toFixed(2)
+            : 0,
+        );
         break;
       case 'min':
         this.calculationResult.set(numericItems.length > 0 ? Math.min(...numericItems) : null);
@@ -463,9 +502,9 @@ export class JsonViewerComponent {
       const parts = inner.split(',').map((p: string) => p.trim());
 
       // Check if all parts are quoted simple identifiers
-      const isQuotedUnion = parts.length > 1 && parts.every((p: string) =>
-        /^['"][a-zA-Z_$][a-zA-Z0-9_$]*['"]$/.test(p)
-      );
+      const isQuotedUnion =
+        parts.length > 1 &&
+        parts.every((p: string) => /^['"][a-zA-Z_$][a-zA-Z0-9_$]*['"]$/.test(p));
 
       if (isQuotedUnion) {
         // Strip the quotes from each key
@@ -480,11 +519,11 @@ export class JsonViewerComponent {
   onSuggestionSelect(suggestion: string) {
     const current = this.queryInput();
     const parts = current.split(/[.\[\]]/);
-    
+
     // Find where the last part starts
     const lastPart = parts[parts.length - 1];
     const prefix = current.substring(0, current.lastIndexOf(lastPart));
-    
+
     const updated = prefix + suggestion;
     this.queryInput.set(updated);
     this.applyQuery();
@@ -511,7 +550,6 @@ export class JsonViewerComponent {
       this.rawJson.set(beautified);
       this.generateHighlightedHtml(beautified);
       this.applyQuery();
-      
     } catch (e: any) {
       this.isValid.set(false);
       this.parsedObj.set(null);
@@ -530,14 +568,12 @@ export class JsonViewerComponent {
     }
 
     // Escape HTML characters to prevent XSS manually before coloring (Fallback for Invalid JSON)
-    const escaped = jsonString
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+    const escaped = jsonString.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
     // Regex syntax highlighter logic
-    const regex = /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g;
-    
+    const regex =
+      /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g;
+
     const highlighted = escaped.replace(regex, (match) => {
       let cls = 'number';
       if (/^"/.test(match)) {
@@ -570,7 +606,7 @@ export class JsonViewerComponent {
   private buildSyntaxHighlightedHtml(obj: any, indentLevel = 0, isLast = true): string {
     const indent = '  '.repeat(indentLevel);
     const innerIndent = '  '.repeat(indentLevel + 1);
-    
+
     if (obj === null) return `<span class="null">null</span>${isLast ? '' : ','}`;
     if (typeof obj === 'boolean') return `<span class="boolean">${obj}</span>${isLast ? '' : ','}`;
     if (typeof obj === 'number') return `<span class="number">${obj}</span>${isLast ? '' : ','}`;
@@ -584,9 +620,13 @@ export class JsonViewerComponent {
       const countLabel = `<span class="text-muted text-sm" style="opacity: 0.7; font-style: italic;"> // ${obj.length} item${obj.length === 1 ? '' : 's'}</span>`;
       let html = `<span class="json-block"><span class="json-toggle">▼</span>[ ${countLabel}<span class="json-content">\n`;
       for (let i = 0; i < obj.length; i++) {
-        html += innerIndent + this.buildSyntaxHighlightedHtml(obj[i], indentLevel + 1, i === obj.length - 1) + '\n';
+        html +=
+          innerIndent +
+          this.buildSyntaxHighlightedHtml(obj[i], indentLevel + 1, i === obj.length - 1) +
+          '\n';
       }
-      html += indent + `</span><span class="json-close-bracket">]</span></span>${isLast ? '' : ','}`;
+      html +=
+        indent + `</span><span class="json-close-bracket">]</span></span>${isLast ? '' : ','}`;
       return html;
     }
 
@@ -600,9 +640,14 @@ export class JsonViewerComponent {
         const val = obj[key];
         const isLastKey = i === keys.length - 1;
         const escapedKey = key.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        html += innerIndent + `<span class="key">"${escapedKey}"</span>: ` + this.buildSyntaxHighlightedHtml(val, indentLevel + 1, isLastKey) + '\n';
+        html +=
+          innerIndent +
+          `<span class="key">"${escapedKey}"</span>: ` +
+          this.buildSyntaxHighlightedHtml(val, indentLevel + 1, isLastKey) +
+          '\n';
       }
-      html += indent + `</span><span class="json-close-bracket">}</span></span>${isLast ? '' : ','}`;
+      html +=
+        indent + `</span><span class="json-close-bracket">}</span></span>${isLast ? '' : ','}`;
       return html;
     }
 
@@ -687,7 +732,7 @@ export class JsonViewerComponent {
   openHelpDialog() {
     this.dialog.open(this.helpDialogTpl, {
       width: '600px',
-      panelClass: 'premium-dialog'
+      panelClass: 'premium-dialog',
     });
   }
 }
