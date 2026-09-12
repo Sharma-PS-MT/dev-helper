@@ -1,0 +1,8 @@
+ok now i m going to develop new features i will give give phase 1 requirements for the new features.
+
+phase 1 requirements:
+1. add a new configuration option to add orodruin base url : eg: https://orodruin.cloudsolutions.com.sa/
+
+phase 2 requirements:
+1. in the /branch-compare : remove the compare button and class="results-layout fade-in-up mt-24" branch-compare component in  
+2. by default do the analyze gap beta improve the UI for analyze gap beta result

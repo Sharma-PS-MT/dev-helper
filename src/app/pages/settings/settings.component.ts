@@ -87,6 +87,9 @@ export class SettingsComponent implements OnInit {
     openaiMaxTokens: [4096, [Validators.min(1), Validators.max(100000)]],
   });
 
+  /** Standalone signal for global Orodruin config — not part of per-user form. */
+  orodruinBaseUrl = signal('https://orodruin.cloudsolutions.com.sa/');
+
   showBitToken = signal(false);
   showJiraToken = signal(false);
   showGeminiToken = signal(false);
@@ -131,7 +134,7 @@ export class SettingsComponent implements OnInit {
     private http: HttpClient,
     public session: AuthSessionService,
   ) {
-    // Explicitly react to Firebase resolving properties asynchronously
+    // Sync per-user config fields into the reactive form
     effect(() => {
       const c = this.authConfig.config();
       this.form.patchValue({
@@ -157,6 +160,12 @@ export class SettingsComponent implements OnInit {
       }
     });
 
+    // Sync global Orodruin config into the local signal
+    effect(() => {
+      const url = this.authConfig.orodruinBaseUrl();
+      if (url) this.orodruinBaseUrl.set(url);
+    });
+
     this.route.paramMap.subscribe((params) => {
       const cat = params.get('category');
       if (cat) this.activeCategory.set(cat);
@@ -166,6 +175,21 @@ export class SettingsComponent implements OnInit {
   ngOnInit(): void {}
 
   save(): boolean {
+    if (this.activeCategory() === 'orodruin') {
+      const url = this.orodruinBaseUrl().trim();
+      if (!url) {
+        this.notify.error('Orodruin Base URL cannot be empty.');
+        return false;
+      }
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        this.notify.error('Orodruin Base URL must start with http:// or https://');
+        return false;
+      }
+      this.authConfig.saveGlobalOrodruin(url);
+      this.notify.success('Configuration saved successfully!');
+      return true;
+    }
+
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       this.notify.error('Please fix form errors before saving.');

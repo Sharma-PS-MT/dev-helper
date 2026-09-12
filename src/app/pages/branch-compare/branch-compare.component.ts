@@ -1,4 +1,12 @@
-import { Component, OnInit, signal, computed, ChangeDetectionStrategy } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  signal,
+  computed,
+  effect,
+  untracked,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -11,6 +19,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatChipsModule } from '@angular/material/chips';
 import { BitbucketService } from '../../core/services/bitbucket.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { BranchCompareStateService } from '../../core/services/branch-compare-state.service';
@@ -44,6 +53,7 @@ import { of, forkJoin, Observable, Subject } from 'rxjs';
     MatPaginatorModule,
     MatTooltipModule,
     MatSlideToggleModule,
+    MatChipsModule,
     TicketBadgeComponent,
   ],
   templateUrl: './branch-compare.component.html',
@@ -117,15 +127,35 @@ export class BranchCompareComponent implements OnInit {
   /** Incoming: exclude PR merge commits */
   gapIncomingExcludePullRequests = signal(true);
 
+  // ── Gap Text Search Filters ─────────────────────────────────────────────
+  criticalSearchText = signal('');
+  incomingSearchText = signal('');
+
+  // ── Expanded Commit Message Tracking ─────────────────────────────────────
+  expandedCommitHashes = signal<Set<string>>(new Set());
+
+  // ── Column Copy Status ───────────────────────────────────────────────────
+  copyCriticalSuccess = signal(false);
+  copyIncomingSuccess = signal(false);
+
   filteredCriticalCommits = computed(() => {
     const gap = this.gapResult();
     if (!gap) return [];
     const exM = this.gapExcludeMergeCommits();
     const exP = this.gapExcludePullRequests();
+    const search = this.criticalSearchText().trim().toLowerCase();
+
     return gap.criticalCommits.filter((cwt) => {
       const msg = cwt.commit.message.trim();
       if (exM && BranchCompareComponent.MERGE_PATTERNS.some((p) => p.test(msg))) return false;
       if (exP && BranchCompareComponent.PR_PATTERNS.some((p) => p.test(msg))) return false;
+      if (search) {
+        const author = (cwt.commit.author.user?.display_name || cwt.commit.author.raw || '').toLowerCase();
+        const hash = (cwt.commit.hash || '').toLowerCase();
+        const tickets = cwt.ticketIds.join(' ').toLowerCase();
+        const full = `${msg} ${author} ${hash} ${tickets}`.toLowerCase();
+        if (!full.includes(search)) return false;
+      }
       return true;
     });
   });
@@ -135,10 +165,19 @@ export class BranchCompareComponent implements OnInit {
     if (!gap) return [];
     const exM = this.gapIncomingExcludeMergeCommits();
     const exP = this.gapIncomingExcludePullRequests();
+    const search = this.incomingSearchText().trim().toLowerCase();
+
     return gap.incomingCommits.filter((cwt) => {
       const msg = cwt.commit.message.trim();
       if (exM && BranchCompareComponent.MERGE_PATTERNS.some((p) => p.test(msg))) return false;
       if (exP && BranchCompareComponent.PR_PATTERNS.some((p) => p.test(msg))) return false;
+      if (search) {
+        const author = (cwt.commit.author.user?.display_name || cwt.commit.author.raw || '').toLowerCase();
+        const hash = (cwt.commit.hash || '').toLowerCase();
+        const tickets = cwt.ticketIds.join(' ').toLowerCase();
+        const full = `${msg} ${author} ${hash} ${tickets}`.toLowerCase();
+        if (!full.includes(search)) return false;
+      }
       return true;
     });
   });
@@ -220,7 +259,22 @@ export class BranchCompareComponent implements OnInit {
     private notify: NotificationService,
     private compareState: BranchCompareStateService,
     private authConfig: AuthConfigService,
-  ) {}
+  ) {
+    // Auto-trigger analyzeGap when both refs are set and differ
+    effect(() => {
+      const repo = this.selectedRepo();
+      const from = this.fromRef();
+      const to = this.toRef();
+      const loading = this.loadingRefs();
+      const analyzing = untracked(() => this.analyzingGap());
+
+      if (repo && from && to && from !== to && !loading && !analyzing) {
+        untracked(() => {
+          this.analyzeGap();
+        });
+      }
+    });
+  }
 
   fromSearch$ = new Subject<string>();
   toSearch$ = new Subject<string>();
@@ -383,7 +437,7 @@ export class BranchCompareComponent implements OnInit {
             this.notify.success(`Loaded ${index + 1} of ${queue.length}: ${project}/${repository}`);
           }
 
-          this.compare();
+          this.analyzeGap();
         });
       });
     });
@@ -610,9 +664,140 @@ export class BranchCompareComponent implements OnInit {
     this.fromRef.set('');
     this.toRef.set('');
     this.result.set(null);
+    this.gapResult.set(null);
+    this.criticalSearchText.set('');
+    this.incomingSearchText.set('');
+    this.expandedCommitHashes.set(new Set());
     this.multiQueue.set([]);
     this.multiIndex.set(0);
     this.pageIndex.set(0);
+  }
+
+  toggleCommitExpand(hash: string): void {
+    const current = new Set(this.expandedCommitHashes());
+    if (current.has(hash)) {
+      current.delete(hash);
+    } else {
+      current.add(hash);
+    }
+    this.expandedCommitHashes.set(current);
+  }
+
+  isCommitExpanded(hash: string): boolean {
+    return this.expandedCommitHashes().has(hash);
+  }
+
+  copyGapColumnAsConfluence(column: 'critical' | 'incoming'): void {
+    const commits =
+      column === 'critical' ? this.filteredCriticalCommits() : this.filteredIncomingCommits();
+    if (!commits || commits.length === 0) {
+      this.notify.error('No commits to copy in this column.');
+      return;
+    }
+
+    const gap = this.gapResult();
+    const repoName = this.selectedRepo() || 'Repository';
+    const colTitle = column === 'critical' ? 'Critical Commits' : 'Incoming Commits';
+    const fromRef = gap?.fromRef || this.fromRef();
+    const toRef = gap?.toRef || this.toRef();
+    const jiraBase = (this.authConfig.config().jiraBaseUrl || '').replace(/\/$/, '');
+
+    const thStyle =
+      'border:1px solid #ccc;padding:6px 10px;background:#f4f5f7;font-weight:600;text-align:left;';
+    const tdStyle = 'border:1px solid #ccc;padding:6px 10px;vertical-align:top;';
+
+    const rowsHtml = commits
+      .map((cwt, i) => {
+        const hash = cwt.commit.hash ? cwt.commit.hash.slice(0, 7) : '';
+        const msg = cwt.commit.message.split('\n')[0];
+        const author = (
+          cwt.commit.author.user?.display_name ||
+          cwt.commit.author.raw.split('<')[0] ||
+          ''
+        ).trim();
+        const dateStr = cwt.commit.date ? new Date(cwt.commit.date).toLocaleString() : '';
+        const ticketLinks = cwt.ticketIds
+          .map((id) => (jiraBase ? `<a href="${jiraBase}/browse/${id}">${id}</a>` : id))
+          .join(', ');
+
+        return `<tr>
+          <td style="${tdStyle}">${i + 1}</td>
+          <td style="${tdStyle}"><code>${hash}</code></td>
+          <td style="${tdStyle}">${msg}</td>
+          <td style="${tdStyle}">${ticketLinks || '—'}</td>
+          <td style="${tdStyle}">${author}</td>
+          <td style="${tdStyle}">${dateStr}</td>
+        </tr>`;
+      })
+      .join('');
+
+    const html = `
+      <h3 style="font-family:sans-serif;margin:0 0 4px 0;font-size:16px;">${repoName} &mdash; ${colTitle}</h3>
+      <p style="font-family:sans-serif;margin:0 0 12px 0;font-size:13px;color:#555;">
+        ${fromRef} &harr; ${toRef}
+      </p>
+      <table style="border-collapse:collapse;width:100%;font-family:sans-serif;font-size:13px;">
+        <thead>
+          <tr>
+            <th style="${thStyle}">#</th>
+            <th style="${thStyle}">Commit</th>
+            <th style="${thStyle}">Message</th>
+            <th style="${thStyle}">Tickets</th>
+            <th style="${thStyle}">Author</th>
+            <th style="${thStyle}">Date</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>`;
+
+    const plain = [
+      `${repoName} — ${colTitle}`,
+      `${fromRef} ↔ ${toRef}`,
+      '',
+      '#\tCommit\tMessage\tTickets\tAuthor\tDate',
+      ...commits.map((cwt, i) => {
+        const hash = cwt.commit.hash ? cwt.commit.hash.slice(0, 7) : '';
+        const msg = cwt.commit.message.split('\n')[0];
+        const author = (
+          cwt.commit.author.user?.display_name ||
+          cwt.commit.author.raw.split('<')[0] ||
+          ''
+        ).trim();
+        const dateStr = cwt.commit.date ? new Date(cwt.commit.date).toLocaleString() : '';
+        const tickets = cwt.ticketIds.join(', ') || '—';
+        return `${i + 1}\t${hash}\t${msg}\t${tickets}\t${author}\t${dateStr}`;
+      }),
+    ].join('\n');
+
+    const targetSignal =
+      column === 'critical' ? this.copyCriticalSuccess : this.copyIncomingSuccess;
+
+    try {
+      const item = new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([plain], { type: 'text/plain' }),
+      });
+      navigator.clipboard
+        .write([item])
+        .then(() => {
+          targetSignal.set(true);
+          this.notify.success(`Copied ${commits.length} ${colTitle.toLowerCase()} to clipboard!`);
+          setTimeout(() => targetSignal.set(false), 2500);
+        })
+        .catch(() => {
+          navigator.clipboard.writeText(plain).then(() => {
+            targetSignal.set(true);
+            this.notify.success(`Copied ${commits.length} ${colTitle.toLowerCase()} (plain text)!`);
+            setTimeout(() => targetSignal.set(false), 2500);
+          });
+        });
+    } catch {
+      navigator.clipboard.writeText(plain).then(() => {
+        targetSignal.set(true);
+        this.notify.success(`Copied ${commits.length} ${colTitle.toLowerCase()} (plain text)!`);
+        setTimeout(() => targetSignal.set(false), 2500);
+      });
+    }
   }
 
   onPageChange(e: PageEvent): void {

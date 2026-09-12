@@ -127,6 +127,40 @@ export class FirebaseService {
   }
 
   // =========================================================================
+  // GLOBAL ORODRUIN CONFIG — shared across all users (global/orodruin doc)
+  // =========================================================================
+
+  private get globalOrodruinDoc() {
+    return doc(this.db, 'global', 'orodruin');
+  }
+
+  async saveGlobalOrodruinConfig(baseUrl: string): Promise<void> {
+    this.status.set('syncing');
+    try {
+      await setDoc(this.globalOrodruinDoc, { baseUrl }, { merge: true });
+      this.status.set('connected');
+    } catch (e) {
+      console.error('Firebase global orodruin save failed', e);
+      this.status.set('error');
+    }
+  }
+
+  async loadGlobalOrodruinConfig(): Promise<string | null> {
+    try {
+      const snap = await getDoc(this.globalOrodruinDoc);
+      if (snap.exists()) {
+        this.status.set('connected');
+        return (snap.data()['baseUrl'] as string) || null;
+      }
+      return null;
+    } catch (e) {
+      console.error('Firebase global orodruin load failed', e);
+      this.status.set('error');
+      return null;
+    }
+  }
+
+  // =========================================================================
   // GLOBAL SERVICE REGISTRY — shared across all users (global/serviceRegistry doc)
   // =========================================================================
 
