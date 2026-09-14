@@ -16,6 +16,8 @@ from pydantic import BaseModel, Field
 from csi_config import (
     ARGO_ENVIRONMENTS,
     KNOWN_SERVICES,
+    get_all_services,
+    refresh_services_cache,
     resolve_environment,
     resolve_service,
     get_all_streams,
@@ -130,15 +132,16 @@ def get_environments(
     "/modules",
     response_model=List[ServiceRegistryEntry],
     summary="Get module list",
-    description="Retrieves list of all registered CSI modules and services."
+    description="Retrieves list of all registered CSI modules and services directly from the Firebase Firestore single source of truth."
 )
 def get_modules(
     stream: Optional[str] = Query(None, description="Filter modules by stream key (e.g. 'BM', 'PMS')"),
     project: Optional[str] = Query(None, description="Filter modules by Bitbucket/Jira project"),
     search: Optional[str] = Query(None, description="Search across key, displayName, repo, or aliases"),
+    refresh: bool = Query(False, description="Force refresh from Firebase Firestore"),
     api_key: str = Depends(verify_api_key)
 ):
-    results = KNOWN_SERVICES
+    results = get_all_services(force_refresh=refresh)
 
     if stream:
         s_lower = stream.strip().lower()
@@ -161,6 +164,21 @@ def get_modules(
         ]
 
     return results
+
+
+@router.post(
+    "/modules/refresh",
+    summary="Refresh module list from Firebase",
+    description="Forces an immediate cache invalidation and reload of the service registry from Firebase Firestore."
+)
+def refresh_modules(api_key: str = Depends(verify_api_key)):
+    services = refresh_services_cache()
+    return {
+        "status": "success",
+        "source": "Firebase Firestore (global/serviceRegistry)",
+        "count": len(services),
+        "modules": [s.key for s in services]
+    }
 
 
 @router.get(

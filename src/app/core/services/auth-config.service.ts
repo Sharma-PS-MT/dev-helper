@@ -27,8 +27,8 @@ export interface AppConfig {
   openaiModel: string;
   openaiMaxTokens: number;
 
-  // NOTE: keycloakEnvs intentionally removed — now globally shared.
-  // Access via AuthConfigService.keycloakEnvs signal.
+  // NOTE: keycloakEnvs, argocdEnvs, orodruinBaseUrl intentionally removed — now globally shared.
+  // Access via AuthConfigService signals: keycloakEnvs, argocdEnvs, orodruinBaseUrl.
 }
 
 export interface KeycloakEnvConfig {
@@ -94,20 +94,24 @@ export class AuthConfigService {
   private _keycloakEnvs = signal<KeycloakEnvConfig[]>([]);
   private _argocdEnvs = signal<ArgocdEnvConfig[]>([]);
   private _serviceRegistry = signal<ServiceRegistryEntry[]>([]);
+  /** Global Orodruin base URL — shared across all users. */
+  private _orodruinBaseUrl = signal<string>('https://orodruin.cloudsolutions.com.sa/');
 
   config = this._config.asReadonly();
   keycloakEnvs = this._keycloakEnvs.asReadonly();
   argocdEnvs = this._argocdEnvs.asReadonly();
   serviceRegistry = this._serviceRegistry.asReadonly();
+  orodruinBaseUrl = this._orodruinBaseUrl.asReadonly();
 
   private firebase = inject(FirebaseService);
   private sessionLoader: AuthSessionService | null = null;
 
-  constructor() { 
+  constructor() {
     // Load global shared configurations once at app startup
     this.loadGlobalKeycloak();
     this.loadGlobalArgocd();
     this.loadGlobalServiceRegistry();
+    this.loadGlobalOrodruin();
   }
 
   // Triggered right after Session connects mapping isolated payload domains
@@ -153,10 +157,11 @@ export class AuthConfigService {
       }
     }).catch();
 
-    // 2. Load global shared Keycloak app envs (independent of user)
+    // 2. Load global shared configurations (independent of user)
     this.loadGlobalKeycloak();
     this.loadGlobalArgocd();
     this.loadGlobalServiceRegistry();
+    this.loadGlobalOrodruin();
   }
 
   /** Reload global Keycloak envs from Firebase global/keycloak document. */
@@ -183,6 +188,19 @@ export class AuthConfigService {
   saveGlobalArgocd(envs: ArgocdEnvConfig[]): void {
     this._argocdEnvs.set(envs);
     this.firebase.saveGlobalArgocdEnvs(envs);
+  }
+
+  /** Reload global Orodruin base URL from Firebase global/orodruin document. */
+  loadGlobalOrodruin(): void {
+    this.firebase.loadGlobalOrodruinConfig().then(url => {
+      if (url) this._orodruinBaseUrl.set(url);
+    }).catch();
+  }
+
+  /** Save global Orodruin base URL — persists to shared global/orodruin document. */
+  saveGlobalOrodruin(baseUrl: string): void {
+    this._orodruinBaseUrl.set(baseUrl);
+    this.firebase.saveGlobalOrodruinConfig(baseUrl);
   }
 
   /** Reload global Service Registry entries from Firebase global/serviceRegistry document. */

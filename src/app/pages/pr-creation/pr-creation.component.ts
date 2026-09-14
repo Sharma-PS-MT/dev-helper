@@ -1,4 +1,11 @@
-import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  signal,
+  computed,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -66,10 +73,10 @@ export interface BranchCreateRepoRow {
     MatChipsModule,
   ],
   templateUrl: './pr-creation.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./pr-creation.component.scss'],
 })
 export class PrCreationComponent implements OnInit {
-
   private authConfig = inject(AuthConfigService);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -84,9 +91,7 @@ export class PrCreationComponent implements OnInit {
   filteredProjects = computed(() => {
     const t = this.projectSearch().toLowerCase();
     return this.projects().filter(
-      p =>
-        (p.name || '').toLowerCase().includes(t) ||
-        (p.key || '').toLowerCase().includes(t)
+      (p) => (p.name || '').toLowerCase().includes(t) || (p.key || '').toLowerCase().includes(t),
     );
   });
 
@@ -105,39 +110,38 @@ export class PrCreationComponent implements OnInit {
   validationDone = computed(
     () =>
       this.repos().length > 0 &&
-      this.repos().every(r => r.status !== 'idle' && r.status !== 'validating')
+      this.repos().every((r) => r.status !== 'idle' && r.status !== 'validating'),
   );
 
-  validCount = computed(() => this.repos().filter(r => r.status === 'ok').length);
+  validCount = computed(() => this.repos().filter((r) => r.status === 'ok').length);
 
   canMakePRs = computed(
     () =>
       !this.creatingPRs() &&
       this.validationDone() &&
-      this.repos().some(r => r.selected && r.status === 'ok')
+      this.repos().some((r) => r.selected && r.status === 'ok'),
   );
 
   allSelected = computed(
     () =>
       this.repos().length > 0 &&
-      this.repos().filter(r => r.status === 'ok').every(r => r.selected)
+      this.repos()
+        .filter((r) => r.status === 'ok')
+        .every((r) => r.selected),
   );
 
-  someSelected = computed(
-    () => this.repos().some(r => r.selected) && !this.allSelected()
-  );
+  someSelected = computed(() => this.repos().some((r) => r.selected) && !this.allSelected());
 
   // ─── Summary counts ────────────────────────────────────────────────────────
-  countOk = computed(() => this.repos().filter(r => r.status === 'ok').length);
+  countOk = computed(() => this.repos().filter((r) => r.status === 'ok').length);
   countMissing = computed(
     () =>
-      this.repos().filter(
-        r => r.status === 'source-missing' || r.status === 'target-missing'
-      ).length
+      this.repos().filter((r) => r.status === 'source-missing' || r.status === 'target-missing')
+        .length,
   );
-  countExists = computed(() => this.repos().filter(r => r.status === 'exists').length);
-  countCreated = computed(() => this.repos().filter(r => r.status === 'created').length);
-  countError = computed(() => this.repos().filter(r => r.status === 'error').length);
+  countExists = computed(() => this.repos().filter((r) => r.status === 'exists').length);
+  countCreated = computed(() => this.repos().filter((r) => r.status === 'created').length);
+  countError = computed(() => this.repos().filter((r) => r.status === 'error').length);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ─── CREATE BRANCH TAB ────────────────────────────────────────────────────
@@ -155,9 +159,7 @@ export class PrCreationComponent implements OnInit {
   cbFilteredProjects = computed(() => {
     const t = this.cbProjectSearch().toLowerCase();
     return this.projects().filter(
-      p =>
-        (p.name || '').toLowerCase().includes(t) ||
-        (p.key || '').toLowerCase().includes(t)
+      (p) => (p.name || '').toLowerCase().includes(t) || (p.key || '').toLowerCase().includes(t),
     );
   });
 
@@ -165,7 +167,7 @@ export class PrCreationComponent implements OnInit {
   availableStreams = computed(() => {
     const registry = this.authConfig.serviceRegistry();
     const streams = registry
-      .map(e => e.stream)
+      .map((e) => e.stream)
       .filter((s): s is string => !!s && s.trim() !== '');
     return [...new Set(streams)].sort();
   });
@@ -179,36 +181,40 @@ export class PrCreationComponent implements OnInit {
   cbValidationDone = computed(
     () =>
       this.cbRepos().length > 0 &&
-      this.cbRepos().every(r => r.status !== 'idle' && r.status !== 'validating')
+      this.cbRepos().every((r) => r.status !== 'idle' && r.status !== 'validating'),
   );
 
   cbCanCreate = computed(
     () =>
       !this.cbCreating() &&
       this.cbValidationDone() &&
-      this.cbRepos().some(r => r.selected && r.status === 'source-ok')
+      this.cbRepos().some((r) => r.selected && r.status === 'source-ok'),
   );
 
   cbAllSelected = computed(
     () =>
       this.cbRepos().length > 0 &&
-      this.cbRepos().filter(r => r.status === 'source-ok').every(r => r.selected)
+      this.cbRepos()
+        .filter((r) => r.status === 'source-ok')
+        .every((r) => r.selected),
   );
 
-  cbSomeSelected = computed(
-    () => this.cbRepos().some(r => r.selected) && !this.cbAllSelected()
-  );
+  cbSomeSelected = computed(() => this.cbRepos().some((r) => r.selected) && !this.cbAllSelected());
 
   // ─── CB summary counts ────────────────────────────────────────────────────
-  cbCountOk = computed(() => this.cbRepos().filter(r => r.status === 'source-ok').length);
-  cbCountMissing = computed(() => this.cbRepos().filter(r => r.status === 'source-missing').length);
-  cbCountCreated = computed(() => this.cbRepos().filter(r => r.status === 'created').length);
-  cbCountExists = computed(() => this.cbRepos().filter(r => r.status === 'already-exists').length);
-  cbCountError = computed(() => this.cbRepos().filter(r => r.status === 'error').length);
+  cbCountOk = computed(() => this.cbRepos().filter((r) => r.status === 'source-ok').length);
+  cbCountMissing = computed(
+    () => this.cbRepos().filter((r) => r.status === 'source-missing').length,
+  );
+  cbCountCreated = computed(() => this.cbRepos().filter((r) => r.status === 'created').length);
+  cbCountExists = computed(
+    () => this.cbRepos().filter((r) => r.status === 'already-exists').length,
+  );
+  cbCountError = computed(() => this.cbRepos().filter((r) => r.status === 'error').length);
 
   constructor(
     private bitbucket: BitbucketService,
-    private notify: NotificationService
+    private notify: NotificationService,
   ) {}
 
   ngOnInit(): void {
@@ -222,7 +228,7 @@ export class PrCreationComponent implements OnInit {
   loadProjects(): void {
     this.loadingProjects.set(true);
     this.bitbucket.getProjects().subscribe({
-      next: px => {
+      next: (px) => {
         this.projects.set(px);
         this.loadingProjects.set(false);
       },
@@ -238,9 +244,9 @@ export class PrCreationComponent implements OnInit {
     this.repos.set([]);
     this.loadingRepos.set(true);
     this.bitbucket.getRepositories(key).subscribe({
-      next: rx => {
+      next: (rx) => {
         this.repos.set(
-          rx.map(repo => ({
+          rx.map((repo) => ({
             repo,
             projectKey: key,
             selected: true,
@@ -248,7 +254,7 @@ export class PrCreationComponent implements OnInit {
             remarks: '',
             prId: null,
             prUrl: null,
-          }))
+          })),
         );
         this.loadingRepos.set(false);
       },
@@ -260,14 +266,14 @@ export class PrCreationComponent implements OnInit {
   }
 
   toggleSelectAll(checked: boolean): void {
-    this.repos.update(rows =>
-      rows.map(r => ({ ...r, selected: r.status === 'ok' ? checked : r.selected }))
+    this.repos.update((rows) =>
+      rows.map((r) => ({ ...r, selected: r.status === 'ok' ? checked : r.selected })),
     );
   }
 
   toggleRowSelect(repo: BitbucketRepo, checked: boolean): void {
-    this.repos.update(rows =>
-      rows.map(r => (r.repo.slug === repo.slug ? { ...r, selected: checked } : r))
+    this.repos.update((rows) =>
+      rows.map((r) => (r.repo.slug === repo.slug ? { ...r, selected: checked } : r)),
     );
   }
 
@@ -294,20 +300,20 @@ export class PrCreationComponent implements OnInit {
     }
 
     this.validatingBranches.set(true);
-    this.repos.update(rows =>
-      rows.map(r => ({
+    this.repos.update((rows) =>
+      rows.map((r) => ({
         ...r,
         status: 'validating',
         remarks: '',
         prId: null,
         prUrl: null,
-      }))
+      })),
     );
 
     const repoList = this.repos();
     let completed = 0;
 
-    repoList.forEach(row => {
+    repoList.forEach((row) => {
       const srcCheck$ = this.bitbucket
         .getBranches(row.repo.slug, projKey, src, undefined, 5)
         .pipe(catchError(() => of({ values: [], limit: 5, isLastPage: true })));
@@ -368,7 +374,7 @@ export class PrCreationComponent implements OnInit {
       return;
     }
 
-    const targetRows = this.repos().filter(r => r.selected && r.status === 'ok');
+    const targetRows = this.repos().filter((r) => r.selected && r.status === 'ok');
     if (targetRows.length === 0) {
       this.notify.error('No valid repositories selected. Run validation first.');
       return;
@@ -379,13 +385,13 @@ export class PrCreationComponent implements OnInit {
     let createdCount = 0;
     let skippedCount = 0;
 
-    targetRows.forEach(row => {
+    targetRows.forEach((row) => {
       this.updateRow(row.repo.slug, { status: 'creating', remarks: 'Creating PR...' });
 
       this.bitbucket
         .createPullRequest(projKey, row.repo.slug, src, tgt, title, description)
         .subscribe({
-          next: res => {
+          next: (res) => {
             this.applyResult(row.repo.slug, res);
             if (res.status === 'created') createdCount++;
             if (res.status === 'already_exists') skippedCount++;
@@ -393,11 +399,11 @@ export class PrCreationComponent implements OnInit {
             if (completed === targetRows.length) {
               this.creatingPRs.set(false);
               this.notify.success(
-                `Done! ${createdCount} PR(s) created, ${skippedCount} skipped (already exist).`
+                `Done! ${createdCount} PR(s) created, ${skippedCount} skipped (already exist).`,
               );
             }
           },
-          error: err => {
+          error: (err) => {
             const msg = err?.error?.detail || err?.message || 'Request failed';
             this.updateRow(row.repo.slug, {
               status: 'error',
@@ -412,15 +418,15 @@ export class PrCreationComponent implements OnInit {
   }
 
   resetResults(): void {
-    this.repos.update(rows =>
-      rows.map(r => ({
+    this.repos.update((rows) =>
+      rows.map((r) => ({
         ...r,
         status: 'idle',
         remarks: '',
         prId: null,
         prUrl: null,
         selected: true,
-      }))
+      })),
     );
   }
 
@@ -437,16 +443,35 @@ export class PrCreationComponent implements OnInit {
   private applyResult(repoSlug: string, res: PRCreationResult): void {
     switch (res.status) {
       case 'source_branch_missing':
-        this.updateRow(repoSlug, { status: 'source-missing', remarks: res.message, selected: false });
+        this.updateRow(repoSlug, {
+          status: 'source-missing',
+          remarks: res.message,
+          selected: false,
+        });
         break;
       case 'target_branch_missing':
-        this.updateRow(repoSlug, { status: 'target-missing', remarks: res.message, selected: false });
+        this.updateRow(repoSlug, {
+          status: 'target-missing',
+          remarks: res.message,
+          selected: false,
+        });
         break;
       case 'already_exists':
-        this.updateRow(repoSlug, { status: 'exists', remarks: res.message, prId: res.pr_id, prUrl: res.pr_url, selected: false });
+        this.updateRow(repoSlug, {
+          status: 'exists',
+          remarks: res.message,
+          prId: res.pr_id,
+          prUrl: res.pr_url,
+          selected: false,
+        });
         break;
       case 'created':
-        this.updateRow(repoSlug, { status: 'created', remarks: res.message, prId: res.pr_id, prUrl: res.pr_url });
+        this.updateRow(repoSlug, {
+          status: 'created',
+          remarks: res.message,
+          prId: res.pr_id,
+          prUrl: res.pr_url,
+        });
         break;
       case 'error':
         this.updateRow(repoSlug, { status: 'error', remarks: res.message, selected: false });
@@ -457,8 +482,8 @@ export class PrCreationComponent implements OnInit {
   }
 
   private updateRow(repoSlug: string, patch: Partial<PRCreateRepoRow>): void {
-    this.repos.update(rows =>
-      rows.map(r => (r.repo.slug === repoSlug ? { ...r, ...patch } : r))
+    this.repos.update((rows) =>
+      rows.map((r) => (r.repo.slug === repoSlug ? { ...r, ...patch } : r)),
     );
   }
 
@@ -507,7 +532,7 @@ export class PrCreationComponent implements OnInit {
 
     // Gather all project+repo entries that belong to this stream from service registry
     const registry = this.authConfig.serviceRegistry();
-    const entries = registry.filter(e => e.stream === streamName);
+    const entries = registry.filter((e) => e.stream === streamName);
 
     if (entries.length === 0) {
       this.notify.error(`No repositories found for stream "${streamName}".`);
@@ -518,11 +543,11 @@ export class PrCreationComponent implements OnInit {
     let loaded = 0;
     const rows: BranchCreateRepoRow[] = [];
 
-    entries.forEach(entry => {
+    entries.forEach((entry) => {
       this.bitbucket.getRepositories(entry.project).subscribe({
-        next: allRepos => {
+        next: (allRepos) => {
           // Find the specific repo from registry
-          const match = allRepos.find(r => r.slug === entry.repository);
+          const match = allRepos.find((r) => r.slug === entry.repository);
           if (match) {
             rows.push({
               repo: match,
@@ -555,16 +580,16 @@ export class PrCreationComponent implements OnInit {
     this.cbRepos.set([]);
     this.cbLoadingRepos.set(true);
     this.bitbucket.getRepositories(key).subscribe({
-      next: rx => {
+      next: (rx) => {
         this.cbRepos.set(
-          rx.map(repo => ({
+          rx.map((repo) => ({
             repo,
             projectKey: key,
             selected: true,
             status: 'idle',
             remarks: '',
             branchUrl: null,
-          }))
+          })),
         );
         this.cbLoadingRepos.set(false);
       },
@@ -576,14 +601,14 @@ export class PrCreationComponent implements OnInit {
   }
 
   cbToggleSelectAll(checked: boolean): void {
-    this.cbRepos.update(rows =>
-      rows.map(r => ({ ...r, selected: r.status === 'source-ok' ? checked : r.selected }))
+    this.cbRepos.update((rows) =>
+      rows.map((r) => ({ ...r, selected: r.status === 'source-ok' ? checked : r.selected })),
     );
   }
 
   cbToggleRowSelect(repoSlug: string, checked: boolean): void {
-    this.cbRepos.update(rows =>
-      rows.map(r => (r.repo.slug === repoSlug ? { ...r, selected: checked } : r))
+    this.cbRepos.update((rows) =>
+      rows.map((r) => (r.repo.slug === repoSlug ? { ...r, selected: checked } : r)),
     );
   }
 
@@ -610,24 +635,24 @@ export class PrCreationComponent implements OnInit {
     }
 
     this.cbValidating.set(true);
-    this.cbRepos.update(rows =>
-      rows.map(r => ({
+    this.cbRepos.update((rows) =>
+      rows.map((r) => ({
         ...r,
         status: 'validating',
         remarks: '',
         branchUrl: null,
-      }))
+      })),
     );
 
     const repoList = this.cbRepos();
     let completed = 0;
 
-    repoList.forEach(row => {
+    repoList.forEach((row) => {
       this.bitbucket
         .getBranches(row.repo.slug, row.projectKey, src, undefined, 20)
         .pipe(catchError(() => of({ values: [], limit: 20, isLastPage: true })))
         .subscribe({
-          next: result => {
+          next: (result) => {
             const found = result.values.some((b: any) => b.name === src);
             this.updateCbRow(row.repo.slug, {
               status: found ? 'source-ok' : 'source-missing',
@@ -662,7 +687,7 @@ export class PrCreationComponent implements OnInit {
       return;
     }
 
-    const targetRows = this.cbRepos().filter(r => r.selected && r.status === 'source-ok');
+    const targetRows = this.cbRepos().filter((r) => r.selected && r.status === 'source-ok');
     if (targetRows.length === 0) {
       this.notify.error('No valid repositories selected. Run validation first.');
       return;
@@ -673,47 +698,48 @@ export class PrCreationComponent implements OnInit {
     let createdCount = 0;
     let skippedCount = 0;
 
-    targetRows.forEach(row => {
-      this.updateCbRow(row.repo.slug, { status: 'creating', remarks: `Creating '${newBranch}'...` });
+    targetRows.forEach((row) => {
+      this.updateCbRow(row.repo.slug, {
+        status: 'creating',
+        remarks: `Creating '${newBranch}'...`,
+      });
 
-      this.bitbucket
-        .createBranch(row.projectKey, row.repo.slug, newBranch, src)
-        .subscribe({
-          next: res => {
-            this.applyCbResult(row.repo.slug, res);
-            if (res.status === 'created') createdCount++;
-            if (res.status === 'already_exists') skippedCount++;
-            completed++;
-            if (completed === targetRows.length) {
-              this.cbCreating.set(false);
-              this.notify.success(
-                `Done! ${createdCount} branch(es) created, ${skippedCount} already existed.`
-              );
-            }
-          },
-          error: err => {
-            const msg = err?.error?.detail || err?.message || 'Request failed';
-            this.updateCbRow(row.repo.slug, {
-              status: 'error',
-              remarks: msg,
-              selected: false,
-            });
-            completed++;
-            if (completed === targetRows.length) this.cbCreating.set(false);
-          },
-        });
+      this.bitbucket.createBranch(row.projectKey, row.repo.slug, newBranch, src).subscribe({
+        next: (res) => {
+          this.applyCbResult(row.repo.slug, res);
+          if (res.status === 'created') createdCount++;
+          if (res.status === 'already_exists') skippedCount++;
+          completed++;
+          if (completed === targetRows.length) {
+            this.cbCreating.set(false);
+            this.notify.success(
+              `Done! ${createdCount} branch(es) created, ${skippedCount} already existed.`,
+            );
+          }
+        },
+        error: (err) => {
+          const msg = err?.error?.detail || err?.message || 'Request failed';
+          this.updateCbRow(row.repo.slug, {
+            status: 'error',
+            remarks: msg,
+            selected: false,
+          });
+          completed++;
+          if (completed === targetRows.length) this.cbCreating.set(false);
+        },
+      });
     });
   }
 
   cbResetResults(): void {
-    this.cbRepos.update(rows =>
-      rows.map(r => ({
+    this.cbRepos.update((rows) =>
+      rows.map((r) => ({
         ...r,
         status: 'idle',
         remarks: '',
         branchUrl: null,
         selected: true,
-      }))
+      })),
     );
   }
 
@@ -729,13 +755,26 @@ export class PrCreationComponent implements OnInit {
   private applyCbResult(repoSlug: string, res: BranchCreationResult): void {
     switch (res.status) {
       case 'source_missing':
-        this.updateCbRow(repoSlug, { status: 'source-missing', remarks: res.message, selected: false });
+        this.updateCbRow(repoSlug, {
+          status: 'source-missing',
+          remarks: res.message,
+          selected: false,
+        });
         break;
       case 'already_exists':
-        this.updateCbRow(repoSlug, { status: 'already-exists', remarks: res.message, branchUrl: res.branch_url, selected: false });
+        this.updateCbRow(repoSlug, {
+          status: 'already-exists',
+          remarks: res.message,
+          branchUrl: res.branch_url,
+          selected: false,
+        });
         break;
       case 'created':
-        this.updateCbRow(repoSlug, { status: 'created', remarks: res.message, branchUrl: res.branch_url });
+        this.updateCbRow(repoSlug, {
+          status: 'created',
+          remarks: res.message,
+          branchUrl: res.branch_url,
+        });
         break;
       case 'error':
         this.updateCbRow(repoSlug, { status: 'error', remarks: res.message, selected: false });
@@ -746,8 +785,8 @@ export class PrCreationComponent implements OnInit {
   }
 
   private updateCbRow(repoSlug: string, patch: Partial<BranchCreateRepoRow>): void {
-    this.cbRepos.update(rows =>
-      rows.map(r => (r.repo.slug === repoSlug ? { ...r, ...patch } : r))
+    this.cbRepos.update((rows) =>
+      rows.map((r) => (r.repo.slug === repoSlug ? { ...r, ...patch } : r)),
     );
   }
 

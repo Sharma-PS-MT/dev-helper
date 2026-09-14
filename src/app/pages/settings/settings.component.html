@@ -3,6 +3,7 @@
     <h1 style="text-transform: capitalize">{{ activeCategory() === 'gemini' ? 'AI' : activeCategory() }} Configuration</h1>
     <p *ngIf="activeCategory() === 'bitbucket'">Configure your Bitbucket App Passwords</p>
     <p *ngIf="activeCategory() === 'jira'">Configure your JIRA API credentials</p>
+    <p *ngIf="activeCategory() === 'orodruin'">Configure the Orodruin base URL and internal gateway settings</p>
     <p *ngIf="activeCategory() === 'gemini'">Connect AI providers for intelligent code review &amp; analysis</p>
     <p *ngIf="activeCategory() === 'argocd'">Manage ArgoCD environment deployments globally</p>
     <p *ngIf="activeCategory() === 'service-registry'">Manage service-to-repository mappings for ArgoCD branch compare globally</p>
@@ -129,6 +130,33 @@
           <input matInput formControlName="jiraTicketPattern" />
           <mat-hint>Regex pattern to extract ticket IDs from commit messages</mat-hint>
         </mat-form-field>
+      </div>
+
+      <!-- Orodruin Card (Global — shared across all users) -->
+      <div class="section-card" *ngIf="activeCategory() === 'orodruin'">
+        <div class="section-title">
+          <mat-icon>hub</mat-icon> Orodruin Gateway Configuration
+          <span class="global-badge">
+            <mat-icon>public</mat-icon> Global
+          </span>
+        </div>
+
+        <p class="section-desc">
+          This configuration is <strong>shared across all users</strong> — changes apply globally, not per user.
+        </p>
+
+        <div class="field-group">
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Orodruin Base URL</mat-label>
+            <input matInput
+              [ngModel]="orodruinBaseUrl()"
+              (ngModelChange)="orodruinBaseUrl.set($event)"
+              [ngModelOptions]="{standalone: true}"
+              placeholder="https://orodruin.cloudsolutions.com.sa/" />
+            <mat-icon matSuffix matTooltip="Base URL for Orodruin gateway">dns</mat-icon>
+            <mat-hint>e.g. <code>https://orodruin.cloudsolutions.com.sa/</code></mat-hint>
+          </mat-form-field>
+        </div>
       </div>
 
       <!-- ═══════════════════════════════════════════════════════════════════ -->
@@ -557,8 +585,8 @@
     </div>
 
     <div class="form-actions">
-    <button mat-flat-button color="primary" type="submit"
-            *ngIf="activeCategory() !== 'argocd' && activeCategory() !== 'service-registry'">
+      <button mat-flat-button color="primary" type="submit"
+              *ngIf="activeCategory() !== 'argocd' && activeCategory() !== 'service-registry'">
         <mat-icon>save</mat-icon> Save Configuration
       </button>
     </div>

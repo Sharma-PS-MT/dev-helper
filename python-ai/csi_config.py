@@ -6,8 +6,13 @@ Supports environment variable overrides for secrets and URLs.
 """
 
 import os
+import time
+import logging
+import requests
 from typing import List, Dict, Optional, Any
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger("csi_config")
 
 
 class ArgoEnvConfig(BaseModel):
@@ -199,177 +204,110 @@ ARGO_ENVIRONMENTS: List[ArgoEnvConfig] = [
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SERVICE REGISTRY & STREAMS
+# SERVICE REGISTRY & STREAMS (Single Source of Truth: Firebase Firestore)
 # ─────────────────────────────────────────────────────────────────────────────
-KNOWN_SERVICES: List[ServiceRegistryEntry] = [
-    ServiceRegistryEntry(
-        key="BM_APPROVAL",
-        project="BM",
-        repository="csi-bm-approval-java-service",
-        displayName="BM Approval Backend",
-        aliases=[
-            "csi-bm-approval-java-service",
-            "prod-bmapprovaljava",
-            "bmapprovaljava",
-            "prod-billingapprovaljava",
-            "approval-java",
-            "approval-service"
-        ],
-        stream="BM"
-    ),
-    ServiceRegistryEntry(
-        key="BM_APPROVAL_UI",
-        project="BM",
-        repository="csi-bm-approval-ui",
-        displayName="BM Approval UI",
-        aliases=[
-            "csi-bm-approval-ui",
-            "bmapprovalui",
-            "prod-billingapprovalui",
-            "approval-ui"
-        ],
-        stream="BM"
-    ),
-    ServiceRegistryEntry(
-        key="BM_BILLING",
-        project="BM",
-        repository="csi-bm-billing-java-service",
-        displayName="BM Billing Backend",
-        aliases=[
-            "csi-bm-billing-java-service",
-            "prod-bmbillingjava",
-            "bmbillingjava",
-            "prod-billingjava",
-            "billing-java",
-            "billing-service"
-        ],
-        stream="BM"
-    ),
-    ServiceRegistryEntry(
-        key="BM_BILLING_UI",
-        project="BM",
-        repository="csi-bm-billing-ui",
-        displayName="BM Billing UI",
-        aliases=[
-            "csi-bm-billing-ui",
-            "prod-bmbillingui",
-            "bmbillingui",
-            "prod-billingmasterui",
-            "billing-ui"
-        ],
-        stream="BM"
-    ),
-    ServiceRegistryEntry(
-        key="BM_INTE_BRIDGE",
-        project="BM",
-        repository="csi-bm-inte-bridge-java-service",
-        displayName="BM Integration Bridge",
-        aliases=[
-            "csi-bm-inte-bridge-java-service",
-            "prod-bmbridgejava",
-            "bmbridgejava",
-            "inte-bridge"
-        ],
-        stream="BM"
-    ),
-    ServiceRegistryEntry(
-        key="BM_INVOICE",
-        project="BM",
-        repository="csi-bm-invoice-java-service",
-        displayName="BM Invoice Backend",
-        aliases=[
-            "csi-bm-invoice-java-service",
-            "prod-bminvoicejava",
-            "bminvoicejava",
-            "prod-billinginvoicejava",
-            "invoice-java",
-            "invoice-service"
-        ],
-        stream="BM"
-    ),
-    ServiceRegistryEntry(
-        key="BM_INVOICE_UI",
-        project="BM",
-        repository="csi-bm-invoice-ui",
-        displayName="BM Invoice UI",
-        aliases=[
-            "csi-bm-invoice-ui",
-            "prod-bminvoiceui",
-            "bminvoiceui",
-            "prod-billinginvoiceui",
-            "invoice-ui"
-        ],
-        stream="BM"
-    ),
-    ServiceRegistryEntry(
-        key="BM_PROMOTION",
-        project="BM",
-        repository="csi-bm-promotion-java-service",
-        displayName="BM Promotion Service",
-        aliases=[
-            "csi-bm-promotion-java-service",
-            "promotion-service",
-            "csi-bm-promotion"
-        ],
-        stream="BM"
-    ),
-    ServiceRegistryEntry(
-        key="PMS_ADT_UI",
-        project="Patient Management System",
-        repository="csi-pms-adt-ui",
-        displayName="PMS ADT UI",
-        aliases=["csi-pms-adt-ui", "adt-ui", "prod-adtui", "adt"],
-        stream="PMS"
-    ),
-    ServiceRegistryEntry(
-        key="PMS_ADT_JAVA",
-        project="Patient Management System",
-        repository="csi-pms-adt-request-java-sev",
-        displayName="PMS ADT Request Backend",
-        aliases=["csi-pms-adt-request-java-sev", "adt-backend", "adt-service"],
-        stream="PMS"
-    ),
-    ServiceRegistryEntry(
-        key="MLM_UI",
-        project="Medical Leave Management",
-        repository="csi-mlm-ui",
-        displayName="Medical Leave Management UI",
-        aliases=["csi-mlm-ui", "mlm-ui", "mlm"],
-        stream="MLM"
-    ),
-    ServiceRegistryEntry(
-        key="RMS_MASTERDATA",
-        project="Resource Management System",
-        repository="csi-rms-masterdata-java-sev",
-        displayName="RMS Masterdata Service",
-        aliases=["csi-rms-masterdata-java-sev", "rms-masterdata", "masterdata"],
-        stream="RMS"
-    ),
-    ServiceRegistryEntry(
-        key="EMPI_API",
-        project="EMPI",
-        repository="csi-empi-api",
-        displayName="EMPI API",
-        aliases=["csi-empi-api", "empi-api", "empi"],
-        stream="EMPI"
-    ),
-    ServiceRegistryEntry(
-        key="EMPI_WEBUI",
-        project="EMPI",
-        repository="csi-empi-webui",
-        displayName="EMPI Web UI",
-        aliases=["csi-empi-webui", "empi-ui"],
-        stream="EMPI"
-    ),
-    ServiceRegistryEntry(
-        key="IE_GENERAL",
-        project="Integrations",
-        repository="csi-ie-general",
-        displayName="Integrations General",
-        aliases=["csi-ie-general", "ie-general", "integrations-general"],
-        stream="Integrations"
-    )
-]
+FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "dev-helper-87942")
+FIREBASE_SERVICE_REGISTRY_URL = os.getenv(
+    "FIREBASE_SERVICE_REGISTRY_URL",
+    f"https://firestore.googleapis.com/v1/projects/{FIREBASE_PROJECT_ID}/databases/(default)/documents/global/serviceRegistry"
+)
+SERVICES_CACHE_TTL = int(os.getenv("SERVICES_CACHE_TTL_SECONDS", "300"))  # 5 minutes
+
+_SERVICES_CACHE: List[ServiceRegistryEntry] = []
+_SERVICES_CACHE_TIME: float = 0.0
+
+
+def _parse_firestore_value(val: Any) -> Any:
+    """Helper to parse Firestore REST API typed values into Python primitives."""
+    if not isinstance(val, dict):
+        return val
+    if "stringValue" in val:
+        return val["stringValue"]
+    elif "booleanValue" in val:
+        return val["booleanValue"]
+    elif "integerValue" in val:
+        return int(val["integerValue"])
+    elif "arrayValue" in val:
+        return [_parse_firestore_value(v) for v in val["arrayValue"].get("values", [])]
+    elif "mapValue" in val:
+        return {k: _parse_firestore_value(v) for k, v in val["mapValue"].get("fields", {}).items()}
+    return None
+
+
+def fetch_services_from_firebase() -> List[ServiceRegistryEntry]:
+    """
+    Fetches the single source of truth for the Service Registry from Firebase Firestore.
+    Document: global/serviceRegistry
+    """
+    try:
+        resp = requests.get(FIREBASE_SERVICE_REGISTRY_URL, timeout=8)
+        if resp.status_code == 200:
+            data = resp.json()
+            fields = data.get("fields", {})
+            entries_raw = fields.get("entries", {})
+            parsed = _parse_firestore_value(entries_raw)
+            if isinstance(parsed, list):
+                services: List[ServiceRegistryEntry] = []
+                for item in parsed:
+                    if isinstance(item, dict) and "key" in item and "repository" in item:
+                        services.append(
+                            ServiceRegistryEntry(
+                                key=str(item.get("key", "")),
+                                displayName=str(item.get("displayName") or item.get("key", "")),
+                                project=str(item.get("project", "")),
+                                repository=str(item.get("repository", "")),
+                                aliases=item.get("aliases", []) if isinstance(item.get("aliases"), list) else [],
+                                stream=item.get("stream")
+                            )
+                        )
+                logger.info(f"Loaded {len(services)} services from Firebase Firestore (single source of truth)")
+                return services
+        logger.warning(f"Failed to load services from Firebase Firestore: HTTP {resp.status_code}")
+    except Exception as e:
+        logger.warning(f"Error fetching services from Firebase Firestore: {e}")
+    return []
+
+
+def get_all_services(force_refresh: bool = False) -> List[ServiceRegistryEntry]:
+    """
+    Returns all registered services from Firebase Firestore (cached for SERVICES_CACHE_TTL seconds).
+    Single source of truth shared with Angular UI.
+    """
+    global _SERVICES_CACHE, _SERVICES_CACHE_TIME
+    now = time.time()
+    if force_refresh or not _SERVICES_CACHE or (now - _SERVICES_CACHE_TIME > SERVICES_CACHE_TTL):
+        fb_services = fetch_services_from_firebase()
+        if fb_services:
+            _SERVICES_CACHE = fb_services
+            _SERVICES_CACHE_TIME = now
+    return _SERVICES_CACHE
+
+
+def refresh_services_cache() -> List[ServiceRegistryEntry]:
+    """Explicitly invalidates and reloads service registry from Firebase."""
+    return get_all_services(force_refresh=True)
+
+
+class DynamicServiceList:
+    """Dynamic proxy list resolving to Firebase Firestore single source of truth."""
+    def __iter__(self):
+        return iter(get_all_services())
+
+    def __len__(self):
+        return len(get_all_services())
+
+    def __getitem__(self, item):
+        return get_all_services()[item]
+
+    def __contains__(self, item):
+        return item in get_all_services()
+
+    def __repr__(self):
+        return repr(get_all_services())
+
+
+# Backward-compatible proxy to single source of truth
+KNOWN_SERVICES: Any = DynamicServiceList()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -391,30 +329,31 @@ def resolve_environment(query: str) -> Optional[ArgoEnvConfig]:
 
 
 def resolve_service(query: str) -> Optional[ServiceRegistryEntry]:
-    """Resolves a service key, repository, or alias to a ServiceRegistryEntry."""
+    """Resolves a service key, repository, or alias to a ServiceRegistryEntry using Firebase single source of truth."""
     q = query.strip().lower()
-    for s in KNOWN_SERVICES:
+    services = get_all_services()
+    for s in services:
         if s.key.lower() == q or s.repository.lower() == q:
             return s
         if any(alias.lower() == q for alias in s.aliases):
             return s
     # Substring match
-    for s in KNOWN_SERVICES:
+    for s in services:
         if q in s.repository.lower() or any(q in alias.lower() for alias in s.aliases):
             return s
     return None
 
 
 def get_all_streams() -> List[str]:
-    """Returns unique sorted list of stream keys."""
-    streams = {s.stream for s in KNOWN_SERVICES if s.stream}
+    """Returns unique sorted list of stream keys from Firebase single source of truth."""
+    streams = {s.stream for s in get_all_services() if s.stream}
     return sorted(list(streams))
 
 
 def get_services_by_stream(stream_key: str) -> List[ServiceRegistryEntry]:
-    """Returns services under a specific stream key (case-insensitive)."""
+    """Returns services under a specific stream key from Firebase single source of truth."""
     sk = stream_key.strip().lower()
-    return [s for s in KNOWN_SERVICES if s.stream and s.stream.strip().lower() == sk]
+    return [s for s in get_all_services() if s.stream and s.stream.strip().lower() == sk]
 
 
 CSI_ROOT = os.getenv("CSI_WORKSPACE_ROOT", "D:\\CSI")

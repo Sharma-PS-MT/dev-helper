@@ -1,4 +1,11 @@
-import { Component, OnInit, signal, effect, untracked } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  signal,
+  effect,
+  untracked,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -43,13 +50,25 @@ export interface GroupedAppRow {
   selector: 'app-argocd-dashboard',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, RouterModule,
-    MatCardModule, MatButtonModule, MatIconModule,
-    MatProgressSpinnerModule, MatCheckboxModule, MatTableModule, MatSelectModule,
-    MatInputModule, MatFormFieldModule, MatChipsModule, MatTooltipModule, MatDialogModule
+    CommonModule,
+    FormsModule,
+    RouterModule,
+    MatCardModule,
+    MatButtonModule,
+    MatIconModule,
+    MatProgressSpinnerModule,
+    MatCheckboxModule,
+    MatTableModule,
+    MatSelectModule,
+    MatInputModule,
+    MatFormFieldModule,
+    MatChipsModule,
+    MatTooltipModule,
+    MatDialogModule,
   ],
   templateUrl: './argocd-dashboard.component.html',
-  styleUrls: ['./argocd-dashboard.component.scss']
+  changeDetection: ChangeDetectionStrategy.Eager,
+  styleUrls: ['./argocd-dashboard.component.scss'],
 })
 export class ArgocdDashboardComponent implements OnInit {
   envs = signal<EnvSelection[]>([]);
@@ -74,11 +93,11 @@ export class ArgocdDashboardComponent implements OnInit {
   private envCache = new Map<string, ArgoAppModel[]>();
 
   get hasActiveFilters(): boolean {
-    return Object.values(this.filterValues).some(val => val !== '');
+    return Object.values(this.filterValues).some((val) => val !== '');
   }
 
   get selectedEnvCount(): number {
-    return this.envs().filter(e => e.selected).length;
+    return this.envs().filter((e) => e.selected).length;
   }
 
   hasExactlyTwoEnvs(): boolean {
@@ -108,34 +127,40 @@ export class ArgocdDashboardComponent implements OnInit {
     private router: Router,
     private notify: NotificationService,
     private compareState: BranchCompareStateService,
-    private gapState: GapAnalysisStateService
+    private gapState: GapAnalysisStateService,
   ) {
     // Sync env list from Firebase signal — use untracked to avoid loop
-    effect(() => {
-      const globalEnvs = this.authConfig.argocdEnvs();
-      const currentEnvs = untracked(() => this.envs());
-      const merged = globalEnvs.map(env => {
-        const existing = currentEnvs.find(e => e.config.id === env.id);
-        return existing || { config: env, selected: false, loading: false, error: null };
-      });
-      this.envs.set(merged);
-    }, { allowSignalWrites: true });
+    effect(
+      () => {
+        const globalEnvs = this.authConfig.argocdEnvs();
+        const currentEnvs = untracked(() => this.envs());
+        const merged = globalEnvs.map((env) => {
+          const existing = currentEnvs.find((e) => e.config.id === env.id);
+          return existing || { config: env, selected: false, loading: false, error: null };
+        });
+        this.envs.set(merged);
+      },
+      { allowSignalWrites: true },
+    );
 
     // Multi-column AND filter predicate
     this.dataSource.filterPredicate = (data: GroupedAppRow, filter: string) => {
       const terms = JSON.parse(filter);
-      return Object.keys(terms).every(col => {
+      return Object.keys(terms).every((col) => {
         const term = terms[col]?.toString().toLowerCase() || '';
         if (!term) return true;
-        
+
         if (col === 'appName') {
-          return data.appName.toLowerCase().includes(term) || data.repository.toLowerCase().includes(term);
+          return (
+            data.appName.toLowerCase().includes(term) ||
+            data.repository.toLowerCase().includes(term)
+          );
         }
 
         if (col === 'stream') {
           return data.stream?.toLowerCase().includes(term) || false;
         }
-        
+
         const envApp = data.envs[col];
         if (!envApp) return false;
         return envApp.syncTag?.toLowerCase().includes(term) || false;
@@ -143,7 +168,7 @@ export class ArgocdDashboardComponent implements OnInit {
     };
   }
 
-  ngOnInit(): void { }
+  ngOnInit(): void {}
 
   // ── Environment chips ──────────────────────────────────────────────────────
 
@@ -179,19 +204,19 @@ export class ArgocdDashboardComponent implements OnInit {
 
   isAllSelected(): boolean {
     if (this.dataSource.filteredData.length === 0) return false;
-    return this.dataSource.filteredData.every(row => this.selectedRows.has(row));
+    return this.dataSource.filteredData.every((row) => this.selectedRows.has(row));
   }
 
   isSomeSelected(): boolean {
-    const some = this.dataSource.filteredData.some(row => this.selectedRows.has(row));
+    const some = this.dataSource.filteredData.some((row) => this.selectedRows.has(row));
     return some && !this.isAllSelected();
   }
 
   toggleSelectAll(checked: boolean) {
     if (checked) {
-      this.dataSource.filteredData.forEach(row => this.selectedRows.add(row));
+      this.dataSource.filteredData.forEach((row) => this.selectedRows.add(row));
     } else {
-      this.dataSource.filteredData.forEach(row => this.selectedRows.delete(row));
+      this.dataSource.filteredData.forEach((row) => this.selectedRows.delete(row));
     }
   }
 
@@ -207,7 +232,7 @@ export class ArgocdDashboardComponent implements OnInit {
       width: '900px',
       maxHeight: '90vh',
       data: { apps: envApps },
-      panelClass: 'dark-dialog'
+      panelClass: 'dark-dialog',
     });
   }
 
@@ -217,7 +242,8 @@ export class ArgocdDashboardComponent implements OnInit {
     const rows = Array.from(this.selectedRows);
     if (rows.length === 0) return;
 
-    const preFills: import('../../core/services/branch-compare-state.service').BranchComparePreFill[] = [];
+    const preFills: import('../../core/services/branch-compare-state.service').BranchComparePreFill[] =
+      [];
     let hasTooManyEnvs = false;
 
     for (const row of rows) {
@@ -256,7 +282,9 @@ export class ArgocdDashboardComponent implements OnInit {
     }
 
     if (hasTooManyEnvs) {
-      this.notify.error('Please select exactly two environments or one environment for compare gap.');
+      this.notify.error(
+        'Please select exactly two environments or one environment for compare gap.',
+      );
     }
 
     if (preFills.length === 0) {
@@ -273,12 +301,12 @@ export class ArgocdDashboardComponent implements OnInit {
   // ── Navigate to Gap Analysis ──────────────────────────────────────────────
 
   navigateToGap() {
-    const selected = this.envs().filter(e => e.selected);
+    const selected = this.envs().filter((e) => e.selected);
     if (selected.length !== 2) {
       this.notify.error('Please select exactly two environments for GAP analysis.');
       return;
     }
-    
+
     const rows = Array.from(this.selectedRows);
     if (rows.length === 0) {
       this.notify.error('Please select at least one application.');
@@ -288,17 +316,17 @@ export class ArgocdDashboardComponent implements OnInit {
     // Set the state
     const env1 = selected[0].config.name;
     const env2 = selected[1].config.name;
-    
+
     this.gapState.set({
       sourceEnv: env1,
       targetEnv: env2,
-      services: rows.map(r => ({
+      services: rows.map((r) => ({
         appName: r.appName,
         repository: r.repository,
         project: r.resolvedProject,
         sourceVersion: r.envs[env1]?.syncTag || '—',
-        targetVersion: r.envs[env2]?.syncTag || '—'
-      }))
+        targetVersion: r.envs[env2]?.syncTag || '—',
+      })),
     });
 
     this.router.navigate(['/gap-analysis']);
@@ -317,28 +345,31 @@ export class ArgocdDashboardComponent implements OnInit {
     }
     env.loading = true;
     env.error = null;
-    this.envs.update(list => [...list]); // trigger CD for loading spinner
+    this.envs.update((list) => [...list]); // trigger CD for loading spinner
 
-    this.argocd.fetchApplicationsForEnv(env.config).pipe(
-      catchError(err => {
-        env.error = err.message || 'Connection failed';
+    this.argocd
+      .fetchApplicationsForEnv(env.config)
+      .pipe(
+        catchError((err) => {
+          env.error = err.message || 'Connection failed';
+          env.loading = false;
+          this.envs.update((list) => [...list]);
+          return of([] as ArgoAppModel[]);
+        }),
+      )
+      .subscribe((apps) => {
         env.loading = false;
-        this.envs.update(list => [...list]);
-        return of([] as ArgoAppModel[]);
-      })
-    ).subscribe(apps => {
-      env.loading = false;
-      this.envs.update(list => [...list]);
-      this.envCache.set(env.config.id, this.applyEnvFilter(env.config.name, apps));
-      this.buildTable();
-    });
+        this.envs.update((list) => [...list]);
+        this.envCache.set(env.config.id, this.applyEnvFilter(env.config.name, apps));
+        this.buildTable();
+      });
   }
 
   /** Apply environment-specific namespace filters (e.g. HMG PROD). */
   private applyEnvFilter(envName: string, apps: ArgoAppModel[]): ArgoAppModel[] {
     const name = envName?.trim().toUpperCase() || '';
-    if (name === 'HMG PROD')     return apps.filter(a => a.namespace === 'vida-prod');
-    if (name === 'HMG PRE-PROD') return apps.filter(a => a.namespace === 'vida-uat');
+    if (name === 'HMG PROD') return apps.filter((a) => a.namespace === 'vida-prod');
+    if (name === 'HMG PRE-PROD') return apps.filter((a) => a.namespace === 'vida-uat');
     return apps;
   }
 
@@ -347,7 +378,7 @@ export class ArgocdDashboardComponent implements OnInit {
    * Zero API calls — called after every cache mutation.
    */
   private buildTable(): void {
-    const selectedEnvs = this.envs().filter(e => e.selected);
+    const selectedEnvs = this.envs().filter((e) => e.selected);
 
     if (selectedEnvs.length === 0) {
       this.dataSource.data = [];
@@ -392,11 +423,11 @@ export class ArgocdDashboardComponent implements OnInit {
     const rows = Array.from(groupedMap.values()).sort((a, b) => a.appName.localeCompare(b.appName));
     this.dataSource.data = rows as any;
 
-    this.envColumns = selectedEnvs.map(e => e.config.name?.trim().toUpperCase() || 'UNKNOWN');
+    this.envColumns = selectedEnvs.map((e) => e.config.name?.trim().toUpperCase() || 'UNKNOWN');
     this.displayedColumns = ['select', 'appName', 'stream', ...this.envColumns];
 
     // Add missing filter keys (never remove existing ones mid-session)
-    this.envColumns.forEach(col => {
+    this.envColumns.forEach((col) => {
       if (!(col in this.filterValues)) this.filterValues[col] = '';
     });
 
@@ -411,7 +442,7 @@ export class ArgocdDashboardComponent implements OnInit {
     this.selectedRows.clear();
     this.envCache.clear();
 
-    const selectedEnvs = this.envs().filter(e => e.selected);
+    const selectedEnvs = this.envs().filter((e) => e.selected);
     if (selectedEnvs.length === 0) {
       this.dataSource.data = [];
       this.envColumns = [];
@@ -420,25 +451,28 @@ export class ArgocdDashboardComponent implements OnInit {
       return;
     }
 
-    selectedEnvs.forEach(e => { e.loading = true; e.error = null; });
-    this.envs.update(list => [...list]);
+    selectedEnvs.forEach((e) => {
+      e.loading = true;
+      e.error = null;
+    });
+    this.envs.update((list) => [...list]);
 
-    const requests = selectedEnvs.map(env =>
+    const requests = selectedEnvs.map((env) =>
       this.argocd.fetchApplicationsForEnv(env.config).pipe(
-        catchError(err => {
+        catchError((err) => {
           env.error = err.message || 'Connection failed';
           return of([] as ArgoAppModel[]);
-        })
-      )
+        }),
+      ),
     );
 
-    forkJoin(requests).subscribe(results => {
+    forkJoin(requests).subscribe((results) => {
       results.forEach((apps, idx) => {
         const env = selectedEnvs[idx];
         env.loading = false;
         this.envCache.set(env.config.id, this.applyEnvFilter(env.config.name, apps));
       });
-      this.envs.update(list => [...list]);
+      this.envs.update((list) => [...list]);
       this.buildTable();
     });
   }
@@ -446,12 +480,14 @@ export class ArgocdDashboardComponent implements OnInit {
   applyFilter() {
     this.dataSource.filter = JSON.stringify(this.filterValues);
     // setTimeout ensures filteredData is settled before we read length
-    setTimeout(() => { this.totalRows = this.dataSource.filteredData.length; });
+    setTimeout(() => {
+      this.totalRows = this.dataSource.filteredData.length;
+    });
   }
 
   clearFilters() {
     this.filterValues = { appName: '', stream: '' };
-    this.envColumns.forEach(col => this.filterValues[col] = '');
+    this.envColumns.forEach((col) => (this.filterValues[col] = ''));
     this.applyFilter();
   }
 
@@ -474,11 +510,14 @@ export class ArgocdDashboardComponent implements OnInit {
 
   copyToClipboard(text: string) {
     if (!text) return;
-    navigator.clipboard.writeText(text).then(() => {
-      this.notify.success('Copied to clipboard: ' + text);
-    }).catch(err => {
-      this.notify.error('Failed to copy: ' + err);
-    });
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        this.notify.success('Copied to clipboard: ' + text);
+      })
+      .catch((err) => {
+        this.notify.error('Failed to copy: ' + err);
+      });
   }
 
   copyAsConfluenceTable() {
@@ -489,24 +528,30 @@ export class ArgocdDashboardComponent implements OnInit {
     }
 
     const envs = this.envColumns;
-    const thStyle = 'border:1px solid #ccc;padding:6px 10px;background:#f4f5f7;font-weight:600;text-align:left;color:#333;';
+    const thStyle =
+      'border:1px solid #ccc;padding:6px 10px;background:#f4f5f7;font-weight:600;text-align:left;color:#333;';
     const tdStyle = 'border:1px solid #ccc;padding:6px 10px;vertical-align:top;';
 
     // Header: App Name + Env Names
     const headerCells = ['Application Name', ...envs]
-      .map(h => `<th style="${thStyle}">${h}</th>`).join('');
+      .map((h) => `<th style="${thStyle}">${h}</th>`)
+      .join('');
 
-    const rowsHtml = selected.map(row => {
-      const envCells = envs.map(env => {
-        const tag = row.envs[env]?.syncTag || '—';
-        return `<td style="${tdStyle}">${tag}</td>`;
-      }).join('');
+    const rowsHtml = selected
+      .map((row) => {
+        const envCells = envs
+          .map((env) => {
+            const tag = row.envs[env]?.syncTag || '—';
+            return `<td style="${tdStyle}">${tag}</td>`;
+          })
+          .join('');
 
-      return `<tr>
+        return `<tr>
         <td style="${tdStyle}"><strong>${row.appName}</strong></td>
         ${envCells}
       </tr>`;
-    }).join('');
+      })
+      .join('');
 
     const html = `
       <table style="border-collapse:collapse;width:100%;font-family:sans-serif;font-size:13px;">
@@ -516,10 +561,9 @@ export class ArgocdDashboardComponent implements OnInit {
 
     const plain = [
       ['Application Name', ...envs].join('\t'),
-      ...selected.map(row => [
-        row.appName,
-        ...envs.map(env => row.envs[env]?.syncTag || '—')
-      ].join('\t'))
+      ...selected.map((row) =>
+        [row.appName, ...envs.map((env) => row.envs[env]?.syncTag || '—')].join('\t'),
+      ),
     ].join('\n');
 
     try {
@@ -527,13 +571,19 @@ export class ArgocdDashboardComponent implements OnInit {
         'text/html': new Blob([html], { type: 'text/html' }),
         'text/plain': new Blob([plain], { type: 'text/plain' }),
       });
-      navigator.clipboard.write([item]).then(() => {
-        this.notify.success(`Copied ${selected.length} apps as a Confluence table!`);
-      }).catch(() => this.notify.error('Failed to copy to clipboard.'));
+      navigator.clipboard
+        .write([item])
+        .then(() => {
+          this.notify.success(`Copied ${selected.length} apps as a Confluence table!`);
+        })
+        .catch(() => this.notify.error('Failed to copy to clipboard.'));
     } catch {
-      navigator.clipboard.writeText(plain).then(() => {
-        this.notify.success(`Copied ${selected.length} apps (plain text fallback).`);
-      }).catch(() => this.notify.error('Failed to copy to clipboard.'));
+      navigator.clipboard
+        .writeText(plain)
+        .then(() => {
+          this.notify.success(`Copied ${selected.length} apps (plain text fallback).`);
+        })
+        .catch(() => this.notify.error('Failed to copy to clipboard.'));
     }
   }
 }

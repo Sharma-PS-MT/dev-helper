@@ -1,7 +1,21 @@
-import { Component, OnInit, signal, inject, effect, computed } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  signal,
+  inject,
+  effect,
+  computed,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { FormsModule, ReactiveFormsModule, FormBuilder, Validators, AbstractControl } from '@angular/forms';
+import {
+  FormsModule,
+  ReactiveFormsModule,
+  FormBuilder,
+  Validators,
+  AbstractControl,
+} from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -13,7 +27,12 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatTableModule } from '@angular/material/table';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatSelectModule } from '@angular/material/select';
-import { AuthConfigService, AppConfig, ArgocdEnvConfig, ServiceRegistryEntry } from '../../core/services/auth-config.service';
+import {
+  AuthConfigService,
+  AppConfig,
+  ArgocdEnvConfig,
+  ServiceRegistryEntry,
+} from '../../core/services/auth-config.service';
 import { JiraService } from '../../core/services/jira.service';
 import { BitbucketService } from '../../core/services/bitbucket.service';
 import { NotificationService } from '../../core/services/notification.service';
@@ -26,20 +45,30 @@ import { AuthSessionService } from '../../core/services/auth-session.service';
   selector: 'app-settings',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, ReactiveFormsModule,
-    MatCardModule, MatFormFieldModule, MatInputModule,
-    MatButtonModule, MatIconModule, MatDividerModule,
-    MatProgressSpinnerModule, MatTooltipModule, MatTableModule, MatChipsModule,
+    CommonModule,
+    FormsModule,
+    ReactiveFormsModule,
+    MatCardModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatButtonModule,
+    MatIconModule,
+    MatDividerModule,
+    MatProgressSpinnerModule,
+    MatTooltipModule,
+    MatTableModule,
+    MatChipsModule,
     MatSelectModule,
   ],
   templateUrl: './settings.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./settings.component.scss'],
 })
 export class SettingsComponent implements OnInit {
   private fb = inject(FormBuilder);
   private route = inject(ActivatedRoute);
   firebase = inject(FirebaseService);
-  
+
   activeCategory = signal<string>('bitbucket');
 
   form = this.fb.group({
@@ -58,6 +87,9 @@ export class SettingsComponent implements OnInit {
     openaiMaxTokens: [4096, [Validators.min(1), Validators.max(100000)]],
   });
 
+  /** Standalone signal for global Orodruin config — not part of per-user form. */
+  orodruinBaseUrl = signal('https://orodruin.cloudsolutions.com.sa/');
+
   showBitToken = signal(false);
   showJiraToken = signal(false);
   showGeminiToken = signal(false);
@@ -72,7 +104,9 @@ export class SettingsComponent implements OnInit {
   filteredOpenaiModels = computed(() => {
     const q = this.modelSearchQuery().toLowerCase().trim();
     if (!q) return this.openaiModels();
-    return this.openaiModels().filter(m => m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q));
+    return this.openaiModels().filter(
+      (m) => m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q),
+    );
   });
   bitbucketStatus = signal<'idle' | 'ok' | 'fail'>('idle');
   jiraStatus = signal<'idle' | 'ok' | 'fail'>('idle');
@@ -80,7 +114,7 @@ export class SettingsComponent implements OnInit {
   // ArgoCD Global table logic
   argocdColumns = ['name', 'url', 'username', 'password', 'actions'];
   argocdEnvs = computed(() => this.authConfig.argocdEnvs());
-  
+
   newArgoEnv: ArgocdEnvConfig = this.emptyArgoEnv();
   showArgoPwd: { [key: string]: boolean } = {};
 
@@ -98,9 +132,9 @@ export class SettingsComponent implements OnInit {
     private bitbucket: BitbucketService,
     private notify: NotificationService,
     private http: HttpClient,
-    public session: AuthSessionService
+    public session: AuthSessionService,
   ) {
-    // Explicitly react to Firebase resolving properties asynchronously
+    // Sync per-user config fields into the reactive form
     effect(() => {
       const c = this.authConfig.config();
       this.form.patchValue({
@@ -126,7 +160,13 @@ export class SettingsComponent implements OnInit {
       }
     });
 
-    this.route.paramMap.subscribe(params => {
+    // Sync global Orodruin config into the local signal
+    effect(() => {
+      const url = this.authConfig.orodruinBaseUrl();
+      if (url) this.orodruinBaseUrl.set(url);
+    });
+
+    this.route.paramMap.subscribe((params) => {
       const cat = params.get('category');
       if (cat) this.activeCategory.set(cat);
     });
@@ -135,10 +175,25 @@ export class SettingsComponent implements OnInit {
   ngOnInit(): void {}
 
   save(): boolean {
-    if (this.form.invalid) { 
-      this.form.markAllAsTouched(); 
+    if (this.activeCategory() === 'orodruin') {
+      const url = this.orodruinBaseUrl().trim();
+      if (!url) {
+        this.notify.error('Orodruin Base URL cannot be empty.');
+        return false;
+      }
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        this.notify.error('Orodruin Base URL must start with http:// or https://');
+        return false;
+      }
+      this.authConfig.saveGlobalOrodruin(url);
+      this.notify.success('Configuration saved successfully!');
+      return true;
+    }
+
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
       this.notify.error('Please fix form errors before saving.');
-      return false; 
+      return false;
     }
     this.authConfig.save(this.form.value as Partial<AppConfig>);
     this.notify.success('Configuration saved successfully!');
@@ -161,103 +216,110 @@ export class SettingsComponent implements OnInit {
     this.openaiError.set('');
     this.openaiModels.set([]);
 
-    this.http.post<any>('/python-ai/openai/models', {
-      base_url: baseUrl,
-      api_key: apiKey
-    }).pipe(
-      catchError((err) => {
-        this.openaiConnecting.set(false);
-        this.openaiError.set(err.error?.detail || 'Connection failed. Check your API key/URL and try again.');
-        return of(null);
+    this.http
+      .post<any>('/python-ai/openai/models', {
+        base_url: baseUrl,
+        api_key: apiKey,
       })
-    ).subscribe((res: any) => {
-      if (!res) return;
-      this.openaiConnecting.set(false);
-      
-      const rawModels = res.data || [];
-      let finalModels: { id: string; name: string }[] = [];
+      .pipe(
+        catchError((err) => {
+          this.openaiConnecting.set(false);
+          this.openaiError.set(
+            err.error?.detail || 'Connection failed. Check your API key/URL and try again.',
+          );
+          return of(null);
+        }),
+      )
+      .subscribe((res: any) => {
+        if (!res) return;
+        this.openaiConnecting.set(false);
 
-      // If it is OpenRouter, filter for free models
-      if (baseUrl.toLowerCase().includes('openrouter.ai')) {
-        finalModels = rawModels
-          .filter((m: any) => {
-            const promptPrice = parseFloat(m?.pricing?.prompt || '1');
-            const completionPrice = parseFloat(m?.pricing?.completion || '1');
-            return promptPrice === 0 && completionPrice === 0;
-          })
-          .map((m: any) => ({ id: m.id, name: m.name || m.id }));
-      } else {
-        // Generic OpenAI Compatible: include all models
-        finalModels = rawModels.map((m: any) => ({ id: m.id, name: m.id }));
-      }
+        const rawModels = res.data || [];
+        let finalModels: { id: string; name: string }[] = [];
 
-      finalModels.sort((a: any, b: any) => a.name.localeCompare(b.name));
-      this.openaiModels.set(finalModels);
-      this.openaiConnected.set(true);
-      
-      // Save base URL and API key immediately
-      const current = this.authConfig.config();
-      this.authConfig.save({
-        ...current,
-        openaiBaseUrl: baseUrl,
-        openaiApiKey: apiKey
+        // If it is OpenRouter, filter for free models
+        if (baseUrl.toLowerCase().includes('openrouter.ai')) {
+          finalModels = rawModels
+            .filter((m: any) => {
+              const promptPrice = parseFloat(m?.pricing?.prompt || '1');
+              const completionPrice = parseFloat(m?.pricing?.completion || '1');
+              return promptPrice === 0 && completionPrice === 0;
+            })
+            .map((m: any) => ({ id: m.id, name: m.name || m.id }));
+        } else {
+          // Generic OpenAI Compatible: include all models
+          finalModels = rawModels.map((m: any) => ({ id: m.id, name: m.id }));
+        }
+
+        finalModels.sort((a: any, b: any) => a.name.localeCompare(b.name));
+        this.openaiModels.set(finalModels);
+        this.openaiConnected.set(true);
+
+        // Save base URL and API key immediately
+        const current = this.authConfig.config();
+        this.authConfig.save({
+          ...current,
+          openaiBaseUrl: baseUrl,
+          openaiApiKey: apiKey,
+        });
+        this.notify.success(`Connected! ${finalModels.length} models available.`);
       });
-      this.notify.success(`Connected! ${finalModels.length} models available.`);
-    });
   }
 
   private fetchModelsSilently(baseUrl: string, apiKey: string): void {
-    this.http.post<any>('/python-ai/openai/models', {
-      base_url: baseUrl,
-      api_key: apiKey
-    }).pipe(
-      catchError(() => of(null))
-    ).subscribe((res: any) => {
-      if (!res) return;
-      
-      const rawModels = res.data || [];
-      let finalModels: { id: string; name: string }[] = [];
+    this.http
+      .post<any>('/python-ai/openai/models', {
+        base_url: baseUrl,
+        api_key: apiKey,
+      })
+      .pipe(catchError(() => of(null)))
+      .subscribe((res: any) => {
+        if (!res) return;
 
-      if (baseUrl.toLowerCase().includes('openrouter.ai')) {
-        finalModels = rawModels
-          .filter((m: any) => {
-            const promptPrice = parseFloat(m?.pricing?.prompt || '1');
-            const completionPrice = parseFloat(m?.pricing?.completion || '1');
-            return promptPrice === 0 && completionPrice === 0;
-          })
-          .map((m: any) => ({ id: m.id, name: m.name || m.id }));
-      } else {
-        finalModels = rawModels.map((m: any) => ({ id: m.id, name: m.id }));
-      }
+        const rawModels = res.data || [];
+        let finalModels: { id: string; name: string }[] = [];
 
-      finalModels.sort((a: any, b: any) => a.name.localeCompare(b.name));
-      this.openaiModels.set(finalModels);
-    });
+        if (baseUrl.toLowerCase().includes('openrouter.ai')) {
+          finalModels = rawModels
+            .filter((m: any) => {
+              const promptPrice = parseFloat(m?.pricing?.prompt || '1');
+              const completionPrice = parseFloat(m?.pricing?.completion || '1');
+              return promptPrice === 0 && completionPrice === 0;
+            })
+            .map((m: any) => ({ id: m.id, name: m.name || m.id }));
+        } else {
+          finalModels = rawModels.map((m: any) => ({ id: m.id, name: m.id }));
+        }
+
+        finalModels.sort((a: any, b: any) => a.name.localeCompare(b.name));
+        this.openaiModels.set(finalModels);
+      });
   }
 
   testBitbucket(): void {
     if (!this.save()) return;
     this.bitbucketTesting.set(true);
     this.bitbucketStatus.set('idle');
-    this.bitbucket.getProjects().pipe(
-      catchError(() => of(null))
-    ).subscribe(res => {
-      this.bitbucketTesting.set(false);
-      if (res && res.length >= 0) {
-        this.bitbucketStatus.set('ok');
-        this.notify.success('Bitbucket connection successful!');
-      } else {
-        this.bitbucketStatus.set('fail');
-        this.notify.error('Bitbucket connection failed. Check workspace and token.');
-      }
-    });
+    this.bitbucket
+      .getProjects()
+      .pipe(catchError(() => of(null)))
+      .subscribe((res) => {
+        this.bitbucketTesting.set(false);
+        if (res && res.length >= 0) {
+          this.bitbucketStatus.set('ok');
+          this.notify.success('Bitbucket connection successful!');
+        } else {
+          this.bitbucketStatus.set('fail');
+          this.notify.error('Bitbucket connection failed. Check workspace and token.');
+        }
+      });
   }
 
   testJira(): void {
     if (!this.save()) return;
     this.jiraTesting.set(true);
     this.jiraStatus.set('idle');
-    this.jira.getMyself().subscribe(profile => {
+    this.jira.getMyself().subscribe((profile) => {
       this.jiraTesting.set(false);
       if (profile) {
         this.jiraStatus.set('ok');
@@ -275,13 +337,18 @@ export class SettingsComponent implements OnInit {
   // ===========================================================================
   // ArgoCD Config Logic
   // ===========================================================================
-  
+
   private emptyArgoEnv(): ArgocdEnvConfig {
     return { id: '', name: '', url: '', username: '', password: '' };
   }
 
   addArgoEnv() {
-    if (!this.newArgoEnv.name || !this.newArgoEnv.url || !this.newArgoEnv.username || !this.newArgoEnv.password) {
+    if (
+      !this.newArgoEnv.name ||
+      !this.newArgoEnv.url ||
+      !this.newArgoEnv.username ||
+      !this.newArgoEnv.password
+    ) {
       this.notify.error('All fields are required for ArgoCD environment');
       return;
     }
@@ -293,9 +360,9 @@ export class SettingsComponent implements OnInit {
 
     const newEnv = {
       ...this.newArgoEnv,
-      id: Date.now().toString()
+      id: Date.now().toString(),
     };
-    
+
     const updated = [...this.argocdEnvs(), newEnv];
     this.authConfig.saveGlobalArgocd(updated);
     this.newArgoEnv = this.emptyArgoEnv();
@@ -312,7 +379,7 @@ export class SettingsComponent implements OnInit {
 
   saveArgoEnv(env: ArgocdEnvConfig) {
     // Save triggered (changes update in-place normally but we flush explicitly)
-    const updated = this.argocdEnvs().map((e: ArgocdEnvConfig) => e.id === env.id ? env : e);
+    const updated = this.argocdEnvs().map((e: ArgocdEnvConfig) => (e.id === env.id ? env : e));
     this.authConfig.saveGlobalArgocd(updated);
     this.notify.success('ArgoCD Environment Updated (Global)');
   }
@@ -339,7 +406,10 @@ export class SettingsComponent implements OnInit {
 
   /** Derive registry key from displayName: uppercase, spaces→underscores */
   private toKey(displayName: string): string {
-    return displayName.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+    return displayName
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_');
   }
 
   addSvcEntry() {
@@ -349,13 +419,19 @@ export class SettingsComponent implements OnInit {
       return;
     }
     const key = this.toKey(e.displayName);
-    const existing = this.serviceRegistry().find(s => s.key === key);
+    const existing = this.serviceRegistry().find((s) => s.key === key);
     if (existing) {
       this.notify.error(`A service with key "${key}" already exists.`);
       return;
     }
     const aliases = this.newSvcAlias
-      ? [...e.aliases, ...this.newSvcAlias.split(',').map(a => a.trim()).filter(Boolean)]
+      ? [
+          ...e.aliases,
+          ...this.newSvcAlias
+            .split(',')
+            .map((a) => a.trim())
+            .filter(Boolean),
+        ]
       : e.aliases;
     const entry: ServiceRegistryEntry = { ...e, key, aliases };
     const updated = [...this.serviceRegistry(), entry];
@@ -367,7 +443,7 @@ export class SettingsComponent implements OnInit {
 
   removeSvcEntry(key: string) {
     if (confirm('Remove this service from the registry?')) {
-      const updated = this.serviceRegistry().filter(s => s.key !== key);
+      const updated = this.serviceRegistry().filter((s) => s.key !== key);
       this.authConfig.saveGlobalServiceRegistry(updated);
       this.notify.success('Service removed from registry');
     }
@@ -377,11 +453,14 @@ export class SettingsComponent implements OnInit {
     // flush pending alias input
     const pending = this.newAliasInput[entry.key]?.trim();
     if (pending) {
-      const extra = pending.split(',').map(a => a.trim()).filter(Boolean);
+      const extra = pending
+        .split(',')
+        .map((a) => a.trim())
+        .filter(Boolean);
       entry.aliases = [...new Set([...entry.aliases, ...extra])];
       this.newAliasInput[entry.key] = '';
     }
-    const updated = this.serviceRegistry().map(s => s.key === entry.key ? { ...entry } : s);
+    const updated = this.serviceRegistry().map((s) => (s.key === entry.key ? { ...entry } : s));
     this.authConfig.saveGlobalServiceRegistry(updated);
     this.notify.success(`Service "${entry.displayName}" updated (Global)`);
   }
@@ -389,26 +468,32 @@ export class SettingsComponent implements OnInit {
   addAliasToEntry(entry: ServiceRegistryEntry) {
     const raw = (this.newAliasInput[entry.key] || '').trim();
     if (!raw) return;
-    const extra = raw.split(',').map(a => a.trim()).filter(Boolean);
+    const extra = raw
+      .split(',')
+      .map((a) => a.trim())
+      .filter(Boolean);
     entry.aliases = [...new Set([...entry.aliases, ...extra])];
     this.newAliasInput[entry.key] = '';
     this.saveSvcEntry(entry);
   }
 
   removeAlias(entry: ServiceRegistryEntry, alias: string) {
-    entry.aliases = entry.aliases.filter(a => a !== alias);
+    entry.aliases = entry.aliases.filter((a) => a !== alias);
     this.saveSvcEntry(entry);
   }
 
   addAliasToNew() {
     const raw = this.newSvcAlias.trim();
     if (!raw) return;
-    const extra = raw.split(',').map(a => a.trim()).filter(Boolean);
+    const extra = raw
+      .split(',')
+      .map((a) => a.trim())
+      .filter(Boolean);
     this.newSvcEntry.aliases = [...new Set([...this.newSvcEntry.aliases, ...extra])];
     this.newSvcAlias = '';
   }
 
   removeAliasFromNew(alias: string) {
-    this.newSvcEntry.aliases = this.newSvcEntry.aliases.filter(a => a !== alias);
+    this.newSvcEntry.aliases = this.newSvcEntry.aliases.filter((a) => a !== alias);
   }
 }

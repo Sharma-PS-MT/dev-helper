@@ -43,7 +43,7 @@ docker run -p 4201:4201 dev-helper
 
 ## Architecture
 
-This is an **Angular 21 SPA** with a **Python FastAPI backend**, deployed as a Docker container where Nginx serves the static Angular build and proxies `/python-ai/*` to FastAPI on port 8000.
+This is an **Angular 22 SPA** with a **Python FastAPI backend**, deployed as a Docker container where Nginx serves the static Angular build and proxies `/python-ai/*` to FastAPI on port 8000.
 
 ### Frontend (`src/app/`)
 

@@ -19,6 +19,7 @@ from csi_config import (
     ServiceRegistryEntry,
     ARGO_ENVIRONMENTS,
     KNOWN_SERVICES,
+    get_all_services,
     resolve_environment,
     resolve_service,
     get_services_by_stream,
@@ -292,7 +293,7 @@ class CsiService:
             if not target_services:
                 raise ValueError(f"No modules found under stream '{stream_key}'")
         else:
-            target_services = list(KNOWN_SERVICES)
+            target_services = list(get_all_services())
 
         # 3. Fetch applications for each environment
         env_apps_map: Dict[str, List[DeployedAppInfo]] = {}
@@ -482,7 +483,7 @@ class CsiService:
             if not target_services:
                 raise ValueError(f"No modules found under stream '{stream_key}'")
         else:
-            target_services = list(KNOWN_SERVICES)
+            target_services = list(get_all_services())
 
         # 2. If environment-based, get deployed versions
         deployed_versions_map: Dict[str, Dict[str, str]] = {}

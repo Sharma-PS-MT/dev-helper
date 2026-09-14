@@ -1,4 +1,4 @@
-import { Component, signal, ViewChild, ElementRef } from '@angular/core';
+import { Component, signal, ViewChild, ElementRef, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -12,12 +12,18 @@ import { MatTooltipModule } from '@angular/material/tooltip';
   selector: 'app-base64-viewer',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, MatCardModule,
-    MatFormFieldModule, MatInputModule, MatButtonModule,
-    MatIconModule, MatTooltipModule
+    CommonModule,
+    FormsModule,
+    MatCardModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatButtonModule,
+    MatIconModule,
+    MatTooltipModule,
   ],
   templateUrl: './base64-viewer.component.html',
-  styleUrls: ['./base64-viewer.component.scss']
+  changeDetection: ChangeDetectionStrategy.Eager,
+  styleUrls: ['./base64-viewer.component.scss'],
 })
 export class Base64ViewerComponent {
   base64Input = '';
@@ -48,7 +54,7 @@ export class Base64ViewerComponent {
     }
 
     let cleaned = val.trim();
-    
+
     // Remove surrounding double quotes if they exist
     if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
       cleaned = cleaned.substring(1, cleaned.length - 1);

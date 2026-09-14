@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { Component, OnInit, signal, computed, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
@@ -23,6 +23,7 @@ import { McpDocsDialogComponent } from '../../shared/components/mcp-docs-dialog/
     MatDialogModule
   ],
   templateUrl: './dashboard.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./dashboard.component.scss'],
 })
 export class DashboardComponent {
@@ -32,42 +33,58 @@ export class DashboardComponent {
 
   features = [
     {
-      icon: 'rate_review', title: 'PR Review', route: '/pr-review',
+      icon: 'rate_review',
+      title: 'PR Review',
+      route: '/pr-review',
       description: 'Analyze pull requests for missing JIRA tickets, open issues, and code gaps.',
       color: '#39c5cf',
     },
     {
-      icon: 'compare_arrows', title: 'Branch Compare', route: '/branch-compare',
+      icon: 'compare_arrows',
+      title: 'Branch Compare',
+      route: '/branch-compare',
       description: 'Compare branches or tags, view commits, and check JIRA ticket statuses.',
       color: '#bc8cff',
     },
     {
-      icon: 'analytics', title: 'Gap Analysis', route: '/gap-analysis',
+      icon: 'analytics',
+      title: 'Gap Analysis',
+      route: '/gap-analysis',
       description: 'Analyze gaps and view comprehensive metrics.',
       color: '#ff9800',
     },
     {
-      icon: 'cloud_sync', title: 'ArgoCD Dashboard', route: '/argocd-dashboard',
+      icon: 'cloud_sync',
+      title: 'ArgoCD Dashboard',
+      route: '/argocd-dashboard',
       description: 'Monitor your deployments via ArgoCD.',
       color: '#2196f3',
     },
     {
-      icon: 'data_object', title: 'JSON Viewer', route: '/json-viewer',
+      icon: 'data_object',
+      title: 'JSON Viewer',
+      route: '/json-viewer',
       description: 'Format, validate, and explore JSON data.',
       color: '#9c27b0',
     },
     {
-      icon: 'transform', title: 'Base64 Viewer', route: '/base64-viewer',
+      icon: 'transform',
+      title: 'Base64 Viewer',
+      route: '/base64-viewer',
       description: 'Encode and decode Base64 strings easily.',
       color: '#e91e63',
     },
     {
-      icon: 'vpn_key', title: 'Token Gen', route: '/token-gen',
+      icon: 'vpn_key',
+      title: 'Token Gen',
+      route: '/token-gen',
       description: 'Generate various tokens for local development.',
       color: '#607d8b',
     },
     {
-      icon: 'settings', title: 'Settings', route: '/settings',
+      icon: 'settings',
+      title: 'Settings',
+      route: '/settings',
       description: 'Configure your Bitbucket and JIRA API credentials and workspace.',
       color: '#f0883e',
     },
