@@ -6,6 +6,14 @@
     <h2 class="page-title">{{ pageTitle() }}</h2>
   </div>
   <div class="topbar-right">
+    <button mat-stroked-button class="docs-btn api-btn" (click)="openApiDocs()" matTooltip="View REST API Documentation">
+      <mat-icon>api</mat-icon>
+      <span>API Docs</span>
+    </button>
+    <button mat-stroked-button class="docs-btn mcp-btn" (click)="openMcpDocs()" matTooltip="View MCP Server Integration Guide">
+      <mat-icon>hub</mat-icon>
+      <span>MCP Docs</span>
+    </button>
     <div class="workspace-chip" *ngIf="workspace()">
       <mat-icon>work_outline</mat-icon>
       <span>{{ workspace() }}</span>

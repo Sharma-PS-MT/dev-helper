@@ -47,6 +47,130 @@
   }
 }
 
+.developer-integrations {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 24px 32px;
+  margin-bottom: 36px;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%) !important;
+  border: 1px solid rgba(99, 102, 241, 0.25) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc);
+  }
+
+  .integrations-info {
+    max-width: 600px;
+
+    .integrations-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      color: #818cf8;
+      margin-bottom: 8px;
+
+      mat-icon {
+        font-size: 14px;
+        width: 14px;
+        height: 14px;
+      }
+    }
+
+    h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #f8fafc;
+      margin: 0 0 6px 0;
+      letter-spacing: -0.3px;
+    }
+
+    p {
+      font-size: 13px;
+      color: #94a3b8;
+      margin: 0;
+      line-height: 1.5;
+    }
+  }
+
+  .integrations-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+
+    .integration-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 20px;
+      height: 42px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      mat-icon {
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+      }
+
+      &.api-glow-btn {
+        background: rgba(14, 165, 233, 0.15) !important;
+        border: 1px solid rgba(56, 189, 248, 0.4) !important;
+        color: #38bdf8 !important;
+
+        &:hover {
+          background: rgba(14, 165, 233, 0.25) !important;
+          border-color: #38bdf8 !important;
+          box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
+          transform: translateY(-2px);
+        }
+      }
+
+      &.mcp-glow-btn {
+        background: rgba(139, 92, 246, 0.15) !important;
+        border: 1px solid rgba(167, 139, 250, 0.4) !important;
+        color: #c084fc !important;
+
+        &:hover {
+          background: rgba(139, 92, 246, 0.25) !important;
+          border-color: #c084fc !important;
+          box-shadow: 0 0 16px rgba(167, 139, 250, 0.35);
+          transform: translateY(-2px);
+        }
+      }
+    }
+  }
+
+  @media (max-width: 900px) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+
+    .integrations-actions {
+      width: 100%;
+      flex-wrap: wrap;
+    }
+  }
+}
+
 .features-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(265px, 1fr));
   gap: 24px; margin-bottom: 40px;

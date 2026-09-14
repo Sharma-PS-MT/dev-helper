@@ -62,4 +62,12 @@ env/
 
 # Graphify
 /graphify-out/
+
+# Local IDE and temporary sessions
+.claude/
+.commandcode/
+python-ai/tempo_session/
+csi-helper-mcp/node_modules/
+csi-helper-mcp/dist/
+
 

@@ -1,0 +1,21 @@
+{
+  "name": "csi-helper-mcp",
+  "version": "1.0.0",
+  "description": "CSI Helper MCP Server — interfaces with CSI Helper REST APIs for environment, module, and deployed version comparisons",
+  "type": "module",
+  "bin": {
+    "csi-helper-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.7.3"
+  }
+}
