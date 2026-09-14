@@ -1,11 +1,14 @@
-import { Component, OnInit, signal, computed, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, signal, computed, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { AuthConfigService } from '../../core/services/auth-config.service';
+import { ApiDocsDialogComponent } from '../../shared/components/api-docs-dialog/api-docs-dialog.component';
+import { McpDocsDialogComponent } from '../../shared/components/mcp-docs-dialog/mcp-docs-dialog.component';
 
 @Component({
   selector: 'app-dashboard',
@@ -17,6 +20,7 @@ import { AuthConfigService } from '../../core/services/auth-config.service';
     MatIconModule,
     MatButtonModule,
     MatProgressBarModule,
+    MatDialogModule
   ],
   templateUrl: './dashboard.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -86,5 +90,25 @@ export class DashboardComponent {
     },
   ];
 
+  private dialog = inject(MatDialog);
+
   constructor(private authConfig: AuthConfigService) {}
+
+  openApiDocs(): void {
+    this.dialog.open(ApiDocsDialogComponent, {
+      width: '1000px',
+      maxWidth: '95vw',
+      maxHeight: '90vh',
+      panelClass: 'dark-dialog'
+    });
+  }
+
+  openMcpDocs(): void {
+    this.dialog.open(McpDocsDialogComponent, {
+      width: '1000px',
+      maxWidth: '95vw',
+      maxHeight: '90vh',
+      panelClass: 'dark-dialog'
+    });
+  }
 }
