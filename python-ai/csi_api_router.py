@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from csi_config import (
     ARGO_ENVIRONMENTS,
+    get_all_environments,
     KNOWN_SERVICES,
     get_all_services,
     refresh_services_cache,
@@ -97,16 +98,19 @@ class DeploymentCompareRequest(BaseModel):
     "/environments",
     response_model=List[EnvironmentResponse],
     summary="Get environment list",
-    description="Retrieves list of all configured ArgoCD deployment environments."
+    description="Retrieves list of all configured ArgoCD deployment environments directly from Firebase Firestore single source of truth."
 )
 def get_environments(
     search: Optional[str] = Query(None, description="Filter environments by name, id, or alias"),
+    refresh: bool = Query(False, description="Force refresh from Firebase Firestore"),
     api_key: str = Depends(verify_api_key)
 ):
     results: List[EnvironmentResponse] = []
-    q = search.lower().strip() if search else None
+    q = search.lower().strip() if (search and isinstance(search, str)) else None
+    do_refresh = refresh if isinstance(refresh, bool) else False
+    envs = get_all_environments(force_refresh=do_refresh)
 
-    for env in ARGO_ENVIRONMENTS:
+    for env in envs:
         if q:
             match = (
                 q in env.id.lower() or
@@ -128,6 +132,21 @@ def get_environments(
     return results
 
 
+@router.post(
+    "/environments/refresh",
+    summary="Refresh environment list from Firebase",
+    description="Forces an immediate cache invalidation and reload of ArgoCD environments from Firebase Firestore."
+)
+def refresh_environments(api_key: str = Depends(verify_api_key)):
+    envs = get_all_environments(force_refresh=True)
+    return {
+        "status": "success",
+        "source": "Firebase Firestore (global/argocd)",
+        "count": len(envs),
+        "environments": [e.name for e in envs]
+    }
+
+
 @router.get(
     "/modules",
     response_model=List[ServiceRegistryEntry],
@@ -141,17 +160,18 @@ def get_modules(
     refresh: bool = Query(False, description="Force refresh from Firebase Firestore"),
     api_key: str = Depends(verify_api_key)
 ):
-    results = get_all_services(force_refresh=refresh)
+    do_refresh = refresh if isinstance(refresh, bool) else False
+    results = get_all_services(force_refresh=do_refresh)
 
-    if stream:
+    if stream and isinstance(stream, str):
         s_lower = stream.strip().lower()
         results = [m for m in results if m.stream and m.stream.strip().lower() == s_lower]
 
-    if project:
+    if project and isinstance(project, str):
         p_lower = project.strip().lower()
         results = [m for m in results if m.project.strip().lower() == p_lower]
 
-    if search:
+    if search and isinstance(search, str):
         q = search.strip().lower()
         results = [
             m for m in results

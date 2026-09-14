@@ -35,186 +35,14 @@ class ServiceRegistryEntry(BaseModel):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ENVIRONMENTS
-# ─────────────────────────────────────────────────────────────────────────────
-ARGO_ENVIRONMENTS: List[ArgoEnvConfig] = [
-    ArgoEnvConfig(
-        id="dev",
-        name="DEV",
-        url=os.getenv("ARGO_DEV_URL", "https://dev-argocd.cloudsolutions.com.sa"),
-        username=os.getenv("ARGO_DEV_USER", "admin"),
-        password=os.getenv("ARGO_DEV_PASSWORD", "Argo@123"),
-        aliases=["dev", "csi-dev", "development"],
-        is_production=False
-    ),
-    ArgoEnvConfig(
-        id="perf",
-        name="PERF",
-        url=os.getenv("ARGO_PERF_URL", "https://argocd.cloudsolutions.com.sa"),
-        username=os.getenv("ARGO_PERF_USER", "readonly"),
-        password=os.getenv("ARGO_PERF_PASSWORD", "Readonly@123"),
-        aliases=["perf", "qa", "vida-qa"],
-        is_production=False
-    ),
-    ArgoEnvConfig(
-        id="vida-uat",
-        name="VIDA UAT (hmg-uat)",
-        url=os.getenv("ARGO_UAT_URL", "https://argocd-vidauat2.cloudsolutions.com.sa"),
-        username=os.getenv("ARGO_UAT_USER", "supportAdmin"),
-        password=os.getenv("ARGO_UAT_PASSWORD", "cG50DI@55@"),
-        aliases=["uat", "vida-uat", "hmg-uat", "vidauat"],
-        is_production=False
-    ),
-    ArgoEnvConfig(
-        id="hmg-prod",
-        name="HMG PROD",
-        url=os.getenv("ARGO_HMG_PROD_URL", "https://argo.hmg.com"),
-        username=os.getenv("ARGO_HMG_PROD_USER", "supportuser"),
-        password=os.getenv("ARGO_HMG_PROD_PASSWORD", "Support@hmg"),
-        aliases=["hmg", "hmg-prod", "prod", "vida-prod"],
-        is_production=True
-    ),
-    ArgoEnvConfig(
-        id="hmg-pre-prod",
-        name="HMG PRE-PROD",
-        url=os.getenv("ARGO_HMG_PREPROD_URL", "https://argo.hmg.com"),
-        username=os.getenv("ARGO_HMG_PREPROD_USER", "supportuser"),
-        password=os.getenv("ARGO_HMG_PREPROD_PASSWORD", "Support@hmg"),
-        aliases=["hmg-pre-prod", "pre-prod", "preprod"],
-        is_production=False
-    ),
-    ArgoEnvConfig(
-        id="s1-prod",
-        name="S1 PROD",
-        url=os.getenv("ARGO_S1_PROD_URL", "https://prod-aseer-argo.moh.gov.sa"),
-        username=os.getenv("ARGO_S1_PROD_USER", "supportuser"),
-        password=os.getenv("ARGO_S1_PROD_PASSWORD", "Support@aseer"),
-        aliases=["s1-prod", "aseer-prod", "s1prod", "aseer"],
-        is_production=True
-    ),
-    ArgoEnvConfig(
-        id="s1-uat",
-        name="S1 UAT",
-        url=os.getenv("ARGO_S1_UAT_URL", "https://aseer-argo.moh.gov.sa"),
-        username=os.getenv("ARGO_S1_UAT_USER", "admin"),
-        password=os.getenv("ARGO_S1_UAT_PASSWORD", "Argo@123"),
-        aliases=["s1-uat", "aseer-uat", "s1uat"],
-        is_production=False
-    ),
-    ArgoEnvConfig(
-        id="s2-uat",
-        name="S2 UAT",
-        url=os.getenv("ARGO_S2_UAT_URL", "http://argos2.moh.gov.sa"),
-        username=os.getenv("ARGO_S2_UAT_USER", "readonly"),
-        password=os.getenv("ARGO_S2_UAT_PASSWORD", "readonly@s2"),
-        aliases=["s2-uat", "s2uat", "s2"],
-        is_production=False
-    ),
-    ArgoEnvConfig(
-        id="s2-prod",
-        name="S2 PROD",
-        url=os.getenv("ARGO_S2_PROD_URL", "http://argos2-prod.moh.gov.sa"),
-        username=os.getenv("ARGO_S2_PROD_USER", "readonly"),
-        password=os.getenv("ARGO_S2_PROD_PASSWORD", "readonly@s2"),
-        aliases=["s2-prod", "s2prod"],
-        is_production=True
-    ),
-    ArgoEnvConfig(
-        id="s3-uat",
-        name="S3 UAT",
-        url=os.getenv("ARGO_S3_UAT_URL", "http://argos3.moh.gov.sa"),
-        username=os.getenv("ARGO_S3_UAT_USER", "readonly"),
-        password=os.getenv("ARGO_S3_UAT_PASSWORD", "readonly@s3"),
-        aliases=["s3-uat", "s3uat", "s3"],
-        is_production=False
-    ),
-    ArgoEnvConfig(
-        id="s3-prod",
-        name="S3 PROD",
-        url=os.getenv("ARGO_S3_PROD_URL", "http://argos3-prod.moh.gov.sa"),
-        username=os.getenv("ARGO_S3_PROD_USER", "readonly"),
-        password=os.getenv("ARGO_S3_PROD_PASSWORD", "readonly@s3"),
-        aliases=["s3-prod", "s3prod"],
-        is_production=True
-    ),
-    ArgoEnvConfig(
-        id="kkuh-prod",
-        name="KKUH PROD",
-        url=os.getenv("ARGO_KKUH_PROD_URL", "https://argocd.kkuh.med.sa"),
-        username=os.getenv("ARGO_KKUH_PROD_USER", "readonly"),
-        password=os.getenv("ARGO_KKUH_PROD_PASSWORD", "readonly@kkuh"),
-        aliases=["kkuh-prod", "kkuh", "kkuhprod"],
-        is_production=True
-    ),
-    ArgoEnvConfig(
-        id="kkuh-uat",
-        name="KKUH UAT",
-        url=os.getenv("ARGO_KKUH_UAT_URL", "https://argocd-uat.kkuh.med.sa"),
-        username=os.getenv("ARGO_KKUH_UAT_USER", "readonly"),
-        password=os.getenv("ARGO_KKUH_UAT_PASSWORD", "readonly@kkuh"),
-        aliases=["kkuh-uat", "kkuhuat"],
-        is_production=False
-    ),
-    ArgoEnvConfig(
-        id="kfsh-prod",
-        name="KFSH PROD",
-        url=os.getenv("ARGO_KFSH_PROD_URL", "https://argo.kfshrc.edu.sa"),
-        username=os.getenv("ARGO_KFSH_PROD_USER", "supportuser"),
-        password=os.getenv("ARGO_KFSH_PROD_PASSWORD", "Support@kfsh"),
-        aliases=["kfsh-prod", "kfsh", "kfshrc"],
-        is_production=True
-    ),
-    ArgoEnvConfig(
-        id="kauh-prod",
-        name="KAUH PROD",
-        url=os.getenv("ARGO_KAUH_PROD_URL", "https://argocd.kauh.med.sa"),
-        username=os.getenv("ARGO_KAUH_PROD_USER", "readonly"),
-        password=os.getenv("ARGO_KAUH_PROD_PASSWORD", "readonly@kauh"),
-        aliases=["kauh-prod", "kauh", "kauhprod"],
-        is_production=True
-    ),
-    ArgoEnvConfig(
-        id="kauh-uat",
-        name="KAUH UAT",
-        url=os.getenv("ARGO_KAUH_UAT_URL", "https://argocd-uat.kauh.med.sa"),
-        username=os.getenv("ARGO_KAUH_UAT_USER", "readonly"),
-        password=os.getenv("ARGO_KAUH_UAT_PASSWORD", "readonly@kauh"),
-        aliases=["kauh-uat", "kauhuat"],
-        is_production=False
-    ),
-    ArgoEnvConfig(
-        id="nbcc-prod",
-        name="NBCC PROD",
-        url=os.getenv("ARGO_NBCC_PROD_URL", "https://argo.nbcc.com.sa"),
-        username=os.getenv("ARGO_NBCC_PROD_USER", "supportuser"),
-        password=os.getenv("ARGO_NBCC_PROD_PASSWORD", "Support@nbcc"),
-        aliases=["nbcc-prod", "nbcc"],
-        is_production=True
-    ),
-    ArgoEnvConfig(
-        id="rsg-prod",
-        name="RSG PROD",
-        url=os.getenv("ARGO_RSG_PROD_URL", "https://argo.rsg.com.sa"),
-        username=os.getenv("ARGO_RSG_PROD_USER", "supportuser"),
-        password=os.getenv("ARGO_RSG_PROD_PASSWORD", "Support@rsg"),
-        aliases=["rsg-prod", "rsg"],
-        is_production=True
-    ),
-]
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SERVICE REGISTRY & STREAMS (Single Source of Truth: Firebase Firestore)
+# FIREBASE FIRESTORE CONSTANTS & PARSER
 # ─────────────────────────────────────────────────────────────────────────────
 FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "dev-helper-87942")
-FIREBASE_SERVICE_REGISTRY_URL = os.getenv(
-    "FIREBASE_SERVICE_REGISTRY_URL",
-    f"https://firestore.googleapis.com/v1/projects/{FIREBASE_PROJECT_ID}/databases/(default)/documents/global/serviceRegistry"
-)
+FIREBASE_BASE_DOC_URL = f"https://firestore.googleapis.com/v1/projects/{FIREBASE_PROJECT_ID}/databases/(default)/documents/global"
+FIREBASE_ARGOCD_URL = os.getenv("FIREBASE_ARGOCD_URL", f"{FIREBASE_BASE_DOC_URL}/argocd")
+FIREBASE_KEYCLOAK_URL = os.getenv("FIREBASE_KEYCLOAK_URL", f"{FIREBASE_BASE_DOC_URL}/keycloak")
+FIREBASE_SERVICE_REGISTRY_URL = os.getenv("FIREBASE_SERVICE_REGISTRY_URL", f"{FIREBASE_BASE_DOC_URL}/serviceRegistry")
 SERVICES_CACHE_TTL = int(os.getenv("SERVICES_CACHE_TTL_SECONDS", "300"))  # 5 minutes
-
-_SERVICES_CACHE: List[ServiceRegistryEntry] = []
-_SERVICES_CACHE_TIME: float = 0.0
 
 
 def _parse_firestore_value(val: Any) -> Any:
@@ -232,6 +60,137 @@ def _parse_firestore_value(val: Any) -> Any:
     elif "mapValue" in val:
         return {k: _parse_firestore_value(v) for k, v in val["mapValue"].get("fields", {}).items()}
     return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ARGO ENVIRONMENTS (Single Source of Truth: Firebase Firestore global/argocd)
+# ─────────────────────────────────────────────────────────────────────────────
+_ARGO_ENV_CACHE: List[ArgoEnvConfig] = []
+_ARGO_ENV_CACHE_TIME: float = 0.0
+
+
+def fetch_argo_envs_from_firebase() -> List[ArgoEnvConfig]:
+    """
+    Fetches the single source of truth for ArgoCD environments from Firebase Firestore.
+    Document: global/argocd
+    """
+    import re
+    try:
+        resp = requests.get(FIREBASE_ARGOCD_URL, timeout=8)
+        if resp.status_code == 200:
+            data = resp.json()
+            fields = data.get("fields", {})
+            raw_envs = _parse_firestore_value(fields.get("argocdEnvs", {}))
+            if isinstance(raw_envs, list):
+                envs: List[ArgoEnvConfig] = []
+                for e in raw_envs:
+                    if not isinstance(e, dict):
+                        continue
+                    name = str(e.get("name", "")).strip()
+                    raw_id = str(e.get("id", "")).strip()
+                    url = str(e.get("url", "")).strip()
+                    username = str(e.get("username", "")).strip()
+                    password = str(e.get("password", "")).strip() if e.get("password") else None
+
+                    # Generate clean slug id from name, e.g. "VIDA UAT (hmg-uat)" -> "vida-uat"
+                    base_name = re.sub(r'\(.*?\)', '', name).strip()
+                    clean_id = re.sub(r'[^a-z0-9]+', '-', base_name.lower()).strip('-')
+                    env_id = clean_id or raw_id
+
+                    aliases = [name.lower(), raw_id.lower()]
+                    if clean_id and clean_id not in aliases:
+                        aliases.append(clean_id)
+
+                    # Extract parenthesized tags, e.g. (hmg-uat)
+                    match = re.search(r'\((.*?)\)', name.lower())
+                    if match:
+                        p_slug = re.sub(r'[^a-z0-9]+', '-', match.group(1).strip()).strip('-')
+                        if p_slug and p_slug not in aliases:
+                            aliases.append(p_slug)
+                        aliases.append(match.group(1).strip())
+
+                    # Common abbreviations & aliases
+                    if "vida-uat" in aliases:
+                        for a in ["uat", "vidauat"]:
+                            if a not in aliases:
+                                aliases.append(a)
+                    if "dev" in aliases:
+                        for a in ["csi-dev", "development"]:
+                            if a not in aliases:
+                                aliases.append(a)
+                    if "perf" in aliases:
+                        for a in ["qa", "vida-qa"]:
+                            if a not in aliases:
+                                aliases.append(a)
+                    if "hmg-prod" in aliases:
+                        for a in ["hmg", "prod", "vida-prod"]:
+                            if a not in aliases:
+                                aliases.append(a)
+                    if "s1-prod" in aliases:
+                        for a in ["aseer", "aseer-prod", "s1prod"]:
+                            if a not in aliases:
+                                aliases.append(a)
+
+                    is_prod = "prod" in name.lower() and "pre" not in name.lower()
+
+                    envs.append(
+                        ArgoEnvConfig(
+                            id=env_id,
+                            name=name,
+                            url=url,
+                            username=username,
+                            password=password,
+                            aliases=aliases,
+                            is_production=is_prod
+                        )
+                    )
+                logger.info(f"Loaded {len(envs)} ArgoCD environments from Firebase Firestore (global/argocd)")
+                return envs
+        logger.warning(f"Failed to load ArgoCD environments from Firebase: HTTP {resp.status_code}")
+    except Exception as e:
+        logger.warning(f"Error fetching ArgoCD environments from Firebase: {e}")
+    return []
+
+
+def get_all_environments(force_refresh: bool = False) -> List[ArgoEnvConfig]:
+    """Returns all ArgoCD environments from Firebase Firestore (cached for SERVICES_CACHE_TTL seconds)."""
+    global _ARGO_ENV_CACHE, _ARGO_ENV_CACHE_TIME
+    now = time.time()
+    if force_refresh or not _ARGO_ENV_CACHE or (now - _ARGO_ENV_CACHE_TIME > SERVICES_CACHE_TTL):
+        fb_envs = fetch_argo_envs_from_firebase()
+        if fb_envs:
+            _ARGO_ENV_CACHE = fb_envs
+            _ARGO_ENV_CACHE_TIME = now
+    return _ARGO_ENV_CACHE
+
+
+class DynamicEnvironmentList:
+    """Dynamic proxy list resolving to Firebase Firestore single source of truth for environments."""
+    def __iter__(self):
+        return iter(get_all_environments())
+
+    def __len__(self):
+        return len(get_all_environments())
+
+    def __getitem__(self, item):
+        return get_all_environments()[item]
+
+    def __contains__(self, item):
+        return item in get_all_environments()
+
+    def __repr__(self):
+        return repr(get_all_environments())
+
+
+# Backward-compatible proxy to single source of truth
+ARGO_ENVIRONMENTS: Any = DynamicEnvironmentList()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SERVICE REGISTRY & STREAMS (Single Source of Truth: Firebase Firestore)
+# ─────────────────────────────────────────────────────────────────────────────
+_SERVICES_CACHE: List[ServiceRegistryEntry] = []
+_SERVICES_CACHE_TIME: float = 0.0
 
 
 def fetch_services_from_firebase() -> List[ServiceRegistryEntry]:
@@ -429,157 +388,61 @@ class KeycloakEnvConfig(BaseModel):
     aliases: List[str] = Field(default_factory=list, description="Fuzzy matching aliases for this environment")
 
 
-DEFAULT_KEYCLOAK_ENVIRONMENTS: List[KeycloakEnvConfig] = [
-    KeycloakEnvConfig(
-        envName="alibaba-prod",
-        baseUrl="https://apphiss1vi.moh.gov.sa/auth",
-        realm="apphiss1vi",
-        clientId="app",
-        username="azlee",
-        password=os.getenv("KEYCLOAK_S1_PASSWORD", "SRE@support"),
-        defaultHospitalGroupId="110",
-        aliases=["s1-prod", "s1", "alibaba-prod", "aseer-prod", "aseer", "s1-uat", "alibaba"]
-    ),
-    KeycloakEnvConfig(
-        envName="dev",
-        baseUrl="https://dev.cloudsolutions.com.sa/auth",
-        realm="dev",
-        clientId="app",
-        username="5547",
-        password=os.getenv("KEYCLOAK_DEV_PASSWORD", "123"),
-        defaultHospitalGroupId="1",
-        defaultHospitalIds=["1"],
-        aliases=["dev", "development", "csi-dev"]
-    ),
-    KeycloakEnvConfig(
-        envName="perf",
-        baseUrl="https://vidaqa.cloudsolutions.com.sa/auth",
-        realm="vidaqa",
-        clientId="app",
-        username="5547",
-        password=os.getenv("KEYCLOAK_PERF_PASSWORD", "123"),
-        defaultHospitalGroupId="1",
-        defaultHospitalIds=["1"],
-        aliases=["perf", "qa", "vida-qa"]
-    ),
-    KeycloakEnvConfig(
-        envName="hmg-prod",
-        baseUrl="https://vidaprod.hmg.com/auth",
-        realm="vidaprod",
-        clientId="app",
-        username="220116",
-        password=os.getenv("KEYCLOAK_HMG_PROD_PASSWORD", "RPharmacy@1984"),
-        defaultHospitalGroupId="1",
-        defaultHospitalIds=["1"],
-        aliases=["hmg-prod", "hmg", "vidaprod", "prod"]
-    ),
-    KeycloakEnvConfig(
-        envName="hmg-pre-prod",
-        baseUrl="https://vidapreprod.hmg.com/auth",
-        realm="vidapreprod",
-        clientId="app",
-        username="7001",
-        password=os.getenv("KEYCLOAK_HMG_PREPROD_PASSWORD", "123"),
-        defaultHospitalGroupId="1",
-        defaultHospitalIds=["1"],
-        aliases=["hmg-pre-prod", "preprod", "pre-prod", "vidapreprod"]
-    ),
-    KeycloakEnvConfig(
-        envName="csi-uat2",
-        baseUrl="https://hmguat.cloudsolutions.com.sa/auth",
-        realm="hmguat",
-        clientId="app",
-        username="600000",
-        password=os.getenv("KEYCLOAK_UAT_PASSWORD", "123"),
-        defaultHospitalGroupId="1",
-        defaultHospitalIds=["1"],
-        aliases=["csi-uat2", "uat", "vida-uat", "hmg-uat", "vidauat"]
-    ),
-    KeycloakEnvConfig(
-        envName="s2-prod",
-        baseUrl="https://apphiss2vi.moh.gov.sa/auth",
-        realm="apphiss2vi",
-        clientId="app",
-        username="csl2",
-        password=os.getenv("KEYCLOAK_S2_PASSWORD", "AppSup123456"),
-        defaultHospitalGroupId="110",
-        aliases=["s2-prod", "s2", "s2-uat", "mch"]
-    ),
-    KeycloakEnvConfig(
-        envName="s3-prod",
-        baseUrl="https://apphiss3vi.moh.gov.sa/auth",
-        realm="apphiss3vi",
-        clientId="app",
-        username="L3",
-        password=os.getenv("KEYCLOAK_S3_PASSWORD", "L3@123"),
-        defaultHospitalGroupId="110",
-        aliases=["s3-prod", "s3", "jazan"]
-    ),
-    KeycloakEnvConfig(
-        envName="s3-uat",
-        baseUrl="https://apphiss3viu.moh.gov.sa",
-        realm="apphiss3viu",
-        clientId="frontend-client",
-        username="2303",
-        password=os.getenv("KEYCLOAK_S3_UAT_PASSWORD", "123"),
-        defaultHospitalGroupId="110",
-        aliases=["s3-uat", "s3u"]
-    ),
-    KeycloakEnvConfig(
-        envName="kfsh-prod",
-        baseUrl="https://apphisw1vi.moh.gov.sa/auth",
-        realm="apphisw1vi",
-        clientId="app",
-        username="SRE",
-        password=os.getenv("KEYCLOAK_KFSH_PASSWORD", "SRE@123"),
-        defaultHospitalGroupId="110",
-        aliases=["kfsh-prod", "kfsh", "kfshrc", "apphisw1vi"]
-    )
-]
-
-_FIRESTORE_CACHE: Dict[str, Any] = {"envs": None, "timestamp": 0}
+_KEYCLOAK_CACHE: Dict[str, Any] = {"envs": None, "timestamp": 0}
 
 
-def get_all_keycloak_envs() -> List[KeycloakEnvConfig]:
-    """Returns Keycloak environment configurations, querying Firestore if available or using defaults."""
-    import time
-    now = time.time()
-    if _FIRESTORE_CACHE["envs"] and (now - _FIRESTORE_CACHE["timestamp"] < 300):
-        return _FIRESTORE_CACHE["envs"]
-
-    # Try fetching fresh configs from Firebase REST API
+def fetch_keycloak_envs_from_firebase() -> List[KeycloakEnvConfig]:
+    """
+    Fetches the single source of truth for Keycloak environments from Firebase Firestore.
+    Document: global/keycloak
+    """
     try:
-        import urllib.request
-        import json
-        url = "https://firestore.googleapis.com/v1/projects/dev-helper-87942/databases/(default)/documents/global/keycloak"
-        req = urllib.request.Request(url, headers={"User-Agent": "csi-helper/4.1.0"})
-        with urllib.request.urlopen(req, timeout=4) as resp:
-            if resp.status == 200:
-                data = json.loads(resp.read().decode("utf-8"))
-                values = data.get("fields", {}).get("keycloakEnvs", {}).get("arrayValue", {}).get("values", [])
-                fetched: List[KeycloakEnvConfig] = []
-                for v in values:
-                    f = v.get("mapValue", {}).get("fields", {})
-                    name = f.get("envName", {}).get("stringValue", "")
-                    base = f.get("baseUrl", {}).get("stringValue", "")
-                    realm = f.get("realm", {}).get("stringValue", "")
-                    client = f.get("clientId", {}).get("stringValue", "app")
-                    user = f.get("username", {}).get("stringValue", "")
-                    pwd = f.get("password", {}).get("stringValue", "")
+        resp = requests.get(FIREBASE_KEYCLOAK_URL, timeout=8)
+        if resp.status_code == 200:
+            data = resp.json()
+            fields = data.get("fields", {})
+            values = fields.get("keycloakEnvs", {}).get("arrayValue", {}).get("values", [])
+            fetched: List[KeycloakEnvConfig] = []
+            for v in values:
+                f = v.get("mapValue", {}).get("fields", {})
+                name = f.get("envName", {}).get("stringValue", "").strip()
+                base = f.get("baseUrl", {}).get("stringValue", "").strip()
+                realm = f.get("realm", {}).get("stringValue", "").strip()
+                client = f.get("clientId", {}).get("stringValue", "app").strip()
+                user = f.get("username", {}).get("stringValue", "").strip()
+                pwd = f.get("password", {}).get("stringValue", "").strip() or None
 
-                    if name and base and realm:
-                        # Match aliases & hospital defaults from defaults if known
-                        matched_def = next((d for d in DEFAULT_KEYCLOAK_ENVIRONMENTS if d.envName == name or name in d.aliases), None)
-                        aliases = list(matched_def.aliases) if matched_def else [name.lower()]
-                        if name.lower() not in aliases:
-                            aliases.append(name.lower())
-                        grp = matched_def.defaultHospitalGroupId if matched_def else ("110" if "moh.gov.sa" in base else "1")
-                        hosp_ids = matched_def.defaultHospitalIds if matched_def else (["1"] if grp == "1" else [
-                            "331", "343", "333", "344", "348", "337", "352", "330", "341", "349", "336", "357",
-                            "353", "342", "335", "347", "346", "355", "350", "340", "351", "332", "339", "345"
-                        ])
+                if name and base and realm:
+                    aliases = [name.lower()]
+                    if name == "alibaba-prod":
+                        aliases.extend(["s1-prod", "s1", "aseer-prod", "aseer", "s1-uat", "alibaba"])
+                    elif name == "csi-uat2":
+                        aliases.extend(["uat", "vida-uat", "hmg-uat", "vidauat"])
+                    elif name == "hmg-prod":
+                        aliases.extend(["hmg", "vidaprod", "prod"])
+                    elif name == "hmg-pre-prod":
+                        aliases.extend(["preprod", "pre-prod", "vidapreprod"])
+                    elif name == "perf":
+                        aliases.extend(["qa", "vida-qa"])
+                    elif name == "dev":
+                        aliases.extend(["development", "csi-dev"])
+                    elif name == "s2-prod":
+                        aliases.extend(["s2", "s2-uat", "mch"])
+                    elif name == "s3-prod":
+                        aliases.extend(["s3", "jazan"])
+                    elif name == "s3-uat":
+                        aliases.extend(["s3u"])
+                    elif name == "kfsh-prod":
+                        aliases.extend(["kfsh", "kfshrc", "apphisw1vi"])
 
-                        fetched.append(KeycloakEnvConfig(
+                    grp = "110" if "moh.gov.sa" in base else "1"
+                    hosp_ids = ["1"] if grp == "1" else [
+                        "331", "343", "333", "344", "348", "337", "352", "330", "341", "349", "336", "357",
+                        "353", "342", "335", "347", "346", "355", "350", "340", "351", "332", "339", "345"
+                    ]
+
+                    fetched.append(
+                        KeycloakEnvConfig(
                             envName=name,
                             baseUrl=base,
                             realm=realm,
@@ -588,20 +451,30 @@ def get_all_keycloak_envs() -> List[KeycloakEnvConfig]:
                             password=pwd,
                             defaultHospitalGroupId=grp,
                             defaultHospitalIds=hosp_ids,
-                            aliases=aliases
-                        ))
+                            aliases=list(set(aliases))
+                        )
+                    )
+            logger.info(f"Loaded {len(fetched)} Keycloak environments from Firebase Firestore (global/keycloak)")
+            return fetched
+        logger.warning(f"Failed to load Keycloak environments from Firebase: HTTP {resp.status_code}")
+    except Exception as e:
+        logger.warning(f"Error fetching Keycloak environments from Firebase: {e}")
+    return []
 
-                if fetched:
-                    _FIRESTORE_CACHE["envs"] = fetched
-                    _FIRESTORE_CACHE["timestamp"] = now
-                    return fetched
-    except Exception:
-        pass
 
-    # Fallback to seeded defaults
-    _FIRESTORE_CACHE["envs"] = DEFAULT_KEYCLOAK_ENVIRONMENTS
-    _FIRESTORE_CACHE["timestamp"] = now
-    return DEFAULT_KEYCLOAK_ENVIRONMENTS
+def get_all_keycloak_envs(force_refresh: bool = False) -> List[KeycloakEnvConfig]:
+    """Returns Keycloak environment configurations directly from Firebase Firestore."""
+    now = time.time()
+    if not force_refresh and _KEYCLOAK_CACHE["envs"] and (now - _KEYCLOAK_CACHE["timestamp"] < SERVICES_CACHE_TTL):
+        return _KEYCLOAK_CACHE["envs"]
+
+    envs = fetch_keycloak_envs_from_firebase()
+    if envs:
+        _KEYCLOAK_CACHE["envs"] = envs
+        _KEYCLOAK_CACHE["timestamp"] = now
+        return envs
+
+    return _KEYCLOAK_CACHE["envs"] or []
 
 
 def resolve_keycloak_env(env_name: str) -> Optional[KeycloakEnvConfig]:
