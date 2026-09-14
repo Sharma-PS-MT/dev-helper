@@ -303,7 +303,7 @@ def compare_deployments_post(
 )
 def get_single_module_deployment(
     module_key: str,
-    envs: Optional[str] = Query(None, description="Comma-separated environment IDs (default: dev,vida-uat,hmg-prod)"),
+    envs: Optional[str] = Query(None, description="Comma-separated environment IDs or names (default: first 3 environments from Firebase)"),
     refresh: bool = Query(False, description="Whether to bypass cache"),
     api_key: str = Depends(verify_api_key)
 ):
@@ -317,7 +317,7 @@ def get_single_module_deployment(
     target_envs = (
         [e.strip() for e in envs.split(",") if e.strip()]
         if envs
-        else ["dev", "vida-uat", "hmg-prod"]
+        else [e.id for e in get_all_environments()[:3]]
     )
 
     try:
