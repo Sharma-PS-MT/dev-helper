@@ -6,9 +6,11 @@ Supports environment variable overrides for secrets and URLs.
 """
 
 import os
+import re
 import time
 import logging
 import requests
+from urllib.parse import urlparse
 from typing import List, Dict, Optional, Any
 from pydantic import BaseModel, Field
 
@@ -62,6 +64,76 @@ def _parse_firestore_value(val: Any) -> Any:
     return None
 
 
+def _generate_generic_aliases(*sources: Optional[str]) -> List[str]:
+    """
+    Dynamically generates search aliases purely from Firebase fields (names, IDs, URLs, realms)
+    without any hardcoded environment names or special cases.
+    Extracts slugs, condensed strings, parentheses, base names, and URL host parts.
+    """
+    aliases = set()
+    for src in sources:
+        if not src:
+            continue
+        text = str(src).strip().lower()
+        if not text:
+            continue
+        aliases.add(text)
+
+        # Hyphenated slug (e.g. "s1-prod", "vida-uat")
+        slug = re.sub(r'[^a-z0-9]+', '-', text).strip('-')
+        if slug:
+            aliases.add(slug)
+
+        # Condensed alphanumeric (e.g. "s1prod", "vidauat")
+        condensed = re.sub(r'[^a-z0-9]', '', text)
+        if condensed:
+            aliases.add(condensed)
+
+        # Text inside parentheses (e.g. "(hmg-uat)" -> "hmg-uat", "hmguat")
+        match = re.search(r'\((.*?)\)', text)
+        if match:
+            inner = match.group(1).strip()
+            aliases.add(inner)
+            inner_slug = re.sub(r'[^a-z0-9]+', '-', inner).strip('-')
+            if inner_slug:
+                aliases.add(inner_slug)
+            inner_cond = re.sub(r'[^a-z0-9]', '', inner)
+            if inner_cond:
+                aliases.add(inner_cond)
+
+        # Text outside parentheses (e.g. "VIDA UAT (hmg-uat)" -> "vida uat", "vidauat")
+        base = re.sub(r'\(.*?\)', '', text).strip()
+        base_slug = re.sub(r'[^a-z0-9]+', '-', base).strip('-')
+        if base_slug:
+            aliases.add(base_slug)
+        base_cond = re.sub(r'[^a-z0-9]', '', base)
+        if base_cond:
+            aliases.add(base_cond)
+
+        # If source is a URL, extract host and subdomain parts (e.g. "prod-aseer-argo" -> "aseer", "argo")
+        if "://" in text:
+            try:
+                host = urlparse(text).hostname or ""
+                host_slug = re.sub(r'[^a-z0-9]+', '-', host).strip('-')
+                if host_slug:
+                    aliases.add(host_slug)
+                subdomain = host.split('.')[0]
+                if subdomain:
+                    aliases.add(subdomain)
+                    for subpart in subdomain.split('-'):
+                        if len(subpart) > 1:
+                            aliases.add(subpart)
+            except Exception:
+                pass
+
+        # Individual word tokens of length >= 2
+        for token in re.split(r'[^a-z0-9]+', text):
+            if len(token) >= 2:
+                aliases.add(token)
+
+    return sorted(list(aliases))
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # ARGO ENVIRONMENTS (Single Source of Truth: Firebase Firestore global/argocd)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -74,7 +146,6 @@ def fetch_argo_envs_from_firebase() -> List[ArgoEnvConfig]:
     Fetches the single source of truth for ArgoCD environments from Firebase Firestore.
     Document: global/argocd
     """
-    import re
     try:
         resp = requests.get(FIREBASE_ARGOCD_URL, timeout=8)
         if resp.status_code == 200:
@@ -97,40 +168,8 @@ def fetch_argo_envs_from_firebase() -> List[ArgoEnvConfig]:
                     clean_id = re.sub(r'[^a-z0-9]+', '-', base_name.lower()).strip('-')
                     env_id = clean_id or raw_id
 
-                    aliases = [name.lower(), raw_id.lower()]
-                    if clean_id and clean_id not in aliases:
-                        aliases.append(clean_id)
-
-                    # Extract parenthesized tags, e.g. (hmg-uat)
-                    match = re.search(r'\((.*?)\)', name.lower())
-                    if match:
-                        p_slug = re.sub(r'[^a-z0-9]+', '-', match.group(1).strip()).strip('-')
-                        if p_slug and p_slug not in aliases:
-                            aliases.append(p_slug)
-                        aliases.append(match.group(1).strip())
-
-                    # Common abbreviations & aliases
-                    if "vida-uat" in aliases:
-                        for a in ["uat", "vidauat"]:
-                            if a not in aliases:
-                                aliases.append(a)
-                    if "dev" in aliases:
-                        for a in ["csi-dev", "development"]:
-                            if a not in aliases:
-                                aliases.append(a)
-                    if "perf" in aliases:
-                        for a in ["qa", "vida-qa"]:
-                            if a not in aliases:
-                                aliases.append(a)
-                    if "hmg-prod" in aliases:
-                        for a in ["hmg", "prod", "vida-prod"]:
-                            if a not in aliases:
-                                aliases.append(a)
-                    if "s1-prod" in aliases:
-                        for a in ["aseer", "aseer-prod", "s1prod"]:
-                            if a not in aliases:
-                                aliases.append(a)
-
+                    # Dynamic alias generation purely from Firebase fields (name, id, url)
+                    aliases = _generate_generic_aliases(name, raw_id, clean_id, url)
                     is_prod = "prod" in name.lower() and "pre" not in name.lower()
 
                     envs.append(
@@ -273,17 +312,32 @@ KNOWN_SERVICES: Any = DynamicServiceList()
 # RESOLUTION HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
 def resolve_environment(query: str) -> Optional[ArgoEnvConfig]:
-    """Resolves an environment ID, name, or alias to an ArgoEnvConfig."""
+    """Resolves an environment ID, name, or alias to an ArgoEnvConfig using Firebase single source of truth."""
     q = query.strip().lower()
-    for env in ARGO_ENVIRONMENTS:
+    q_cond = re.sub(r'[^a-z0-9]', '', q)
+    envs = get_all_environments()
+
+    # 1. Exact match on id or name
+    for env in envs:
         if env.id.lower() == q or env.name.lower() == q:
             return env
+
+    # 2. Exact match in aliases
+    for env in envs:
         if any(alias.lower() == q for alias in env.aliases):
             return env
-    # Substring match fallback
-    for env in ARGO_ENVIRONMENTS:
-        if q in env.id.lower() or q in env.name.lower():
+
+    # 3. Condensed alphanumeric match (e.g. 'vidauat' matches 'VIDA UAT', 's1prod' matches 'S1 PROD')
+    if q_cond:
+        for env in envs:
+            if any(re.sub(r'[^a-z0-9]', '', a) == q_cond for a in env.aliases):
+                return env
+
+    # 4. Substring match fallback
+    for env in envs:
+        if q in env.id.lower() or q in env.name.lower() or any(q in alias.lower() for alias in env.aliases):
             return env
+
     return None
 
 
@@ -315,11 +369,44 @@ def get_services_by_stream(stream_key: str) -> List[ServiceRegistryEntry]:
     return [s for s in get_all_services() if s.stream and s.stream.strip().lower() == sk]
 
 
-CSI_ROOT = os.getenv("CSI_WORKSPACE_ROOT", "D:\\CSI")
+def _detect_csi_root() -> str:
+    """Auto-detects the CSI workspace root directory."""
+    env_root = os.getenv("CSI_WORKSPACE_ROOT")
+    if env_root and os.path.isdir(env_root):
+        return env_root
+
+    # Try detecting relative to this repo:
+    # csi-helper is typically at <CSI_ROOT>/OTHER/csi-helper or <CSI_ROOT>/csi-helper
+    current_file = os.path.abspath(__file__)
+    python_ai_dir = os.path.dirname(current_file)
+    csi_helper_dir = os.path.dirname(python_ai_dir)
+    parent_1 = os.path.dirname(csi_helper_dir)  # e.g. D:\CSI\OTHER or D:\CSI
+    parent_2 = os.path.dirname(parent_1)        # e.g. D:\CSI
+
+    for candidate in [parent_2, parent_1]:
+        if os.path.isdir(candidate):
+            try:
+                subdirs = [d.lower() for d in os.listdir(candidate) if os.path.isdir(os.path.join(candidate, d))]
+                if any(x in subdirs for x in ["bm", "other", "automation", "integrations", "pharmacy", "vidaf"]):
+                    return candidate
+            except Exception:
+                pass
+
+    if os.path.isdir("D:\\CSI"):
+        return "D:\\CSI"
+    if os.path.isdir("C:\\CSI"):
+        return "C:\\CSI"
+    return os.getenv("CSI_WORKSPACE_ROOT", "D:\\CSI")
+
+
+CSI_ROOT = _detect_csi_root()
 
 
 def find_local_repo_path(repo_name: str, project_hint: Optional[str] = None) -> Optional[str]:
-    """Locates the local Git repository on disk under CSI_ROOT."""
+    """Locates the local Git repository on disk under CSI_ROOT dynamically without hardcoded stream lists."""
+    if not os.path.isdir(CSI_ROOT):
+        return None
+
     if project_hint:
         direct = os.path.join(CSI_ROOT, project_hint, repo_name)
         if os.path.isdir(direct):
@@ -330,36 +417,29 @@ def find_local_repo_path(repo_name: str, project_hint: Optional[str] = None) -> 
     if os.path.isdir(direct_root):
         return direct_root
 
-    # Candidate folders
-    candidates = [
-        "BM",
-        "Patient Management System",
-        "Medical Leave Management",
-        "Resource Management System",
-        "Integrations",
-        "Java",
-        "Pharmacy",
-        "EMPI",
-        "VIDAF",
-        "Dental",
-        "Automation",
-        "OTHER"
-    ]
+    # Dynamically scan all top-level subdirectories of CSI_ROOT
+    try:
+        subdirs = [
+            d for d in os.listdir(CSI_ROOT)
+            if os.path.isdir(os.path.join(CSI_ROOT, d)) and not d.startswith(".")
+        ]
+    except Exception:
+        subdirs = []
 
-    for folder in candidates:
+    # 1. Direct match in subdirectories: <CSI_ROOT>/<subfolder>/<repo_name>
+    for folder in subdirs:
         cand = os.path.join(CSI_ROOT, folder, repo_name)
         if os.path.isdir(cand):
             return cand
 
-    # Fuzzy search
-    for folder in candidates:
+    # 2. Case-insensitive or fuzzy match within subdirectories
+    repo_lower = repo_name.lower()
+    for folder in subdirs:
         folder_path = os.path.join(CSI_ROOT, folder)
-        if not os.path.isdir(folder_path):
-            continue
         try:
             for item in os.listdir(folder_path):
                 sub = os.path.join(folder_path, item)
-                if os.path.isdir(sub) and (item.lower() == repo_name.lower() or repo_name.lower() in item.lower()):
+                if os.path.isdir(sub) and (item.lower() == repo_lower or repo_lower in item.lower()):
                     return sub
         except Exception:
             pass
@@ -413,27 +493,8 @@ def fetch_keycloak_envs_from_firebase() -> List[KeycloakEnvConfig]:
                 pwd = f.get("password", {}).get("stringValue", "").strip() or None
 
                 if name and base and realm:
-                    aliases = [name.lower()]
-                    if name == "alibaba-prod":
-                        aliases.extend(["s1-prod", "s1", "aseer-prod", "aseer", "s1-uat", "alibaba"])
-                    elif name == "csi-uat2":
-                        aliases.extend(["uat", "vida-uat", "hmg-uat", "vidauat"])
-                    elif name == "hmg-prod":
-                        aliases.extend(["hmg", "vidaprod", "prod"])
-                    elif name == "hmg-pre-prod":
-                        aliases.extend(["preprod", "pre-prod", "vidapreprod"])
-                    elif name == "perf":
-                        aliases.extend(["qa", "vida-qa"])
-                    elif name == "dev":
-                        aliases.extend(["development", "csi-dev"])
-                    elif name == "s2-prod":
-                        aliases.extend(["s2", "s2-uat", "mch"])
-                    elif name == "s3-prod":
-                        aliases.extend(["s3", "jazan"])
-                    elif name == "s3-uat":
-                        aliases.extend(["s3u"])
-                    elif name == "kfsh-prod":
-                        aliases.extend(["kfsh", "kfshrc", "apphisw1vi"])
+                    # Dynamic alias generation purely from Firebase fields (envName, realm, baseUrl)
+                    aliases = _generate_generic_aliases(name, realm, base)
 
                     grp = "110" if "moh.gov.sa" in base else "1"
                     hosp_ids = ["1"] if grp == "1" else [
@@ -478,13 +539,14 @@ def get_all_keycloak_envs(force_refresh: bool = False) -> List[KeycloakEnvConfig
 
 
 def resolve_keycloak_env(env_name: str) -> Optional[KeycloakEnvConfig]:
-    """Resolves an environment name or alias to its KeycloakEnvConfig."""
+    """Resolves an environment name, realm, or alias to its KeycloakEnvConfig from Firebase."""
     query = env_name.strip().lower()
+    q_cond = re.sub(r'[^a-z0-9]', '', query)
     envs = get_all_keycloak_envs()
 
-    # 1. Exact match on envName
+    # 1. Exact match on envName or realm
     for env in envs:
-        if env.envName.lower() == query:
+        if env.envName.lower() == query or env.realm.lower() == query:
             return env
 
     # 2. Exact match in aliases
@@ -492,9 +554,15 @@ def resolve_keycloak_env(env_name: str) -> Optional[KeycloakEnvConfig]:
         if any(a.lower() == query for a in env.aliases):
             return env
 
-    # 3. Substring match
+    # 3. Condensed match (e.g. 's1prod' matches 'alibaba-prod' with realm 'apphiss1vi')
+    if q_cond:
+        for env in envs:
+            if any(re.sub(r'[^a-z0-9]', '', a) == q_cond for a in env.aliases):
+                return env
+
+    # 4. Substring match
     for env in envs:
-        if query in env.envName.lower() or any(query in a.lower() for a in env.aliases):
+        if query in env.envName.lower() or query in env.realm.lower() or any(query in a.lower() for a in env.aliases):
             return env
 
     return None

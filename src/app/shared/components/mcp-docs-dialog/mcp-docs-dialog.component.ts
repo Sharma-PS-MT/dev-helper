@@ -110,13 +110,13 @@ interface McpToolInfo {
           </div>
           <p class="step-desc">To rebuild or run automated tests on the MCP server:</p>
           <div class="code-box">
-            <code>cd D:\\CSI\\OTHER\\csi-helper\\csi-helper-mcp&#10;npm run build&#10;node D:\\CSI\\OTHER\\csi-helper\\test_all_apis.js</code>
+            <code>cd path/to/csi-helper/csi-helper-mcp&#10;npm run build&#10;node ../test_all_apis.js</code>
           </div>
         </div>
       </div>
 
       <div class="modal-footer">
-        <span class="footer-note">CSI Helper MCP Server location: <code>D:\\CSI\\OTHER\\csi-helper\\csi-helper-mcp</code></span>
+        <span class="footer-note">CSI Helper MCP Server location: <code>csi-helper/csi-helper-mcp</code></span>
         <button mat-flat-button color="primary" (click)="close()">Close</button>
       </div>
     </div>
@@ -301,7 +301,7 @@ export class McpDocsDialogComponent {
       "csi-helper": {
         "command": "node",
         "args": [
-          "D:\\\\CSI\\\\OTHER\\\\csi-helper\\\\csi-helper-mcp\\\\dist\\\\index.js"
+          "<ABSOLUTE_PATH_TO>/csi-helper/csi-helper-mcp/dist/index.js"
         ],
         "env": {
           "CSI_HELPER_BASE_URL": "http://localhost:8000/api/v1",

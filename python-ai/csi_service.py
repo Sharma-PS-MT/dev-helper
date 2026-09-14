@@ -203,12 +203,21 @@ class CsiService:
         data = resp.json()
         items = data.get("items") or []
 
-        # Apply environment-specific namespace filter
-        env_upper = env.name.strip().upper()
-        if env_upper == "HMG PROD":
-            items = [a for a in items if a.get("spec", {}).get("destination", {}).get("namespace") == "vida-prod"]
-        elif env_upper == "HMG PRE-PROD":
-            items = [a for a in items if a.get("spec", {}).get("destination", {}).get("namespace") == "vida-uat"]
+        # On multi-namespace clusters, filter applications whose destination namespace matches environment aliases
+        namespaces_present = {
+            a.get("spec", {}).get("destination", {}).get("namespace")
+            for a in items if a.get("spec", {}).get("destination", {}).get("namespace")
+        }
+        if len(namespaces_present) > 1:
+            matched = [
+                a for a in items
+                if any(
+                    alias in (a.get("spec", {}).get("destination", {}).get("namespace") or "").lower()
+                    for alias in env.aliases
+                )
+            ]
+            if matched:
+                items = matched
 
         parsed_apps = [self._parse_app(raw, env) for raw in items]
 
