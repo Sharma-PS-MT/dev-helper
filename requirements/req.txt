@@ -1,8 +1,0 @@
-requirement no 1: in /token-gen i want to add another text boxed too just for saving part To add additional text boxes in the `/token-gen` 
-section for saving client-id, client-secret, tenant-id with modern standard ui/ux
-
-requirement no 2: compare-dialog component related feature dont want kindly remove this feature from the project as it is not needed anymore.
-
-requirement no 3: in the `/token-gen` section, please ensure that the new text boxes for client-id, client-secret, and tenant-id are properly 
-validated and have clear labels for better user experience.
-

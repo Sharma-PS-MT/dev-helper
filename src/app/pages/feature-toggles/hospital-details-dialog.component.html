@@ -1,0 +1,129 @@
+<div class="hospital-dialog-container">
+  <!-- Dialog Header -->
+  <div class="dialog-header">
+    <div class="header-left">
+      <div class="icon-avatar">
+        <mat-icon>local_hospital</mat-icon>
+      </div>
+      <div class="title-meta">
+        <div class="name-row">
+          <h2>{{ hospital.hospitalName }}</h2>
+          <span class="id-badge">ID: {{ hospital.id }}</span>
+        </div>
+        <div class="sub-meta">
+          <span class="meta-tag">
+            <mat-icon inline>tune</mat-icon> {{ enabledCount() }} Active Toggles across {{ environments.length }} environments
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button mat-icon-button mat-dialog-close class="close-btn" matTooltip="Close (Esc)">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <!-- Content: Hospital Feature Toggles -->
+  <div class="dialog-body toggles-tab">
+    <!-- Filter and Search Bar -->
+    <div class="modal-controls">
+      <div class="modal-search">
+        <mat-icon class="search-icon">search</mat-icon>
+        <input
+          type="text"
+          placeholder="Search feature flags for this hospital..."
+          [ngModel]="searchTerm()"
+          (ngModelChange)="searchTerm.set($event)"
+          class="search-input" />
+        <button *ngIf="searchTerm()" mat-icon-button class="clear-btn" (click)="searchTerm.set('')">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <div class="filter-pills">
+        <button class="pill" [class.active]="filterType() === 'all'" (click)="filterType.set('all')">
+          All Flags ({{ totalFlags() }})
+        </button>
+        <button class="pill pill-enabled-filter" [class.active]="filterType() === 'enabled'" (click)="filterType.set('enabled')">
+          Active ({{ enabledCount() }})
+        </button>
+        <button class="pill pill-targeted-filter" [class.active]="filterType() === 'targeted'" (click)="filterType.set('targeted')">
+          Targeted ({{ targetedCount() }})
+        </button>
+        <button class="pill pill-disabled-filter" [class.active]="filterType() === 'disabled'" (click)="filterType.set('disabled')">
+          Disabled
+        </button>
+      </div>
+    </div>
+
+    <!-- Toggles Table -->
+    <div class="modal-table-container">
+      <table class="modal-table">
+        <thead>
+          <tr>
+            <th class="col-flag">Feature Flag</th>
+            <th class="col-meta">Type & Ticket</th>
+            <th *ngFor="let env of environments" class="col-env">{{ env | uppercase }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of filteredFlagRows()" class="table-row">
+            <td class="cell-flag">
+              <div class="flag-name">{{ row.flagName }}</div>
+              <div class="flag-desc" *ngIf="row.description" [matTooltip]="row.description">
+                {{ row.description }}
+              </div>
+            </td>
+            <td class="cell-meta">
+              <span class="tag-pill" *ngIf="row.toggleType">{{ row.toggleType }}</span>
+              <span class="tag-ticket" *ngIf="row.ticketId">{{ row.ticketId }}</span>
+            </td>
+            <td *ngFor="let env of environments" class="cell-env">
+              <ng-container [ngSwitch]="row.envStatuses[env]?.status">
+                <!-- Global Enabled -->
+                <div
+                  *ngSwitchCase="'ENABLED_GLOBAL'"
+                  class="status-badge badge-global"
+                  [matTooltip]="getStatusTooltip('ENABLED_GLOBAL')">
+                  <span class="indicator"></span>
+                  <span class="label">ACTIVE (GLOBAL)</span>
+                </div>
+
+                <!-- Targeted Enabled -->
+                <div
+                  *ngSwitchCase="'ENABLED_TARGETED'"
+                  class="status-badge badge-targeted"
+                  [matTooltip]="getStatusTooltip('ENABLED_TARGETED', row.envStatuses[env]?.allTargetedCount)">
+                  <span class="indicator-ring"></span>
+                  <span class="label">TARGETED</span>
+                </div>
+
+                <!-- Disabled / Excluded -->
+                <div
+                  *ngSwitchCase="'DISABLED'"
+                  class="status-badge badge-off"
+                  [matTooltip]="getStatusTooltip('DISABLED', row.envStatuses[env]?.allTargetedCount)">
+                  <span class="label">OFF</span>
+                </div>
+
+                <!-- Not Found -->
+                <div *ngSwitchDefault class="status-badge badge-na" [matTooltip]="getStatusTooltip('NOT_FOUND')">
+                  <span class="label">—</span>
+                </div>
+              </ng-container>
+            </td>
+          </tr>
+
+          <tr *ngIf="filteredFlagRows().length === 0" class="empty-row">
+            <td [attr.colspan]="2 + environments.length" class="empty-cell">
+              <mat-icon>search_off</mat-icon>
+              <p>No feature toggles match your filter.</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

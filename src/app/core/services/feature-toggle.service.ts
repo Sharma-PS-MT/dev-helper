@@ -30,6 +30,22 @@ export interface FeatureFlagResponse {
   flags: FeatureFlag[];
 }
 
+export interface Hospital {
+  id: number | string;
+  hospitalName: string;
+}
+
+export interface HospitalResponse {
+  hospitals: Hospital[];
+}
+
+export interface TokenResponse {
+  access_token: string;
+  token_type?: string;
+  expires_in?: number;
+  [key: string]: any;
+}
+
 // Proxied through the local Python FastAPI server (/python-ai/feature-flags)
 // to bypass browser CORS and network restrictions.
 const PROXY_BASE = '/python-ai/feature-flags';
@@ -39,12 +55,19 @@ export class FeatureToggleService {
   private http = inject(HttpClient);
 
   /**
+   * Acquires the Keycloak token from Python proxy.
+   */
+  acquireToken(config: KeycloakEnvConfig): Observable<TokenResponse> {
+    return this.http.post<TokenResponse>(`${PROXY_BASE}/token`, config);
+  }
+
+  /**
    * Calls the Python backend proxy (/python-ai/feature-flags/query),
    * which handles Keycloak authentication and fetches feature flags server-side.
    */
-  fetchFeatureFlags(config: KeycloakEnvConfig): Observable<FeatureFlag[]> {
+  fetchFeatureFlags(config: KeycloakEnvConfig, token?: string): Observable<FeatureFlag[]> {
     return this.http
-      .post<FeatureFlagResponse>(`${PROXY_BASE}/query`, { config })
+      .post<FeatureFlagResponse>(`${PROXY_BASE}/query`, { config, token })
       .pipe(
         map((res) => {
           const rawFlags = res?.flags || [];
@@ -57,5 +80,15 @@ export class FeatureToggleService {
           });
         }),
       );
+  }
+
+  /**
+   * Calls the Python backend proxy (/python-ai/feature-flags/hospitals)
+   * to fetch general hospital details from CSI masterdata.
+   */
+  fetchHospitals(config: KeycloakEnvConfig, token?: string): Observable<Hospital[]> {
+    return this.http
+      .post<HospitalResponse>(`${PROXY_BASE}/hospitals`, { config, token })
+      .pipe(map((res) => res?.hospitals || []));
   }
 }

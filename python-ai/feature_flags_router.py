@@ -34,6 +34,11 @@ class FetchFeatureFlagsRequest(BaseModel):
     token: Optional[str] = None
 
 
+class FetchHospitalsRequest(BaseModel):
+    config: KeycloakEnvModel
+    token: Optional[str] = None
+
+
 def _get_base_url_without_auth(raw_url: str) -> str:
     clean = (raw_url or "").strip().rstrip("/")
     if clean.lower().endswith("/auth"):
@@ -144,6 +149,90 @@ def get_feature_flags(req: FetchFeatureFlagsRequest):
         raise HTTPException(status_code=503, detail=f"Cannot reach CSI API endpoint: {e}")
     except requests.exceptions.Timeout:
         raise HTTPException(status_code=504, detail="CSI API endpoint timed out")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/hospitals")
+def get_hospitals(req: FetchHospitalsRequest):
+    """
+    Server-side proxy to fetch hospitals from CSI PMS/RMS masterdata:
+    POST {clean_baseUrl}/csi-api/csi-pms-rms-masterdata/amd-masterdata/hospitals/general-details?fetchAll=true
+    """
+    config = req.config
+    token = req.token
+
+    if not token:
+        token_res = acquire_token(config)
+        token = token_res.get("access_token")
+        if not token:
+            raise HTTPException(
+                status_code=400,
+                detail="Token acquisition failed: no access_token in response",
+            )
+
+    clean_base = _get_base_url_without_auth(config.baseUrl)
+    endpoint = f"{clean_base}/csi-api/csi-pms-rms-masterdata/amd-masterdata/hospitals/general-details?fetchAll=true"
+
+    headers = {
+        "Accept": "application/json, text/plain, */*",
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
+    if config.tenantId:
+        headers["x-group"] = str(config.tenantId).strip()
+
+    try:
+        resp = requests.post(
+            endpoint,
+            json=[],
+            headers=headers,
+            timeout=30,
+            verify=False,
+        )
+
+        if not resp.ok:
+            raise HTTPException(
+                status_code=resp.status_code,
+                detail=f"CSI hospitals API error ({resp.status_code}): {resp.text[:300]}",
+            )
+
+        data = resp.json()
+        raw_list = data if isinstance(data, list) else (
+            data.get("data")
+            or data.get("result")
+            or data.get("hospitals")
+            or data.get("content")
+            or []
+        )
+        cleaned_hospitals = []
+        for h in raw_list:
+            if isinstance(h, dict):
+                hid = h.get("id") or h.get("hospitalId") or h.get("hospital_id")
+                hname = (
+                    h.get("hospitalName")
+                    or h.get("hospital_name")
+                    or h.get("name")
+                    or h.get("hospitalAlias")
+                    or (f"Hospital #{hid}" if hid is not None else "")
+                )
+                if hid is not None:
+                    try:
+                        parsed_id = int(hid)
+                    except (ValueError, TypeError):
+                        parsed_id = hid
+                    cleaned_hospitals.append({
+                        "id": parsed_id,
+                        "hospitalName": str(hname).strip()
+                    })
+
+        return {"hospitals": cleaned_hospitals}
+    except requests.exceptions.ConnectionError as e:
+        raise HTTPException(status_code=503, detail=f"Cannot reach CSI hospitals API endpoint: {e}")
+    except requests.exceptions.Timeout:
+        raise HTTPException(status_code=504, detail="CSI hospitals API endpoint timed out")
     except HTTPException:
         raise
     except Exception as e:
