@@ -28,6 +28,7 @@ from jira_router import router as jira_router          # Jira proxy routes
 from bitbucket_router import router as bitbucket_router  # Bitbucket proxy routes
 from openai_router import router as openai_router        # OpenAI proxy routes
 from csi_api_router import router as csi_api_router      # CSI Helper REST API v1
+from feature_flags_router import router as feature_flags_router  # Feature flags proxy routes
 
 app = FastAPI(
     title="CSI Helper API",
@@ -63,6 +64,7 @@ app.include_router(argocd_router)
 app.include_router(jira_router)
 app.include_router(bitbucket_router)
 app.include_router(openai_router)
+app.include_router(feature_flags_router)
 
 
 # ── Interactive Documentation Handlers (Auto-detecting proxy prefix) ───────────

@@ -36,6 +36,9 @@ export interface KeycloakEnvConfig {
   baseUrl: string;
   realm: string;
   clientId: string;
+  appClientId?: string;
+  clientSecret?: string;
+  tenantId?: string;
   username: string;
   password?: string;
 }

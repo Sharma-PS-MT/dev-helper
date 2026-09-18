@@ -1,0 +1,319 @@
+<div class="page-container fade-in-up">
+  <!-- Header section -->
+  <div class="page-header">
+    <div class="header-left">
+      <div class="title-row">
+        <mat-icon class="header-icon">toggle_on</mat-icon>
+        <h1>Feature Toggles Comparison</h1>
+        <span class="badge-count" *ngIf="selectedEnvCount() > 0">
+          {{ selectedEnvCount() }} {{ selectedEnvCount() === 1 ? 'Environment Selected' : 'Environments Active' }}
+        </span>
+      </div>
+      <p>Inspect and compare live runtime feature flags, rollout status, and hospital targeting across environments.</p>
+    </div>
+
+    <div class="header-actions">
+      <button
+        mat-stroked-button
+        class="action-btn"
+        (click)="copyComparisonSummary()"
+        [disabled]="filteredRows().length === 0"
+        matTooltip="Copy current filtered comparison as CSV">
+        <mat-icon>content_copy</mat-icon> Copy CSV
+      </button>
+
+      <button
+        mat-flat-button
+        color="primary"
+        class="action-btn"
+        (click)="refreshAllSelected()"
+        [disabled]="selectedEnvCount() === 0"
+        matTooltip="Re-fetch all active environment tokens & feature flags">
+        <mat-icon>refresh</mat-icon> Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Environment Selector Chip Matrix -->
+  <mat-card class="env-card">
+    <div class="env-card-header">
+      <div class="env-label-group">
+        <mat-icon inline>hub</mat-icon>
+        <span class="env-label">Select Environments to Compare:</span>
+        <span class="env-sublabel">(Fetched using IAM Tokens & Base URL)</span>
+      </div>
+
+      <div class="env-quick-actions" *ngIf="envs().length > 0">
+        <button mat-button class="quick-link" (click)="selectAllEnvs()">Select All</button>
+        <span class="dot-separator">•</span>
+        <button mat-button class="quick-link" (click)="clearEnvSelection()">Clear Selection</button>
+      </div>
+    </div>
+
+    <div *ngIf="envs().length === 0" class="empty-env-hint">
+      <mat-icon>warning_amber</mat-icon>
+      <span>No IAM Keycloak environments detected. Configure environments in the <a routerLink="/token-gen">IAM Tokens</a> section first.</span>
+    </div>
+
+    <div class="env-chips" *ngIf="envs().length > 0">
+      <div
+        *ngFor="let env of envs()"
+        class="env-chip"
+        [class.selected]="env.selected"
+        [class.loading]="env.loading"
+        [class.error]="!!env.error"
+        (click)="toggleEnv(env)"
+        [matTooltip]="env.error ? 'Error: ' + env.error : 'Base URL: ' + env.config.baseUrl">
+        <mat-checkbox
+          [checked]="env.selected"
+          (click)="$event.stopPropagation(); toggleEnv(env)"
+          color="primary"
+          class="chip-checkbox">
+        </mat-checkbox>
+        <span class="chip-name">{{ env.config.envName | uppercase }}</span>
+        <span class="chip-tag" *ngIf="env.config.tenantId">Tenant: {{ env.config.tenantId }}</span>
+        <mat-spinner *ngIf="env.loading" diameter="15" class="chip-spinner"></mat-spinner>
+        <mat-icon *ngIf="env.error" class="chip-error" inline>error_outline</mat-icon>
+      </div>
+    </div>
+  </mat-card>
+
+  <!-- Filter & Summary Bar -->
+  <div class="controls-card" *ngIf="selectedEnvCount() > 0">
+    <div class="search-box">
+      <mat-icon class="search-icon">search</mat-icon>
+      <input
+        type="text"
+        placeholder="Filter by flag name, ticket ID, or description..."
+        [ngModel]="searchTerm()"
+        (ngModelChange)="searchTerm.set($event)"
+        class="search-input" />
+      <button
+        *ngIf="searchTerm()"
+        mat-icon-button
+        class="clear-btn"
+        (click)="searchTerm.set('')">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="filter-controls">
+      <!-- State filter buttons -->
+      <div class="filter-pills">
+        <button
+          class="pill"
+          [class.active]="filterType() === 'all'"
+          (click)="filterType.set('all')">
+          All Flags ({{ totalFlags() }})
+        </button>
+        <button
+          class="pill diff-pill"
+          [class.active]="filterType() === 'diff'"
+          (click)="filterType.set('diff')">
+          <mat-icon inline>difference</mat-icon>
+          Differences ({{ differingFlagsCount() }})
+        </button>
+        <button
+          class="pill enabled-pill"
+          [class.active]="filterType() === 'enabled'"
+          (click)="filterType.set('enabled')">
+          Enabled
+        </button>
+        <button
+          class="pill partial-pill"
+          [class.active]="filterType() === 'partial'"
+          (click)="filterType.set('partial')">
+          Partially Enabled
+        </button>
+        <button
+          class="pill disabled-pill"
+          [class.active]="filterType() === 'disabled'"
+          (click)="filterType.set('disabled')">
+          Disabled
+        </button>
+      </div>
+
+      <!-- Category / toggleType dropdown -->
+      <div class="category-dropdown" *ngIf="availableCategories().length > 0">
+        <mat-form-field appearance="outline" class="density-compact">
+          <mat-label>Toggle Type</mat-label>
+          <mat-select [ngModel]="selectedCategory()" (ngModelChange)="selectedCategory.set($event)">
+            <mat-option value="all">All Types</mat-option>
+            <mat-option *ngFor="let cat of availableCategories()" [value]="cat">
+              {{ cat | titlecase }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Comparison Grid Table -->
+  <mat-card class="table-card" *ngIf="selectedEnvCount() > 0">
+    <div class="table-scroll-container">
+      <table class="toggle-table">
+        <thead>
+          <tr>
+            <th class="col-flag-header">
+              <div class="th-title">Feature Flag</div>
+              <div class="th-sub">Name & Target Details</div>
+            </th>
+            <th class="col-meta-header">
+              <div class="th-title">Metadata</div>
+              <div class="th-sub">Ticket & Description</div>
+            </th>
+            <th
+              *ngFor="let col of envColumns()"
+              class="col-env-header">
+              <div class="env-header-content">
+                <span class="env-col-name">{{ col | uppercase }}</span>
+              </div>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            *ngFor="let row of filteredRows()"
+            class="table-row"
+            [class.row-diff]="row.hasDifference">
+            
+            <!-- Flag Name Column -->
+            <td class="cell-flag-name">
+              <div class="flag-main">
+                <span class="flag-text" [matTooltip]="row.flagName">{{ row.flagName }}</span>
+                <span class="badge-diff" *ngIf="row.hasDifference" matTooltip="Flag status differs across environments">
+                  DIFF
+                </span>
+              </div>
+            </td>
+
+            <!-- Metadata Info Column -->
+            <td class="cell-meta">
+              <div class="meta-container" *ngIf="row.metadata; else noMeta">
+                <div class="meta-row" *ngIf="row.metadata.ticketId || row.metadata.toggleType">
+                  <span class="ticket-tag" *ngIf="row.metadata.ticketId">
+                    <mat-icon inline>local_offer</mat-icon> {{ row.metadata.ticketId }}
+                  </span>
+                  <span class="release-tag" *ngIf="row.metadata.releaseVersion">
+                    {{ row.metadata.releaseVersion }}
+                  </span>
+                  <span class="type-tag" *ngIf="row.metadata.toggleType">
+                    {{ row.metadata.toggleType }}
+                  </span>
+                </div>
+
+                <div class="meta-desc" *ngIf="row.metadata.description" [matTooltip]="row.metadata.description">
+                  {{ row.metadata.description }}
+                </div>
+
+                <!-- Info Icon button for expanded metadata inspection -->
+                <button
+                  mat-icon-button
+                  class="info-icon-btn"
+                  [matMenuTriggerFor]="metaMenu"
+                  matTooltip="Click to view complete flag metadata details">
+                  <mat-icon inline>info_outline</mat-icon>
+                </button>
+
+                <mat-menu #metaMenu="matMenu" class="metadata-popover">
+                  <div class="meta-popover-content" (click)="$event.stopPropagation()">
+                    <h4>Metadata Details</h4>
+                    <div class="meta-item" *ngIf="row.metadata.ticketId">
+                      <span class="lbl">Ticket:</span> <span class="val">{{ row.metadata.ticketId }}</span>
+                    </div>
+                    <div class="meta-item" *ngIf="row.metadata.releaseVersion">
+                      <span class="lbl">Release:</span> <span class="val">{{ row.metadata.releaseVersion }}</span>
+                    </div>
+                    <div class="meta-item" *ngIf="row.metadata.toggleType">
+                      <span class="lbl">Toggle Type:</span> <span class="val">{{ row.metadata.toggleType }}</span>
+                    </div>
+                    <div class="meta-item" *ngIf="row.metadata.description">
+                      <span class="lbl">Description:</span> <span class="val">{{ row.metadata.description }}</span>
+                    </div>
+                  </div>
+                </mat-menu>
+              </div>
+
+              <ng-template #noMeta>
+                <span class="muted-text">—</span>
+              </ng-template>
+            </td>
+
+            <!-- Environment Status Cells -->
+            <td
+              *ngFor="let col of envColumns()"
+              class="cell-env-val">
+              <ng-container [ngSwitch]="row.envStates[col]?.state">
+                
+                <!-- 1. FULLY ENABLED -->
+                <div *ngSwitchCase="'ENABLED'" class="state-badge state-enabled">
+                  <mat-icon inline class="dot-icon">check_circle</mat-icon>
+                  <span class="badge-label">ENABLED</span>
+                </div>
+
+                <!-- 2. PARTIALLY ENABLED (WITH HOSPITAL IDS) -->
+                <div
+                  *ngSwitchCase="'PARTIALLY_ENABLED'"
+                  class="state-badge state-partial"
+                  [matTooltip]="'Partially enabled for hospital ID(s): ' + (row.envStates[col]?.hospitalIds?.join(', ') || 'None')">
+                  <div class="badge-main">
+                    <mat-icon inline class="dot-icon">donut_large</mat-icon>
+                    <span class="badge-label">PARTIAL</span>
+                  </div>
+                  <div class="hosp-pills" *ngIf="row.envStates[col]?.hospitalIds?.length">
+                    <span class="hosp-chip" *ngFor="let id of row.envStates[col]?.hospitalIds">
+                      H-{{ id }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- 3. DISABLED -->
+                <div *ngSwitchCase="'DISABLED'" class="state-badge state-disabled">
+                  <mat-icon inline class="dot-icon">cancel</mat-icon>
+                  <span class="badge-label">DISABLED</span>
+                </div>
+
+                <!-- 4. NOT FOUND / N/A -->
+                <div *ngSwitchDefault class="state-badge state-na">
+                  <span class="badge-label">N/A</span>
+                </div>
+              </ng-container>
+            </td>
+          </tr>
+
+          <tr *ngIf="filteredRows().length === 0" class="empty-table-row">
+            <td [attr.colspan]="2 + envColumns().length" class="empty-table-cell">
+              <mat-icon class="empty-icon">search_off</mat-icon>
+              <div class="empty-title">No feature toggles match the current filter</div>
+              <p>Try resetting the search query or changing the filter options above.</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Table Footer Bar -->
+    <div class="table-footer">
+      <div class="footer-stats">
+        <span>Showing <strong>{{ filteredRows().length }}</strong> of <strong>{{ totalFlags() }}</strong> flags</span>
+        <span class="dot-separator">•</span>
+        <span class="stat-highlight"><strong>{{ differingFlagsCount() }}</strong> differences identified</span>
+      </div>
+      <div class="footer-legend">
+        <span class="legend-item"><span class="legend-color enabled"></span> Enabled</span>
+        <span class="legend-item"><span class="legend-color partial"></span> Partially Enabled (Targeted)</span>
+        <span class="legend-item"><span class="legend-color disabled"></span> Disabled</span>
+        <span class="legend-item"><span class="legend-color diff"></span> Cross-Environment Difference</span>
+      </div>
+    </div>
+  </mat-card>
+
+  <!-- Empty State when no environments selected -->
+  <mat-card class="empty-welcome-card" *ngIf="selectedEnvCount() === 0">
+    <div class="welcome-inner">
+      <mat-icon class="welcome-icon">alt_route</mat-icon>
+      <h2>No Environments Selected</h2>
+      <p>Select any environment from the chips above to view its live feature flags, or select two or more to cross-compare flags, partial hospital targeting, and rollout differences.</p>
+    </div>
+  </mat-card>
+</div>

@@ -184,14 +184,6 @@
   background: rgba(var(--accent-cyan-rgb, 0, 229, 255), 0.06) !important;
 }
 
-// Compare button (accent orange-ish)
-.compare-btn {
-  background: linear-gradient(135deg, #FF9800, #F44336);
-  color: #fff;
-  font-weight: 600;
-  &:hover { opacity: 0.9; }
-}
-
 // Branch compare navigation button
 .branch-btn {
   background: linear-gradient(135deg, var(--accent-cyan, #00e5ff), #2196F3);

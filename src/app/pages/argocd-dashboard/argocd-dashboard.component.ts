@@ -19,7 +19,6 @@ import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { RouterModule, Router } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -29,7 +28,6 @@ import { NotificationService } from '../../core/services/notification.service';
 import { BranchCompareStateService } from '../../core/services/branch-compare-state.service';
 import { GapAnalysisStateService } from '../../core/services/gap-analysis-state.service';
 import { resolveServices } from '../../core/config/service-registry';
-import { ArgocdCompareDialogComponent } from './argocd-compare-dialog.component';
 
 interface EnvSelection {
   config: ArgocdEnvConfig;
@@ -64,7 +62,6 @@ export interface GroupedAppRow {
     MatFormFieldModule,
     MatChipsModule,
     MatTooltipModule,
-    MatDialogModule,
   ],
   templateUrl: './argocd-dashboard.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -112,10 +109,6 @@ export class ArgocdDashboardComponent implements OnInit {
     return Object.keys(row.envs).length >= 2;
   }
 
-  get canCompare(): boolean {
-    return this.hasMultipleEnvs();
-  }
-
   get defaultBranch(): string {
     return this.authConfig.config().bitbucketDefaultBranch || 'main';
   }
@@ -123,7 +116,6 @@ export class ArgocdDashboardComponent implements OnInit {
   constructor(
     private authConfig: AuthConfigService,
     private argocd: ArgocdService,
-    private dialog: MatDialog,
     private router: Router,
     private notify: NotificationService,
     private compareState: BranchCompareStateService,
@@ -218,22 +210,6 @@ export class ArgocdDashboardComponent implements OnInit {
     } else {
       this.dataSource.filteredData.forEach((row) => this.selectedRows.delete(row));
     }
-  }
-
-  // ── Compare: open side-by-side dialog ─────────────────────────────────────
-
-  openCompare() {
-    const rows = Array.from(this.selectedRows);
-    if (rows.length !== 1) return;
-    const envApps = Object.values(rows[0].envs);
-    if (envApps.length < 2) return;
-
-    this.dialog.open(ArgocdCompareDialogComponent, {
-      width: '900px',
-      maxHeight: '90vh',
-      data: { apps: envApps },
-      panelClass: 'dark-dialog',
-    });
   }
 
   // ── Navigate to Branch-Compare with pre-filled state ──────────────────────

@@ -48,6 +48,24 @@
               <mat-label>OIDC Client ID</mat-label>
               <input matInput formControlName="clientId" placeholder="frontend-client" />
             </mat-form-field>
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>Tenant ID</mat-label>
+              <input matInput formControlName="tenantId" placeholder="105" />
+            </mat-form-field>
+          </div>
+
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>App Client ID</mat-label>
+              <input matInput formControlName="appClientId" placeholder="e.g. app-client-id" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>Client Secret</mat-label>
+              <input matInput formControlName="clientSecret" [type]="showClientSecret() ? 'text' : 'password'" placeholder="Enter client secret" />
+              <button mat-icon-button matSuffix type="button" (click)="showClientSecret.set(!showClientSecret())" tabindex="-1">
+                <mat-icon>{{ showClientSecret() ? 'visibility_off' : 'visibility' }}</mat-icon>
+              </button>
+            </mat-form-field>
           </div>
 
           <div class="form-row">

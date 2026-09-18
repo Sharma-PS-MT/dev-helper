@@ -44,6 +44,7 @@ export class App {
     { label: 'Create PR & Branch', icon: 'call_merge', path: '/pr-creation' },
     { label: 'Branch Compare', icon: 'compare_arrows', path: '/branch-compare' },
     { label: 'IAM Tokens', icon: 'vpn_key', path: '/token-gen' },
+    { label: 'Feature Toggles', icon: 'toggle_on', path: '/feature-toggles' },
     { label: 'JSON Beautifier', icon: 'data_object', path: '/json-viewer' },
     { label: 'Base64 to Image', icon: 'image', path: '/base64-viewer' },
     {

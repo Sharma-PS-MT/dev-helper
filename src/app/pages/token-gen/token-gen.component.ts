@@ -76,6 +76,7 @@ export class TokenGenComponent implements OnInit {
 
   form: FormGroup;
   showPassword = signal(false);
+  showClientSecret = signal(false);
 
   generating = signal(false);
   tokenResult = signal<string>('');
@@ -90,6 +91,9 @@ export class TokenGenComponent implements OnInit {
       baseUrl: ['', Validators.required],
       realm: ['', Validators.required],
       clientId: ['frontend-client', Validators.required],
+      appClientId: [''],
+      clientSecret: [''],
+      tenantId: [''],
       username: ['', Validators.required],
       password: ['', Validators.required],
     });
@@ -108,6 +112,9 @@ export class TokenGenComponent implements OnInit {
         baseUrl: match.baseUrl,
         realm: match.realm,
         clientId: match.clientId || 'frontend-client',
+        appClientId: match.appClientId || '',
+        clientSecret: match.clientSecret || '',
+        tenantId: match.tenantId || '',
         username: match.username,
         password: match.password || '',
       });
@@ -128,6 +135,9 @@ export class TokenGenComponent implements OnInit {
       baseUrl: val.baseUrl,
       realm: val.realm,
       clientId: val.clientId,
+      appClientId: val.appClientId || '',
+      clientSecret: val.clientSecret || '',
+      tenantId: val.tenantId || '',
       username: val.username,
       password: val.password,
     };

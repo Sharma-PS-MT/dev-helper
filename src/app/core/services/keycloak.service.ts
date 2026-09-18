@@ -15,6 +15,9 @@ export class KeycloakService {
     const body = new URLSearchParams();
     body.set('grant_type', 'password');
     body.set('client_id', config.clientId);
+    if (config.clientSecret) {
+      body.set('client_secret', config.clientSecret);
+    }
     body.set('username', config.username);
     if (config.password) {
       body.set('password', config.password);

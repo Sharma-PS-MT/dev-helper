@@ -36,6 +36,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/token-gen/token-gen.component').then(m => m.TokenGenComponent),
   },
   {
+    path: 'feature-toggles',
+    loadComponent: () => import('./pages/feature-toggles/feature-toggles.component').then(m => m.FeatureTogglesComponent),
+  },
+  {
     path: 'crypto-dashboard',
     loadComponent: () => import('./pages/crypto-dashboard/crypto-dashboard.component').then(m => m.CryptoDashboardComponent),
   },

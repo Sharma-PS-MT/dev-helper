@@ -1,8 +1,8 @@
-ok now i m going to develop new features i will give give phase 1 requirements for the new features.
+requirement no 1: in /token-gen i want to add another text boxed too just for saving part To add additional text boxes in the `/token-gen` 
+section for saving client-id, client-secret, tenant-id with modern standard ui/ux
 
-phase 1 requirements:
-1. add a new configuration option to add orodruin base url : eg: https://orodruin.cloudsolutions.com.sa/
+requirement no 2: compare-dialog component related feature dont want kindly remove this feature from the project as it is not needed anymore.
 
-phase 2 requirements:
-1. in the /branch-compare : remove the compare button and class="results-layout fade-in-up mt-24" branch-compare component in  
-2. by default do the analyze gap beta improve the UI for analyze gap beta result
+requirement no 3: in the `/token-gen` section, please ensure that the new text boxes for client-id, client-secret, and tenant-id are properly 
+validated and have clear labels for better user experience.
+

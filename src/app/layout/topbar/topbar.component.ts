@@ -23,6 +23,8 @@ const PAGE_TITLES: Record<string, string> = {
   '/pr-review': 'PR Review',
   '/pr-creation': 'Create Pull Requests',
   '/branch-compare': 'Branch / Tag Compare',
+  '/token-gen': 'IAM Tokens',
+  '/feature-toggles': 'Feature Toggles Comparison',
   '/settings': 'Settings',
 };
 

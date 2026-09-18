@@ -21,11 +21,6 @@
         Compare Gap
       </button>
 
-      <!-- Side-by-side detail dialog: 1 row with >=2 envs -->
-      <button *ngIf="canCompare" mat-flat-button class="compare-btn" (click)="openCompare()">
-        <mat-icon>compare</mat-icon> Side-by-Side
-      </button>
-
       <!-- Copy as Confluence table -->
       <button *ngIf="selectedRows.size >= 1" mat-stroked-button class="copy-table-btn" 
               (click)="copyAsConfluenceTable()"
@@ -159,7 +154,6 @@
       <span *ngIf="selectedRows.size > 0" class="selection-info">
         <mat-icon inline>check_box</mat-icon>
         {{ selectedRows.size }} row selected
-        <span *ngIf="canCompare"> — ready to compare environments</span>
       </span>
       <span class="row-count">Showing {{ totalRows }} applications</span>
     </div>

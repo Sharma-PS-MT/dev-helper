@@ -1,0 +1,57 @@
+i want to add a new feature page to the application. for compare feature toggles accros the environments.
+
+in the top load all the enviorments with from I am token envioments (include uat and prod), similar like argo-cd page
+
+curl --request GET \
+  --url {KEY_CLOAK_BASE_URL if it is contains/auth remove the last path}/csi-api/csi-java-base-utility/base/feature-flags \
+  --header 'accept: application/json, text/plain, */*' \
+  --header 'authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJ2cldlYkEydmpydF9XYWY1Yl83SXkyNDNkaUxNOWEySm5oQzItckJWSThnIn0.eyJleHAiOjE3ODk3MzA4MTMsImlhdCI6MTc4OTcyMzYxMywiYXV0aF90aW1lIjoxNzg5NzIzMTcwLCJqdGkiOiJvbnJ0YWM6NDIyNjAxZmYtYTM4My00MzQ4LTlhNmYtMWM2NTZlMjZmNzg1IiwiaXNzIjoiaHR0cHM6Ly92aWRhcHJlcHJvZC5obWcuY29tL2F1dGgvcmVhbG1zL3ZpZGFwcmVwcm9kIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6ImM3MTVmZDFiLWYwNGItNDUxMi04OTRiLWZlYzIwNDRkM2FkYiIsInR5cCI6IkJlYXJlciIsImF6cCI6ImFwcCIsInNpZCI6IjNlNWRiZmM2LTczNTUtNDgzYi1hYWNmLTRkNWNmYjEzZGE1MyIsImFjciI6IjAiLCJhbGxvd2VkLW9yaWdpbnMiOlsiKiJdLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsiUmVjZXB0aW9uaXN0IiwiU2V0dXAgTWFuYWdlciIsIkFwcHJvdmFsIFVzZXIiLCJBZG1pc3Npb24gU3RhZmYiLCJISU0gVXNlciIsIm9mZmxpbmVfYWNjZXNzIiwiRVIgUmVjZXB0aW9uIiwidW1hX2F1dGhvcml6YXRpb24iLCJCaWxsaW5nIE1hc3RlciBBZG1pbiIsIlBoYXJtYWN5IE1hbmFnZXIiLCJCaWxsaW5nIE1hc3RlciBVc2VyIiwiQmlsbGluZyBNYXN0ZXIgUHJlIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYXBwIjp7InJvbGVzIjpbImJyb3dzZXItaW5zcGVjdG9yIl19LCJhY2NvdW50Ijp7InJvbGVzIjpbIm1hbmFnZS1hY2NvdW50IiwibWFuYWdlLWFjY291bnQtbGlua3MiLCJ2aWV3LXByb2ZpbGUiXX19LCJzY29wZSI6Im9wZW5pZCBwcm9maWxlIGVtYWlsIiwiZW1haWxfdmVyaWZpZWQiOmZhbHNlLCJuYW1lIjoiU0FBREFOIFNBQUZBTiIsInByZWZlcnJlZF91c2VybmFtZSI6IjcwMDEiLCJnaXZlbl9uYW1lIjoiU0FBREFOIiwiZmFtaWx5X25hbWUiOiJTQUFGQU4iLCJlbWFpbCI6ImFobWVkLmFsaGFtZGFuQGNsb3VzZHNvbHV0aW9ucy5jb20uc2EifQ.Cdi74W3KiqAUEIsL7y6--FieluZi4R3k3xDQsIiD_kbZ8JFZKXcL0FlchIa2Z-6G6KMEYgmn7MBMZXURwHjiMhOjy5XUHlGz1C7xq5Rfb0Nkh_O7TtDmUehERvgU91r0kUqOvvSvmGVs6IAyS-aTxhhkPYZFSJYEg6QMlGpWLirGKjAUTBweUM_9-RXUxabchdcpQEii6HgGC8dO4-LWoSKrR7FYwSUT224YcePr1_aabVszaTDllqf38EEVzVS2DyDSbLX724GgkpzZZ__p3_jL3mkVxiU2fysbtAmnxRZb-d2CiUz5hnnNAwRTL6fBsUdqkmZWwfTXT35kULRAEA' \
+  --header 'x-group: {tenant-id}' \
+
+
+
+this response looks like this suggest a modern ui/ux to compare cross environments and their feature toggles. 
+1 main value : state
+flag name : flag
+and metadata : with info small icon
+under target if hospitalIds is present then show state should partially enabled with a different color and show the hospitalIds in a info 
+{
+  "flags": [
+    {
+      "flag": " OR_5632",
+      "state": "ENABLED",
+      "defaultVariant": "true",
+      "target": {
+        "status": true
+      },
+      "variants": {
+        "false": false,
+        "true": true
+      },
+      "metadata": {
+        "toggleType": "feature"
+      }
+    },
+    {
+      "flag": " enableCCBedRequestStatusColumn ",
+      "state": "ENABLED",
+      "defaultVariant": "true",
+      "target": {
+        "status": false,
+        "hospitalIds": [
+          160
+        ]
+      },
+      "variants": {
+        "false": false,
+        "true": true
+      },
+      "metadata":  "metadata": {
+        "ticketId": "V4-46108",
+        "toggleType": "feature",
+        "releaseVersion": "V4.0.2604_W3",
+        "description": "Allow to revoke the finalized invoice in er screen"
+      }
+    },..............
+    ]
+    }
