@@ -246,36 +246,43 @@
               <ng-container [ngSwitch]="row.envStates[col]?.state">
                 
                 <!-- 1. FULLY ENABLED -->
-                <div *ngSwitchCase="'ENABLED'" class="state-badge state-enabled">
-                  <mat-icon inline class="dot-icon">check_circle</mat-icon>
-                  <span class="badge-label">ENABLED</span>
+                <div *ngSwitchCase="'ENABLED'" class="toggle-pill pill-enabled" matTooltip="Globally Enabled across all hospital tenants">
+                  <span class="pill-indicator">
+                    <span class="pulse-ring"></span>
+                    <span class="indicator-dot"></span>
+                  </span>
+                  <span class="pill-text">ENABLED</span>
                 </div>
 
                 <!-- 2. PARTIALLY ENABLED (WITH HOSPITAL IDS) -->
                 <div
                   *ngSwitchCase="'PARTIALLY_ENABLED'"
-                  class="state-badge state-partial"
-                  [matTooltip]="'Partially enabled for hospital ID(s): ' + (row.envStates[col]?.hospitalIds?.join(', ') || 'None')">
-                  <div class="badge-main">
-                    <mat-icon inline class="dot-icon">donut_large</mat-icon>
-                    <span class="badge-label">PARTIAL</span>
-                  </div>
-                  <div class="hosp-pills" *ngIf="row.envStates[col]?.hospitalIds?.length">
-                    <span class="hosp-chip" *ngFor="let id of row.envStates[col]?.hospitalIds">
-                      H-{{ id }}
-                    </span>
-                  </div>
+                  class="toggle-pill pill-partial"
+                  [matTooltip]="getHospitalTooltip(row.envStates[col])"
+                  matTooltipClass="hospital-tooltip"
+                  matTooltipPosition="above">
+                  <span class="pill-indicator">
+                    <span class="pulse-ring"></span>
+                    <span class="indicator-dot"></span>
+                  </span>
+                  <span class="pill-text">PARTIAL</span>
+                  <span class="pill-counter" *ngIf="row.envStates[col]?.hospitalIds?.length">
+                    {{ row.envStates[col]?.hospitalIds?.length }}
+                  </span>
                 </div>
 
                 <!-- 3. DISABLED -->
-                <div *ngSwitchCase="'DISABLED'" class="state-badge state-disabled">
-                  <mat-icon inline class="dot-icon">cancel</mat-icon>
-                  <span class="badge-label">DISABLED</span>
+                <div *ngSwitchCase="'DISABLED'" class="toggle-pill pill-disabled" matTooltip="Disabled in this environment">
+                  <span class="pill-indicator">
+                    <span class="indicator-dot"></span>
+                  </span>
+                  <span class="pill-text">DISABLED</span>
                 </div>
 
                 <!-- 4. NOT FOUND / N/A -->
-                <div *ngSwitchDefault class="state-badge state-na">
-                  <span class="badge-label">N/A</span>
+                <div *ngSwitchDefault class="toggle-pill pill-na" matTooltip="Flag does not exist in this environment">
+                  <span class="pill-dash">—</span>
+                  <span class="pill-text">NOT FOUND</span>
                 </div>
               </ng-container>
             </td>

@@ -587,78 +587,173 @@
       // Environment Status cell
       .cell-env-val {
         text-align: center;
+        white-space: nowrap;
 
-        .state-badge {
+        .toggle-pill {
           display: inline-flex;
-          flex-direction: column;
           align-items: center;
-          justify-content: center;
-          padding: 6px 14px;
-          border-radius: 8px;
-          font-size: 12px;
-          font-weight: 600;
-          letter-spacing: 0.5px;
-          min-width: 110px;
-          transition: transform 0.1s ease;
+          gap: 8px;
+          height: 32px;
+          padding: 0 14px 0 10px;
+          border-radius: 20px;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.8px;
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          user-select: none;
+          position: relative;
+          box-sizing: border-box;
 
-          .badge-main {
+          .pill-indicator {
+            position: relative;
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            justify-content: center;
+            width: 10px;
+            height: 10px;
+
+            .indicator-dot {
+              width: 8px;
+              height: 8px;
+              border-radius: 50%;
+              transition: all 0.2s ease;
+            }
+
+            .pulse-ring {
+              position: absolute;
+              width: 100%;
+              height: 100%;
+              border-radius: 50%;
+              animation: pill-pulse 2.2s infinite ease-out;
+              opacity: 0;
+            }
           }
 
-          .dot-icon {
-            font-size: 14px;
-            width: 14px;
-            height: 14px;
+          .pill-text {
+            line-height: 1;
           }
 
-          // 1. Fully Enabled
-          &.state-enabled {
-            background-color: rgba(76, 175, 80, 0.15);
-            color: #4caf50;
-            border: 1px solid rgba(76, 175, 80, 0.3);
+          .pill-counter {
+            background: rgba(255, 152, 0, 0.28);
+            color: #ffe0b2;
+            font-family: 'Consolas', monospace;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: 2px;
+            border: 1px solid rgba(255, 152, 0, 0.4);
           }
 
-          // 2. Partially Enabled
-          &.state-partial {
-            background-color: rgba(255, 152, 0, 0.15);
-            color: #ff9800;
-            border: 1px solid rgba(255, 152, 0, 0.35);
+          .pill-dash {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 400;
+          }
 
-            .hosp-pills {
-              display: flex;
-              gap: 4px;
-              margin-top: 4px;
-              flex-wrap: wrap;
-              justify-content: center;
+          // 1. ENABLED (Neon Emerald Glow)
+          &.pill-enabled {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.06) 100%);
+            color: #34d399;
+            border: 1px solid rgba(52, 211, 153, 0.3);
+            box-shadow: 0 1px 4px rgba(16, 185, 129, 0.08);
 
-              .hosp-chip {
-                background: rgba(255, 152, 0, 0.25);
-                color: #ffe0b2;
-                font-size: 10px;
-                padding: 1px 5px;
-                border-radius: 4px;
-                font-family: monospace;
+            .indicator-dot {
+              background-color: #10b981;
+              box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
+            }
+
+            .pulse-ring {
+              border: 2px solid rgba(52, 211, 153, 0.6);
+            }
+
+            &:hover {
+              background: linear-gradient(135deg, rgba(16, 185, 129, 0.22) 0%, rgba(5, 150, 105, 0.12) 100%);
+              border-color: #34d399;
+              box-shadow: 0 0 12px rgba(52, 211, 153, 0.25);
+              transform: translateY(-1px);
+            }
+          }
+
+          // 2. PARTIAL (Warm Amber Glow)
+          &.pill-partial {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(217, 119, 6, 0.07) 100%);
+            color: #fbbf24;
+            border: 1px solid rgba(251, 191, 36, 0.35);
+            box-shadow: 0 1px 4px rgba(245, 158, 11, 0.08);
+            cursor: pointer;
+
+            .indicator-dot {
+              background-color: #f59e0b;
+              box-shadow: 0 0 8px rgba(245, 158, 11, 0.8);
+            }
+
+            .pulse-ring {
+              border: 2px solid rgba(251, 191, 36, 0.6);
+            }
+
+            &:hover {
+              background: linear-gradient(135deg, rgba(245, 158, 11, 0.24) 0%, rgba(217, 119, 6, 0.14) 100%);
+              border-color: #fbbf24;
+              box-shadow: 0 0 14px rgba(245, 158, 11, 0.3);
+              transform: translateY(-1px);
+
+              .pill-counter {
+                background: rgba(255, 152, 0, 0.4);
+                border-color: #fbbf24;
               }
             }
           }
 
-          // 3. Disabled
-          &.state-disabled {
-            background-color: rgba(244, 67, 54, 0.12);
-            color: #f44336;
-            border: 1px solid rgba(244, 67, 54, 0.25);
+          // 3. DISABLED (Subtle Crimson)
+          &.pill-disabled {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.10) 0%, rgba(185, 28, 28, 0.04) 100%);
+            color: #f87171;
+            border: 1px solid rgba(248, 113, 113, 0.22);
+
+            .indicator-dot {
+              background-color: #ef4444;
+              box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+            }
+
+            &:hover {
+              background: linear-gradient(135deg, rgba(239, 68, 68, 0.18) 0%, rgba(185, 28, 28, 0.08) 100%);
+              border-color: #f87171;
+              box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
+              transform: translateY(-1px);
+            }
           }
 
-          // 4. Not Found / NA
-          &.state-na {
-            background-color: rgba(255, 255, 255, 0.04);
+          // 4. NOT FOUND / N/A (Muted Sleek Slate)
+          &.pill-na {
+            background: rgba(255, 255, 255, 0.03);
             color: var(--text-muted);
             border: 1px dashed var(--border-color, #2d333b);
+            font-size: 10px;
+
+            &:hover {
+              background: rgba(255, 255, 255, 0.06);
+              border-color: rgba(255, 255, 255, 0.2);
+            }
           }
         }
       }
+    }
+  }
+
+  @keyframes pill-pulse {
+    0% {
+      transform: scale(0.9);
+      opacity: 0.8;
+    }
+    70% {
+      transform: scale(2.3);
+      opacity: 0;
+    }
+    100% {
+      transform: scale(2.4);
+      opacity: 0;
     }
   }
 
@@ -830,4 +925,18 @@
       }
     }
   }
+}
+
+// ── Hospital Tooltip Styling ───────────────────────────────────────────
+::ng-deep .hospital-tooltip {
+  white-space: pre-line !important;
+  font-family: 'Consolas', monospace !important;
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+  background-color: #1e2228 !important;
+  color: #ffb74d !important;
+  border: 1px solid rgba(255, 152, 0, 0.4) !important;
+  border-radius: 6px !important;
+  padding: 8px 12px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5) !important;
 }

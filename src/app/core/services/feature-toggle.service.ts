@@ -48,10 +48,13 @@ export class FeatureToggleService {
       .pipe(
         map((res) => {
           const rawFlags = res?.flags || [];
-          return rawFlags.map((f) => ({
-            ...f,
-            flag: (f.flag || '').trim(),
-          }));
+          return rawFlags.map((f) => {
+            const { variants, defaultVariant, ...rest } = f;
+            return {
+              ...rest,
+              flag: (f.flag || '').trim(),
+            };
+          });
         }),
       );
   }

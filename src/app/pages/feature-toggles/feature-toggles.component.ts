@@ -448,4 +448,12 @@ export class FeatureTogglesComponent implements OnInit {
       });
     }
   }
+
+  getHospitalTooltip(cell?: EnvCellState): string {
+    if (!cell || !cell.hospitalIds || cell.hospitalIds.length === 0) {
+      return 'Partially enabled (No specific hospital IDs specified)';
+    }
+    const ids = cell.hospitalIds;
+    return `Partially Enabled (${ids.length} targeted):\nHospitals: ${ids.join(', ')}`;
+  }
 }
