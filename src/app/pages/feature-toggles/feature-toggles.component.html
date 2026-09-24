@@ -78,34 +78,8 @@
     </div>
   </mat-card>
 
-  <!-- View Mode Switcher -->
-  <div class="view-mode-bar" *ngIf="selectedEnvCount() > 0">
-    <div class="view-mode-toggle">
-      <button
-        type="button"
-        class="mode-btn"
-        [class.active]="viewMode() === 'flags'"
-        (click)="viewMode.set('flags')">
-        <mat-icon>toggle_on</mat-icon>
-        <span>Feature Flags Matrix</span>
-        <span class="mode-count">{{ totalFlags() }}</span>
-      </button>
-      <button
-        type="button"
-        class="mode-btn"
-        [class.active]="viewMode() === 'hospitals'"
-        (click)="viewMode.set('hospitals')">
-        <mat-icon>local_hospital</mat-icon>
-        <span>Hospitals & Targeting</span>
-        <span class="mode-count" *ngIf="allHospitals().length > 0">{{ allHospitals().length }}</span>
-      </button>
-    </div>
-  </div>
-
-  <!-- ========================================================================= -->
-  <!-- 1. FEATURE FLAGS VIEW                                                     -->
-  <!-- ========================================================================= -->
-  <ng-container *ngIf="viewMode() === 'flags' && selectedEnvCount() > 0">
+  <!-- Feature Flags Comparison View -->
+  <ng-container *ngIf="selectedEnvCount() > 0">
     <!-- Filter & Summary Bar -->
     <div class="controls-card">
       <div class="search-box">
@@ -161,18 +135,6 @@
           </button>
         </div>
 
-        <!-- Scope by Hospital dropdown -->
-        <div class="hospital-scope-dropdown" *ngIf="allHospitals().length > 0">
-          <mat-form-field appearance="outline" class="density-compact">
-            <mat-label>Hospital Scope</mat-label>
-            <mat-select [ngModel]="selectedHospitalScope()" (ngModelChange)="selectedHospitalScope.set($event)">
-              <mat-option value="all">All Hospitals (Any)</mat-option>
-              <mat-option *ngFor="let h of allHospitals()" [value]="h.id">
-                #{{ h.id }} — {{ h.hospitalName }}
-              </mat-option>
-            </mat-select>
-          </mat-form-field>
-        </div>
 
         <!-- Category / toggleType dropdown -->
         <div class="category-dropdown" *ngIf="availableCategories().length > 0">
@@ -377,118 +339,6 @@
           <span class="legend-item"><span class="legend-color partial"></span> Partially Enabled (Targeted)</span>
           <span class="legend-item"><span class="legend-color disabled"></span> Disabled</span>
           <span class="legend-item"><span class="legend-color diff"></span> Cross-Environment Difference</span>
-        </div>
-      </div>
-    </mat-card>
-  </ng-container>
-
-  <!-- ========================================================================= -->
-  <!-- 2. HOSPITALS & TARGETING VIEW                                             -->
-  <!-- ========================================================================= -->
-  <ng-container *ngIf="viewMode() === 'hospitals' && selectedEnvCount() > 0">
-    <div class="controls-card">
-      <div class="search-box">
-        <mat-icon class="search-icon">search</mat-icon>
-        <input
-          type="text"
-          placeholder="Search hospitals by ID or Name..."
-          [ngModel]="hospitalSearchTerm()"
-          (ngModelChange)="hospitalSearchTerm.set($event)"
-          class="search-input" />
-        <button
-          *ngIf="hospitalSearchTerm()"
-          mat-icon-button
-          class="clear-btn"
-          (click)="hospitalSearchTerm.set('')">
-          <mat-icon>close</mat-icon>
-        </button>
-      </div>
-
-      <div class="hospital-view-stats">
-        <span class="stat-pill">
-          <mat-icon inline>domain</mat-icon> {{ allHospitals().length }} Hospitals Loaded
-        </span>
-      </div>
-    </div>
-
-    <mat-card class="table-card">
-      <div class="table-scroll-container">
-        <table class="toggle-table hospital-matrix-table">
-          <thead>
-            <tr>
-              <th class="col-hosp-id">ID</th>
-              <th class="col-hosp-name">Hospital Name</th>
-              <th *ngFor="let col of envColumns()" class="col-env-header">
-                <div class="env-header-content">
-                  <span class="env-col-name">{{ col | uppercase }}</span>
-                </div>
-              </th>
-              <th class="col-actions">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              *ngFor="let row of filteredHospitals()"
-              class="table-row clickable-row"
-              (click)="openHospitalModal(row.hospital)">
-              
-              <!-- Hospital ID -->
-              <td class="cell-hosp-id">
-                <span class="hosp-id-pill">#{{ row.hospital.id }}</span>
-              </td>
-
-              <!-- Hospital Name -->
-              <td class="cell-hosp-name">
-                <div class="hosp-name-box">
-                  <span class="name-text">{{ row.hospital.hospitalName }}</span>
-                </div>
-              </td>
-
-              <!-- Environment Active Flags Count Cells -->
-              <td *ngFor="let col of envColumns()" class="cell-env-val">
-                <div
-                  *ngIf="row.envStats[col]?.isPresentInEnv; else notInEnv"
-                  class="hosp-env-badge"
-                  [matTooltip]="'Active flags: ' + row.envStats[col].totalActive + ' (' + row.envStats[col].globalCount + ' Global, ' + row.envStats[col].targetedCount + ' Targeted)'">
-                  <span class="badge-number">{{ row.envStats[col].totalActive }}</span>
-                  <span class="badge-label">Flags Active</span>
-                  <span class="badge-targeted-dot" *ngIf="row.envStats[col].targetedCount > 0" matTooltip="Has targeted flags"></span>
-                </div>
-                <ng-template #notInEnv>
-                  <span class="muted-dash">—</span>
-                </ng-template>
-              </td>
-
-              <!-- Action: Inspect Modal -->
-              <td class="cell-actions" (click)="$event.stopPropagation()">
-                <button
-                  mat-stroked-button
-                  class="inspect-btn"
-                  (click)="openHospitalModal(row.hospital)"
-                  matTooltip="View active feature toggles for this hospital">
-                  <mat-icon inline>visibility</mat-icon> View Flags
-                </button>
-              </td>
-            </tr>
-
-            <tr *ngIf="filteredHospitals().length === 0" class="empty-table-row">
-              <td [attr.colspan]="3 + envColumns().length" class="empty-table-cell">
-                <mat-icon class="empty-icon">search_off</mat-icon>
-                <div class="empty-title">No hospitals match your search</div>
-                <p>Try searching by a different ID or name.</p>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="table-footer">
-        <div class="footer-stats">
-          <span>Showing <strong>{{ filteredHospitals().length }}</strong> of <strong>{{ allHospitals().length }}</strong> hospitals</span>
-        </div>
-        <div class="footer-legend">
-          <span class="legend-item"><span class="legend-color enabled"></span> Active Hospital</span>
-          <span class="legend-item"><span class="legend-color partial"></span> Specific Hospital Targeting</span>
         </div>
       </div>
     </mat-card>

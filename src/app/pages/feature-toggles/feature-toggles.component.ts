@@ -60,17 +60,6 @@ export interface ToggleCompareRow {
   hasDifference: boolean;
 }
 
-export interface HospitalMatrixRow {
-  hospital: Hospital;
-  envStats: {
-    [envName: string]: {
-      totalActive: number;
-      globalCount: number;
-      targetedCount: number;
-      isPresentInEnv: boolean;
-    };
-  };
-}
 
 @Component({
   selector: 'app-feature-toggles',
@@ -107,9 +96,6 @@ export class FeatureTogglesComponent implements OnInit {
   // Selected environment columns for dynamic table view
   envColumns = signal<string[]>([]);
 
-  // Active View Mode: 'flags' (Feature Flags matrix) or 'hospitals' (Hospital list matrix)
-  viewMode = signal<'flags' | 'hospitals'>('flags');
-
   // Rows of comparison data
   allRows = signal<ToggleCompareRow[]>([]);
 
@@ -117,10 +103,6 @@ export class FeatureTogglesComponent implements OnInit {
   searchTerm = signal<string>('');
   filterType = signal<'all' | 'diff' | 'enabled' | 'partial' | 'disabled'>('all');
   selectedCategory = signal<string>('all'); // toggleType filter
-  selectedHospitalScope = signal<number | string | 'all'>('all'); // Filter flags scoped to a specific hospital
-
-  // Search for hospitals view
-  hospitalSearchTerm = signal<string>('');
 
   // Cache of flags per environment: envName -> FeatureFlag[]
   private envCache = new Map<string, FeatureFlag[]>();
@@ -133,8 +115,8 @@ export class FeatureTogglesComponent implements OnInit {
   differingFlagsCount = computed(() => this.allRows().filter((r) => r.hasDifference).length);
   selectedEnvCount = computed(() => this.envs().filter((e) => e.selected).length);
 
-  // Consolidated unique list of all hospitals across selected environments
-  allHospitals = computed<Hospital[]>(() => {
+  // Fast map lookup: id -> Hospital (derived from reactive hospitalCache signal)
+  hospitalMap = computed<Map<string, Hospital>>(() => {
     const cols = this.envColumns();
     const cache = this.hospitalCache();
     const map = new Map<string, Hospital>();
@@ -150,74 +132,7 @@ export class FeatureTogglesComponent implements OnInit {
         }
       }
     }
-
-    return Array.from(map.values()).sort((a, b) =>
-      (a.hospitalName || '').localeCompare(b.hospitalName || '', undefined, { sensitivity: 'base' }),
-    );
-  });
-
-  // Fast map lookup: id -> Hospital
-  hospitalMap = computed<Map<string, Hospital>>(() => {
-    const map = new Map<string, Hospital>();
-    for (const h of this.allHospitals()) {
-      map.set(String(h.id).trim(), h);
-    }
     return map;
-  });
-
-  // Filtered hospitals for hospital-matrix tab
-  filteredHospitals = computed<HospitalMatrixRow[]>(() => {
-    const search = this.hospitalSearchTerm().trim().toLowerCase();
-    const hospitals = this.allHospitals();
-    const cols = this.envColumns();
-    const cache = this.hospitalCache();
-
-    const filtered = hospitals.filter((h) => {
-      if (!search) return true;
-      const matchName = (h.hospitalName || '').toLowerCase().includes(search);
-      const matchId = String(h.id).includes(search);
-      return matchName || matchId;
-    });
-
-    // Compute active flag statistics for each hospital across selected envs
-    return filtered.map((h) => {
-      const envStats: HospitalMatrixRow['envStats'] = {};
-      const hidStr = String(h.id).trim();
-
-      for (const col of cols) {
-        const envHospitals = cache.get(col) || [];
-        const isPresentInEnv = envHospitals.some((item) => String(item.id).trim() === hidStr);
-        const flags = this.envCache.get(col) || [];
-
-        let globalCount = 0;
-        let targetedCount = 0;
-
-        for (const flag of flags) {
-          const stateUpper = (flag.state || '').toUpperCase();
-          const hospitalIds = flag.target?.hospitalIds || [];
-
-          if (hospitalIds.length > 0) {
-            if (hospitalIds.some((id: any) => String(id).trim() === hidStr)) {
-              targetedCount++;
-            }
-          } else if (stateUpper === 'ENABLED' && flag.target?.status !== false) {
-            globalCount++;
-          }
-        }
-
-        envStats[col] = {
-          totalActive: globalCount + targetedCount,
-          globalCount,
-          targetedCount,
-          isPresentInEnv,
-        };
-      }
-
-      return {
-        hospital: h,
-        envStats,
-      };
-    });
   });
 
   availableCategories = computed(() => {
@@ -236,7 +151,6 @@ export class FeatureTogglesComponent implements OnInit {
     const type = this.filterType();
     const category = this.selectedCategory();
     const selectedCols = this.envColumns();
-    const hospitalScope = this.selectedHospitalScope();
 
     return this.allRows().filter((row) => {
       // Search term
@@ -254,24 +168,6 @@ export class FeatureTogglesComponent implements OnInit {
         if (row.metadata?.toggleType?.toLowerCase() !== category.toLowerCase()) {
           return false;
         }
-      }
-
-      // Filter by specific hospital targeting scope
-      if (hospitalScope !== 'all') {
-        const scopeStr = String(hospitalScope).trim();
-        const activeForHospital = selectedCols.some((col) => {
-          const cell = row.envStates[col];
-          if (!cell) return false;
-          if (cell.state === 'ENABLED') return true;
-          if (
-            cell.state === 'PARTIALLY_ENABLED' &&
-            cell.hospitalIds?.some((id: any) => String(id).trim() === scopeStr)
-          ) {
-            return true;
-          }
-          return false;
-        });
-        if (!activeForHospital) return false;
       }
 
       // Filter type
