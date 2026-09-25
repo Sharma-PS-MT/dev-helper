@@ -99,6 +99,20 @@ html, body {
   box-shadow: var(--shadow-lg) !important;
 }
 
+.mat-mdc-icon-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  .mat-icon {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    line-height: 1 !important;
+    margin: 0 !important;
+  }
+}
+
 .mat-mdc-form-field {
   width: 100%;
   .mdc-text-field--outlined:not(.mdc-text-field--disabled) {

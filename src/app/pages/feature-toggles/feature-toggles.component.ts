@@ -60,6 +60,20 @@ export interface ToggleCompareRow {
   hasDifference: boolean;
 }
 
+/** One visible column in the comparison table (original or duplicate). */
+export interface DisplayColumn {
+  /** Unique render key (e.g. 'dev', 'dev__dup_2') */
+  columnKey: string;
+  /** Actual environment name used for data lookup */
+  envName: string;
+  /** Label shown in the header (e.g. 'DEV', 'DEV (2)') */
+  label: string;
+  /** Selected hospital ID for the lens filter, or null = no filter */
+  selectedHospitalId: string | null;
+  /** True for cloned columns; originals cannot be removed */
+  isDuplicate: boolean;
+}
+
 
 @Component({
   selector: 'app-feature-toggles',
@@ -95,6 +109,9 @@ export class FeatureTogglesComponent implements OnInit {
 
   // Selected environment columns for dynamic table view
   envColumns = signal<string[]>([]);
+
+  // Visible display columns — one entry per rendered table column (orig + duplicates)
+  displayColumns = signal<DisplayColumn[]>([]);
 
   // Rows of comparison data
   allRows = signal<ToggleCompareRow[]>([]);
@@ -243,16 +260,98 @@ export class FeatureTogglesComponent implements OnInit {
     }
   }
 
-  selectAllEnvs() {
-    const updated = this.envs().map((e) => ({ ...e, selected: true }));
-    this.envs.set(updated);
-    this.refreshAllSelected();
-  }
 
   clearEnvSelection() {
     const updated = this.envs().map((e) => ({ ...e, selected: false }));
     this.envs.set(updated);
     this.rebuildTable();
+  }
+
+  /** Clone an env column; the duplicate gets its own independent hospital filter. */
+  duplicateColumn(col: DisplayColumn): void {
+    const envCols = this.displayColumns().filter((d) => d.envName === col.envName);
+    const nextIndex = envCols.length + 1;
+
+    const dup: DisplayColumn = {
+      columnKey: `${col.envName}__dup_${nextIndex}`,
+      envName: col.envName,
+      label: `${col.envName.toUpperCase()} (${nextIndex})`,
+      selectedHospitalId: null,
+      isDuplicate: true,
+    };
+
+    // Insert right after the last column that belongs to this env
+    const all = [...this.displayColumns()];
+    const lastIdx = all.reduce((acc, d, i) => (d.envName === col.envName ? i : acc), -1);
+    all.splice(lastIdx + 1, 0, dup);
+    this.displayColumns.set(all);
+  }
+
+  /** Remove a duplicate column (originals are protected). */
+  removeColumn(col: DisplayColumn): void {
+    if (!col.isDuplicate) return;
+    this.displayColumns.update((cols) => cols.filter((d) => d.columnKey !== col.columnKey));
+  }
+
+  /** Set (or clear) the hospital filter lens for a specific display column. */
+  setColumnHospitalFilter(col: DisplayColumn, hospitalId: string | null): void {
+    this.displayColumns.update((cols) =>
+      cols.map((d) =>
+        d.columnKey === col.columnKey ? { ...d, selectedHospitalId: hospitalId || null } : d,
+      ),
+    );
+  }
+
+  /**
+   * Compute the effective display state for a cell, applying the per-column
+   * hospital lens if one is active.
+   */
+  getEffectiveState(cell: EnvCellState | undefined, hospitalId: string | null): ToggleDisplayState {
+    if (!cell) return 'NOT_FOUND';
+    if (!hospitalId) return cell.state; // no lens → raw state
+
+    if (cell.state === 'PARTIALLY_ENABLED') {
+      const ids = (cell.hospitalIds || []).map((id) => String(id).trim());
+      return ids.includes(hospitalId) ? 'ENABLED' : 'DISABLED';
+    }
+
+    return cell.state; // ENABLED / DISABLED / NOT_FOUND unchanged
+  }
+
+  /** Get the sorted hospital list for a given environment (from cache). */
+  getHospitalsForEnv(envName: string): Hospital[] {
+    return this.hospitalCache().get(envName) || [];
+  }
+
+  /** Expose String() to the template for [value] binding. */
+  readonly toStr = (id: number | string): string => String(id).trim();
+
+  /** trackBy function for displayColumns ngFor. */
+  trackByColumnKey(_: number, col: DisplayColumn): string {
+    return col.columnKey;
+  }
+
+  /** Build Jira ticket browse URL from AuthConfig */
+  getTicketUrl(ticketId?: string): string {
+    if (!ticketId) return '#';
+    const jiraBase = (this.authConfig.config().jiraBaseUrl || '').replace(/\/$/, '');
+    if (!jiraBase) return '#';
+    return `${jiraBase}/browse/${ticketId.trim()}`;
+  }
+
+  /** Open Jira ticket in a new browser tab */
+  openTicket(ticketId?: string, event?: Event): void {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    if (!ticketId) return;
+    const jiraBase = (this.authConfig.config().jiraBaseUrl || '').replace(/\/$/, '');
+    if (!jiraBase) {
+      this.notify.warn('Jira Base URL is not configured. Please set it in Settings.');
+      return;
+    }
+    window.open(`${jiraBase}/browse/${ticketId.trim()}`, '_blank', 'noopener,noreferrer');
   }
 
   loadEnvData(env: EnvToggleSelection) {
@@ -434,6 +533,33 @@ export class FeatureTogglesComponent implements OnInit {
     const cols = selectedEnvs.map((e) => e.config.envName);
     this.envColumns.set(cols);
 
+    // ── Sync displayColumns ─────────────────────────────────────────────
+    // Keep duplicates for envs that are still selected; add originals for
+    // newly selected envs; drop everything for deselected envs.
+    const current = this.displayColumns();
+    const newDisplay: DisplayColumn[] = [];
+
+    for (const envName of cols) {
+      const existing = current.filter((d) => d.envName === envName);
+      if (existing.length > 0) {
+        // Env already had columns (original + any duplicates) — keep them
+        newDisplay.push(...existing);
+      } else {
+        // New environment selected — add a fresh original column
+        newDisplay.push({
+          columnKey: envName,
+          envName,
+          label: envName.toUpperCase(),
+          selectedHospitalId: null,
+          isDuplicate: false,
+        });
+      }
+    }
+
+    // Filter out columns whose environment was deselected
+    this.displayColumns.set(newDisplay.filter((d) => cols.includes(d.envName)));
+    // ────────────────────────────────────────────────────────────────────
+
     if (cols.length === 0) {
       this.allRows.set([]);
       return;
@@ -545,25 +671,29 @@ export class FeatureTogglesComponent implements OnInit {
 
   // Copy differences or whole table as CSV
   copyComparisonSummary() {
-    const cols = this.envColumns();
-    if (cols.length === 0) return;
+    const dcols = this.displayColumns();
+    if (dcols.length === 0) return;
 
-    let csv = `Flag Name,Toggle Type,Description,Ticket,${cols.join(',')}\n`;
+    const headers = dcols.map((d) => d.label).join(',');
+    let csv = `Flag Name,Toggle Type,Description,Ticket,${headers}\n`;
+
     for (const row of this.filteredRows()) {
       const meta = row.metadata || {};
       const desc = (meta.description || '').replace(/"/g, '""');
       const ticket = meta.ticketId || '';
       const type = meta.toggleType || '';
 
-      const states = cols
-        .map((c) => {
-          const st = row.envStates[c];
-          if (!st) return 'N/A';
-          if (st.state === 'PARTIALLY_ENABLED') {
-            const hNames = (st.hospitalIds || []).map((id) => `${id}:${this.getHospitalName(id)}`).join(';');
+      const states = dcols
+        .map((d) => {
+          const rawCell = row.envStates[d.envName];
+          const effectiveState = this.getEffectiveState(rawCell, d.selectedHospitalId);
+          if (effectiveState === 'PARTIALLY_ENABLED' && rawCell) {
+            const hNames = (rawCell.hospitalIds || [])
+              .map((id) => `${id}:${this.getHospitalName(id)}`)
+              .join(';');
             return `PARTIAL(${hNames})`;
           }
-          return st.state;
+          return effectiveState;
         })
         .join(',');
 
